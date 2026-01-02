@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useRef } from 'react';
 import { Lineage, type CarouselItem } from '../types';
 import { Download, Eye, Heart, Sparkles, AlertCircle, Trash2 } from 'lucide-react';
 import DOMPurify from 'dompurify';
@@ -17,6 +18,11 @@ const Carousel: React.FC<CarouselProps> = ({ items, lineage, onExtract, isAdmin,
   // Local state to handle likes immediately in UI
   const [localItems, setLocalItems] = useState(items);
 
+  // Swipe State
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [touchEnd, setTouchEnd] = useState<number | null>(null);
+  const minSwipeDistance = 50;
+
   // Update local items and reset index if out of bounds to prevent crashes
   useEffect(() => {
     setLocalItems(items);
@@ -29,9 +35,9 @@ const Carousel: React.FC<CarouselProps> = ({ items, lineage, onExtract, isAdmin,
   useEffect(() => {
     const handleResize = () => {
       const w = window.innerWidth;
-      // Mobile optimization: Increase radius to spread cards out more, prevent overlap
-      if (w < 640) setRadius(340); 
-      else if (w < 1024) setRadius(400);
+      // Mobile optimization: Decrease radius significantly to bring back cards into view
+      if (w < 640) setRadius(250); 
+      else if (w < 1024) setRadius(350);
       else setRadius(550);
     };
     handleResize();
@@ -72,6 +78,30 @@ const Carousel: React.FC<CarouselProps> = ({ items, lineage, onExtract, isAdmin,
     }));
   };
 
+  // Touch Handlers
+  const onTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+    
+    if (isLeftSwipe) {
+       setActiveIndex((prev) => (prev + 1) % localItems.length);
+    }
+    if (isRightSwipe) {
+       setActiveIndex((prev) => (prev - 1 + localItems.length) % localItems.length);
+    }
+  };
+
   if (localItems.length === 0) return null;
 
   // Safety check to ensure we don't calculate NaN
@@ -79,9 +109,14 @@ const Carousel: React.FC<CarouselProps> = ({ items, lineage, onExtract, isAdmin,
   const rotateY = -activeIndex * (360 / safeLength);
 
   return (
-    <div className="relative w-full h-[400px] sm:h-[500px] flex items-center justify-center overflow-hidden perspective-container">
+    <div 
+        className="relative w-full h-[400px] sm:h-[500px] flex items-center justify-center overflow-hidden perspective-container touch-pan-y"
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+    >
       <div 
-        className="relative w-[190px] sm:w-[300px] h-[300px] sm:h-[450px] preserve-3d transition-transform duration-700 ease-out"
+        className="relative w-[220px] sm:w-[300px] h-[320px] sm:h-[450px] preserve-3d transition-transform duration-700 ease-out"
         style={{ transform: `translateZ(-${radius}px) rotateY(${rotateY}deg)` }}
       >
         {localItems.map((item, index) => {
@@ -110,8 +145,8 @@ const Carousel: React.FC<CarouselProps> = ({ items, lineage, onExtract, isAdmin,
               key={item.id}
               className={`absolute top-0 left-0 w-full h-full rounded-xl border flex flex-col justify-between transition-all duration-500 cursor-pointer overflow-hidden
                 ${lineage === Lineage.WIZARD 
-                  ? `bg-black/90 border-emerald-500/40 shadow-[0_0_30px_rgba(16,185,129,0.1)] ${isActive ? 'shadow-[0_0_60px_rgba(16,185,129,0.4)] border-emerald-400 scale-105' : 'opacity-40 grayscale'}` 
-                  : `bg-black/90 border-fuchsia-500/40 shadow-[0_0_30px_rgba(217,70,239,0.1)] ${isActive ? 'shadow-[0_0_60px_rgba(217,70,239,0.4)] border-fuchsia-400 scale-105' : 'opacity-40 grayscale'}`
+                  ? `bg-black/90 border-emerald-500/40 shadow-[0_0_30px_rgba(16,185,129,0.1)] ${isActive ? 'shadow-[0_0_60px_rgba(16,185,129,0.4)] border-emerald-400 scale-105 opacity-100' : 'opacity-30 grayscale blur-[1px]'}` 
+                  : `bg-black/90 border-fuchsia-500/40 shadow-[0_0_30px_rgba(217,70,239,0.1)] ${isActive ? 'shadow-[0_0_60px_rgba(217,70,239,0.4)] border-fuchsia-400 scale-105 opacity-100' : 'opacity-30 grayscale blur-[1px]'}`
                 }
               `}
               style={{
@@ -206,16 +241,16 @@ const Carousel: React.FC<CarouselProps> = ({ items, lineage, onExtract, isAdmin,
       </div>
       
       {/* Navigation Controls (Mobile Friendly) */}
-      <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-4 z-20">
+      <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-4 z-20 pointer-events-none">
         <button 
           onClick={() => setActiveIndex(prev => (prev - 1 + safeLength) % safeLength)}
-          className={`p-3 rounded-full border backdrop-blur-sm transition-transform active:scale-95 ${lineage === Lineage.WIZARD ? 'border-emerald-500/30 text-emerald-400 bg-black/50' : 'border-fuchsia-500/30 text-fuchsia-400 bg-black/50'}`}
+          className={`p-3 rounded-full border backdrop-blur-sm transition-transform active:scale-95 pointer-events-auto ${lineage === Lineage.WIZARD ? 'border-emerald-500/30 text-emerald-400 bg-black/50' : 'border-fuchsia-500/30 text-fuchsia-400 bg-black/50'}`}
         >
           &larr;
         </button>
          <button 
           onClick={() => setActiveIndex(prev => (prev + 1) % safeLength)}
-          className={`p-3 rounded-full border backdrop-blur-sm transition-transform active:scale-95 ${lineage === Lineage.WIZARD ? 'border-emerald-500/30 text-emerald-400 bg-black/50' : 'border-fuchsia-500/30 text-fuchsia-400 bg-black/50'}`}
+          className={`p-3 rounded-full border backdrop-blur-sm transition-transform active:scale-95 pointer-events-auto ${lineage === Lineage.WIZARD ? 'border-emerald-500/30 text-emerald-400 bg-black/50' : 'border-fuchsia-500/30 text-fuchsia-400 bg-black/50'}`}
         >
           &rarr;
         </button>

@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Lineage, type CarouselItem, type LectureRule } from '../types';
 import { GlobalConfig } from '../App';
-import { Book, FileText, Video, Calendar, Search, Filter, X, Trash2, LayoutGrid, List, FolderOpen, ArrowLeft, Edit2, Plus, FolderPlus, Loader2, Image as ImageIcon, Send, Link, Repeat, ExternalLink, Hourglass, MonitorOff, Clock } from 'lucide-react';
+import { Book, FileText, Video, Calendar, Search, Filter, X, Trash2, LayoutGrid, List, FolderOpen, ArrowLeft, Edit2, Plus, FolderPlus, Loader2, Image as ImageIcon, Send, Link, Repeat, ExternalLink, Hourglass, MonitorOff, Clock, Bell } from 'lucide-react';
 import CalendarWidget from './CalendarWidget';
 import DOMPurify from 'dompurify';
 
@@ -510,20 +510,76 @@ const SectorView: React.FC<SectorViewProps> = ({
                  </div>
              )
            ) : (
-             <div className={viewMode === 'list' || isLectureMode ? 'flex flex-col gap-3 relative' : 'columns-1 md:columns-2 lg:columns-3 gap-6 space-y-6'}>
-                {isLectureMode && (
-                    <div className={`absolute left-6 top-0 bottom-0 w-px ${isWizard ? 'bg-emerald-900' : 'bg-fuchsia-900'}`}></div>
-                )}
+             <div className={
+                 isLectureMode 
+                    ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' // CARD GRID FOR LECTURES
+                    : viewMode === 'list' 
+                        ? 'flex flex-col gap-3' 
+                        : 'columns-1 md:columns-2 lg:columns-3 gap-6 space-y-6'
+             }>
                 {filteredItems.map((item) => {
                   const customStyle = item.style || {};
                   const cleanContent = DOMPurify.sanitize(item.content);
                   const isVirtual = item.id.startsWith('virtual-');
                   const hasLink = item.fileUrl && (item.fileUrl.startsWith('http') || item.fileUrl.startsWith('https'));
 
+                  if (isLectureMode) {
+                      // --- LECTURE CARD UI ---
+                      return (
+                          <div 
+                            key={item.id}
+                            onClick={() => onViewItem(item)}
+                            className={`group relative p-8 rounded-2xl border transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl cursor-pointer flex flex-col items-center text-center gap-4 overflow-hidden
+                                ${isWizard 
+                                    ? 'bg-[#0f1510]/95 border-emerald-500/30 hover:border-emerald-500 shadow-[0_0_30px_rgba(16,185,129,0.1)] hover:shadow-[0_0_50px_rgba(16,185,129,0.2)]' 
+                                    : 'bg-[#150f1a]/95 border-fuchsia-500/30 hover:border-fuchsia-500 shadow-[0_0_30px_rgba(217,70,239,0.1)] hover:shadow-[0_0_50px_rgba(217,70,239,0.2)]'}
+                            `}
+                          >
+                              {/* Glowing Icon Circle */}
+                              <div className={`relative mb-2 w-20 h-20 rounded-full flex items-center justify-center border-2 
+                                  ${isWizard ? 'border-emerald-500/50 bg-emerald-900/20 text-emerald-400' : 'border-fuchsia-500/50 bg-fuchsia-900/20 text-fuchsia-400'}
+                              `}>
+                                  <Bell size={32} className={isVirtual ? 'animate-pulse' : ''} />
+                                  <div className={`absolute inset-0 rounded-full blur-xl opacity-40 animate-pulse ${isWizard ? 'bg-emerald-500' : 'bg-fuchsia-500'}`}></div>
+                              </div>
+
+                              {/* H1: Subject */}
+                              <h1 className={`text-2xl font-bold tracking-wide ${isWizard ? 'font-wizardTitle text-emerald-100' : 'font-muggle text-fuchsia-100'}`}>
+                                  {item.subject || 'Lecture'}
+                              </h1>
+
+                              {/* H2: Information */}
+                              <h2 className={`text-sm opacity-70 max-w-[80%] line-clamp-2 ${isWizard ? 'font-wizard text-emerald-200' : 'font-muggle text-fuchsia-200'}`}>
+                                  {item.title}
+                              </h2>
+
+                              {/* H3: Glowing Link Button */}
+                              <div className="mt-4 w-full">
+                                  <div className={`w-full py-3 px-4 rounded-lg font-bold text-xs uppercase tracking-widest border transition-all shadow-[0_0_15px_currentColor] animate-pulse
+                                      ${isWizard 
+                                          ? 'border-emerald-500 text-emerald-300 bg-emerald-900/30 hover:bg-emerald-900/50 hover:text-emerald-100' 
+                                          : 'border-fuchsia-500 text-fuchsia-300 bg-fuchsia-900/30 hover:bg-fuchsia-900/50 hover:text-fuchsia-100'}
+                                  `}>
+                                      Click Here To Go Class ⚡
+                                  </div>
+                              </div>
+
+                              {/* Admin Controls Overlay */}
+                              {isAdmin && !isVirtual && (
+                                  <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
+                                      {onEdit && <button onClick={(e) => { e.stopPropagation(); onEdit(item); }} className="p-1.5 bg-yellow-600 rounded text-black"><Edit2 size={12}/></button>}
+                                      {onDelete && <button onClick={(e) => { e.stopPropagation(); if(confirm('Delete?')) onDelete(item.id); }} className="p-1.5 bg-red-600 rounded text-white"><Trash2 size={12}/></button>}
+                                  </div>
+                              )}
+                          </div>
+                      );
+                  }
+
+                  // --- STANDARD VIEW (List/Masonry) ---
                   return (
                   <div key={item.id} onClick={() => onViewItem(item)}
                     className={`break-inside-avoid relative rounded-xl border backdrop-blur-md group transition-all duration-300 cursor-pointer overflow-hidden
-                      ${(viewMode === 'list' || isLectureMode) ? 'p-4 flex items-center gap-4 hover:translate-x-1 ml-0 sm:ml-4' : 'p-6 flex flex-col gap-4 hover:-translate-y-1'}
+                      ${viewMode === 'list' ? 'p-4 flex items-center gap-4 hover:translate-x-1' : 'p-6 flex flex-col gap-4 hover:-translate-y-1'}
                       ${isWizard ? 'bg-black/40 border-emerald-900/50 hover:bg-emerald-900/10' : 'bg-black/40 border-fuchsia-900/50 hover:bg-fuchsia-900/10'}
                       ${isVirtual ? 'border-l-4' : ''} 
                     `}
@@ -536,7 +592,7 @@ const SectorView: React.FC<SectorViewProps> = ({
                     )}
 
                     {isAdmin && !isVirtual && (
-                        <div className={`absolute top-2 right-2 flex gap-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity ${(viewMode === 'list' || isLectureMode) ? 'order-last relative top-0 right-0 opacity-100' : ''}`}>
+                        <div className={`absolute top-2 right-2 flex gap-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity ${viewMode === 'list' ? 'order-last relative top-0 right-0 opacity-100' : ''}`}>
                              {onEdit && (
                                  <button onClick={(e) => { e.stopPropagation(); onEdit(item); }} className="p-1.5 bg-yellow-600 rounded text-black hover:bg-yellow-500" title="Edit Item">
                                      <Edit2 size={14}/>
@@ -550,33 +606,24 @@ const SectorView: React.FC<SectorViewProps> = ({
                         </div>
                     )}
 
-                    <div className={`shrink-0 rounded-full flex items-center justify-center z-10 ${(viewMode === 'list' || isLectureMode) ? 'w-12 h-12' : 'w-12 h-12 mb-2'} ${isWizard ? 'bg-emerald-900/30 text-emerald-400' : 'bg-fuchsia-900/30 text-fuchsia-400'}`}>
-                       {item.type === 'video' ? <Video size={20} /> : isLectureMode ? <Clock size={20} /> : <FileText size={20} />}
+                    <div className={`shrink-0 rounded-full flex items-center justify-center z-10 ${viewMode === 'list' ? 'w-12 h-12' : 'w-12 h-12 mb-2'} ${isWizard ? 'bg-emerald-900/30 text-emerald-400' : 'bg-fuchsia-900/30 text-fuchsia-400'}`}>
+                       {item.type === 'video' ? <Video size={20} /> : <FileText size={20} />}
                     </div>
                     
                     <div className="flex-1 min-w-0">
                        <div className="flex items-center gap-2 mb-1">
-                          {/* For Lectures, we hide Subject if it's redundant, but showing it as a tag is still useful for style */}
-                          {item.subject && !isLectureMode && <span className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded border opacity-60 ${isWizard ? 'border-emerald-800 text-emerald-300' : 'border-fuchsia-800 text-fuchsia-300'}`}>{item.subject}</span>}
+                          {item.subject && <span className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded border opacity-60 ${isWizard ? 'border-emerald-800 text-emerald-300' : 'border-fuchsia-800 text-fuchsia-300'}`}>{item.subject}</span>}
                           <div className={`flex items-center gap-1 text-[10px] opacity-50 ${isWizard ? 'font-wizard' : 'font-muggle'}`}>
                              <Calendar size={10} />
                              <span>{item.date}</span>
                           </div>
                        </div>
                        <h4 
-                          className={`font-bold leading-tight truncate ${(viewMode === 'list' || isLectureMode) ? 'text-lg' : 'text-lg mb-2'} ${customStyle.isGradient ? 'bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400' : ''} ${isWizard ? 'font-wizardTitle text-emerald-100' : 'font-muggle text-fuchsia-100'}`}
+                          className={`font-bold leading-tight truncate ${viewMode === 'list' ? 'text-lg' : 'text-lg mb-2'} ${customStyle.isGradient ? 'bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400' : ''} ${isWizard ? 'font-wizardTitle text-emerald-100' : 'font-muggle text-fuchsia-100'}`}
                           style={{color: customStyle.titleColor}}
                        >
                            {item.title}
                        </h4>
-                       {/* Show direct content preview for lectures */}
-                       {(viewMode !== 'list' || isLectureMode) && (
-                           <div 
-                              className={`text-sm opacity-60 line-clamp-4 ${isWizard ? 'font-wizard' : 'font-muggle'}`}
-                              style={{color: customStyle.contentColor}}
-                              dangerouslySetInnerHTML={{__html: cleanContent}}
-                           ></div>
-                       )}
                        
                        {/* GO TO CLASS BUTTON */}
                        {(isVirtual || hasLink) && (
