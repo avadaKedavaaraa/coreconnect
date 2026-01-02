@@ -47,65 +47,10 @@ async function safeFetch(url: string, options: RequestInit = {}) {
             return { ok: false, data: { error: "Server returned invalid response" }, status: res.status };
         }
     } catch (e) {
-        console.warn(`[Offline Mode] Backend unreachable at ${url}. App operating in Demo Mode.`);
+        console.warn(`[Offline Mode] Backend unreachable at ${url}.`);
         return { ok: false, data: { error: "Network Error - Backend unreachable" }, status: 0 };
     }
 }
-
-// Enhanced Mock Data Generator
-const generateMockItems = (sectorId: string, lineage: Lineage): CarouselItem[] => {
-  const isWizard = lineage === Lineage.WIZARD;
-  
-  const subjects = isWizard 
-    ? ['Transfiguration', 'Potions', 'Charms', 'Defense Against the Dark Arts', 'Herbology']
-    : ['Data Structures', 'Operating Systems', 'Computer Networks', 'Database Systems', 'Algorithms'];
-
-  const types: Record<string, string> = {
-    'announcements': 'announcement',
-    'lectures': 'video',
-    'books': 'file',
-    'notes': 'file',
-    'resources': 'file',
-    'tasks': 'task'
-  };
-
-  const mockItems = Array.from({ length: 8 }).map((_, i) => {
-    const subject = subjects[i % subjects.length];
-    const itemType = types[sectorId] as any || 'file';
-    
-    const longContent = "This is a detailed analysis that spans multiple lines to test the masonry layout capabilities. It includes comprehensive notes on the subject matter.\n\nFurthermore, the complexity of the task requires deep focus. Students are expected to review all attached materials before the next session.\n\nWarning: Failure to comply may result in detention (or a failing grade).";
-    const shortContent = "Brief summary of the module.";
-
-    if (sectorId === 'announcements') {
-      return {
-        id: `local-ann-${i}`,
-        title: isWizard ? `Daily Prophet: Issue #${9340 + i}` : `System Notification: Update v${5.2 + (i*0.1)}`,
-        date: `2024.12.${20 + i}`,
-        content: isWizard 
-          ? "Reports of flying sparks in the common room have been investigated. It appears a Weasley product is to blame. Please refrain from testing experimental charms indoors.\n\nIn other news, the Quidditch pitch is booked for Slytherin practice this evening." 
-          : "Server maintenance scheduled for 0300 hours. All active sessions will be terminated. Please save your work.\n\nSecurity patch 2.4.1 deployment imminent.",
-        type: 'announcement',
-        isUnread: i < 3,
-        likes: Math.floor(Math.random() * 50) + 10,
-        isLiked: false,
-        sector: 'announcements'
-      } as CarouselItem;
-    }
-
-    return {
-      id: `local-${sectorId}-${i}`,
-      title: isWizard ? `${subject} Scroll: Vol ${i+1}` : `${subject}_Lecture_Notes_${i+1}.pdf`,
-      date: `2024.12.${20 + i}`,
-      content: i % 3 === 0 ? longContent : shortContent,
-      type: itemType,
-      subject: subject,
-      author: isWizard ? 'Prof. McGonagall' : 'Admin_Root',
-      sector: sectorId
-    } as CarouselItem;
-  });
-
-  return mockItems;
-};
 
 export interface GlobalConfig {
   wizardTitle: string;
@@ -118,7 +63,6 @@ export interface GlobalConfig {
   muggleAlarmUrl: string;
   wizardImage: string;
   muggleImage: string;
-  showDemoData: boolean;
   wizardLogoUrl?: string; 
   muggleLogoUrl?: string; 
 }
@@ -133,8 +77,7 @@ const DEFAULT_CONFIG: GlobalConfig = {
   wizardAlarmUrl: 'https://actions.google.com/sounds/v1/cartoon/harp_strum.ogg',
   muggleAlarmUrl: 'https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg',
   wizardImage: 'https://images.unsplash.com/photo-1598153346810-860daa0d6cad?q=80&w=2070&auto=format&fit=crop',
-  muggleImage: 'https://images.unsplash.com/photo-1480714378408-67cf0d13bc1b?q=80&w=2070&auto=format&fit=crop',
-  showDemoData: false
+  muggleImage: 'https://images.unsplash.com/photo-1480714378408-67cf0d13bc1b?q=80&w=2070&auto=format&fit=crop'
 };
 
 const LoadingSpinner = ({ lineage }: { lineage: Lineage | null }) => (
@@ -210,7 +153,9 @@ const App: React.FC = () => {
       const { ok, data, status } = await safeFetch(`${API_URL}/api/config`);
       if (ok && data) {
           setGlobalConfig(prev => {
-             const newData = {...prev, ...data};
+             // Ensure we don't accidentally merge in old boolean keys if they exist in DB
+             const { showDemoData, ...cleanData } = data;
+             const newData = {...prev, ...cleanData};
              // Sync with LocalStorage immediately
              localStorage.setItem('core_connect_global_config_v2', JSON.stringify(newData));
              return newData;
@@ -304,13 +249,6 @@ const App: React.FC = () => {
       if (!lineage) return [];
       
       let combined = [...dbItems];
-      
-      if (globalConfig.showDemoData) {
-          SECTORS.forEach(sector => {
-              const mocks = generateMockItems(sector.id, lineage);
-              combined = [...combined, ...mocks];
-          });
-      }
 
       // SORT DESCENDING BY DATE
       return combined.sort((a, b) => {
@@ -319,7 +257,7 @@ const App: React.FC = () => {
           return dateB.getTime() - dateA.getTime();
       });
 
-  }, [lineage, dbItems, globalConfig.showDemoData]);
+  }, [lineage, dbItems]);
 
   // --- VIEW SPECIFIC ITEMS ---
   const currentViewItems = useMemo(() => {
@@ -373,9 +311,7 @@ const App: React.FC = () => {
   const handleDeleteItem = async (itemId: string) => {
     if(!permissions?.canDelete) { alert("Permission Denied"); return; }
     
-    if (itemId.startsWith('local-')) {
-       alert("Cannot delete demo items. Toggle 'Show Demo Data' in Config to hide them.");
-    } else if (isAdmin) {
+    if (isAdmin) {
         const { ok } = await safeFetch(`${API_URL}/api/admin/items/${itemId}`, {
             method: 'DELETE',
             headers: { 'x-csrf-token': csrfToken }
@@ -390,10 +326,6 @@ const App: React.FC = () => {
   };
 
   const handleEditItemRequest = (item: CarouselItem) => {
-      if(item.id.startsWith('local-')) { 
-        alert("Cannot edit demo items. Create a real item instead."); 
-        return; 
-      }
       setEditingItem(item);
       setAdminPanelOpen(true);
   };

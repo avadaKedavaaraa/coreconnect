@@ -91,7 +91,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   // --- CONFIG STATE ---
   const [editedConfig, setEditedConfig] = useState<GlobalConfig>(globalConfig || {
       wizardTitle: '', muggleTitle: '', wizardGateText: '', muggleGateText: '',
-      wizardAlarmUrl: '', muggleAlarmUrl: '', wizardImage: '', muggleImage: '', showDemoData: true,
+      wizardAlarmUrl: '', muggleAlarmUrl: '', wizardImage: '', muggleImage: '',
       wizardLogoText: 'C', muggleLogoText: 'CC', wizardLogoUrl: '', muggleLogoUrl: ''
   });
   
@@ -1157,11 +1157,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                 <div className="md:col-span-2"><label className="text-xs opacity-50 block mb-1 text-white">Logo Image URL (Optional)</label><input value={editedConfig.muggleLogoUrl || ''} onChange={e => setEditedConfig({...editedConfig, muggleLogoUrl: e.target.value})} className="w-full bg-zinc-900 border border-fuchsia-900 rounded p-2 text-white text-xs font-mono"/></div>
                                 <div className="md:col-span-2"><label className="text-xs opacity-50 block mb-1 text-white">Alarm Sound URL</label><input value={editedConfig.muggleAlarmUrl} onChange={e => setEditedConfig({...editedConfig, muggleAlarmUrl: e.target.value})} className="w-full bg-zinc-900 border border-fuchsia-900 rounded p-2 text-white text-xs font-mono"/></div>
                             </div>
-                        </div>
-
-                        <div className="flex items-center gap-4 p-4 border border-white/10 rounded-lg">
-                            <input type="checkbox" checked={editedConfig.showDemoData} onChange={e => setEditedConfig({...editedConfig, showDemoData: e.target.checked})} className="w-5 h-5"/>
-                            <span className="text-white font-bold">Show Demo Data (Mock Items) when DB is empty or mixed</span>
                         </div>
                     </div>
                 )}
