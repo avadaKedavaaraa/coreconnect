@@ -42,6 +42,7 @@ app.use(helmet({
 
 app.use(hpp());
 
+// CORS: Allow requests from anywhere in this configuration to prevent 405 on Options
 app.use(cors({
   origin: true, 
   credentials: true,
@@ -106,11 +107,13 @@ const requireAuth = (req, res, next) => {
 
 const uploadMiddleware = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
-// --- ROUTE DEFINITIONS ---
-// We define functions for logic to attach them to multiple paths
-// This solves Vercel stripping /api prefixes
+// --- ROUTER DEFINITIONS ---
 
-const handleLogin = async (req, res) => {
+const router = express.Router();
+
+router.get('/health', (req, res) => res.json({ status: 'active', time: new Date().toISOString() }));
+
+router.post('/login', async (req, res) => {
   try {
     const { username, password } = req.body;
     // Auto-init admin if missing (Lazy Init)
@@ -145,20 +148,14 @@ const handleLogin = async (req, res) => {
     
     res.json({ success: true, csrfToken, permissions: user.permissions });
   } catch(e) { res.status(500).json({ error: e.message }); }
-};
+});
 
-const handleMe = (req, res) => {
+router.get('/me', (req, res) => {
   const session = verifySession(req.cookies.session_id);
   if (!session || Date.now() > session.expiresAt) return res.status(401).json({ error: "Session Expired" });
   res.json({ authenticated: true, csrfToken: session.csrfToken, username: session.username, permissions: session.permissions });
-};
+});
 
-// --- ROUTER MOUNTING ---
-const router = express.Router();
-
-router.get('/health', (req, res) => res.json({ status: 'active', time: new Date().toISOString() }));
-router.post('/login', handleLogin);
-router.get('/me', handleMe);
 router.get('/config', async (req, res) => {
     const { data } = await supabase.from('global_config').select('config').limit(1).single();
     res.json(data?.config || {});
@@ -229,6 +226,12 @@ router.post('/admin/upload', requireAuth, async (req, res) => {
 // IMPORTANT: Mount on root AND /api to catch both Vercel rewrite and direct file hits
 app.use('/api', router);
 app.use('/', router);
+
+// Global Error Handler to prevent HTML leakage on 500
+app.use((err, req, res, next) => {
+    console.error(err.stack);
+    res.status(500).json({ error: "Internal Server Error" });
+});
 
 // Export for Vercel
 export default app;
