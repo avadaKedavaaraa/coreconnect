@@ -344,6 +344,15 @@ router.post('/admin/users/delete', requireAuth, async (req, res) => {
     res.json({success: true});
 });
 
+// --- NEW AUDIT LOG ENDPOINT ---
+router.get('/admin/logs', requireAuth, async (req, res) => {
+    if(!req.user.permissions.canViewLogs) return res.status(403).json({error: "Forbidden"});
+    try {
+        const { data } = await supabase.from('audit_logs').select('*').order('timestamp', { ascending: false }).limit(200);
+        res.json(data || []);
+    } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 app.use('/api', router);
 app.use('/', router);
 app.use('/.netlify/functions/api', router);

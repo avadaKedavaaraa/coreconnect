@@ -1,7 +1,7 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Lineage, type CarouselItem } from '../types';
-import { Download, Eye, Heart, Sparkles, AlertCircle, Trash2, ArrowRight } from 'lucide-react';
+import { Download, Eye, Heart, Sparkles, Trash2, Video, FileText, Layers, Link as LinkIcon, Code } from 'lucide-react';
 import DOMPurify from 'dompurify';
 
 interface CarouselProps {
@@ -15,7 +15,6 @@ interface CarouselProps {
 const Carousel: React.FC<CarouselProps> = ({ items, lineage, onExtract, isAdmin, onDelete }) => {
   const [activeIndex, setActiveIndex] = useState(0);
   const [radius, setRadius] = useState(400);
-  // Local state to handle likes immediately in UI
   const [localItems, setLocalItems] = useState(items);
 
   // Swipe State
@@ -23,7 +22,6 @@ const Carousel: React.FC<CarouselProps> = ({ items, lineage, onExtract, isAdmin,
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
   const minSwipeDistance = 50;
 
-  // Update local items and reset index if out of bounds to prevent crashes
   useEffect(() => {
     setLocalItems(items);
     if (items.length > 0 && activeIndex >= items.length) {
@@ -31,41 +29,17 @@ const Carousel: React.FC<CarouselProps> = ({ items, lineage, onExtract, isAdmin,
     }
   }, [items, activeIndex]);
 
-  // Responsive radius
   useEffect(() => {
     const handleResize = () => {
       const w = window.innerWidth;
-      // Mobile optimization: Decrease radius significantly to bring back cards into view
-      if (w < 640) setRadius(250); 
-      // Tablet
-      else if (w < 1024) setRadius(350);
-      // Laptop/Desktop: INCREASE spacing to reduce overlap as requested
-      else setRadius(700); 
+      if (w < 640) setRadius(250); // Mobile
+      else if (w < 1024) setRadius(350); // Tablet
+      else setRadius(600); // Laptop - Increased radius to prevent overlap
     };
     handleResize();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
-
-  // Keyboard Navigation & Likes
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Guard clause if no items
-      if (localItems.length === 0) return;
-
-      if (e.key === 'ArrowRight') {
-        setActiveIndex((prev) => (prev + 1) % localItems.length);
-      } else if (e.key === 'ArrowLeft') {
-        setActiveIndex((prev) => (prev - 1 + localItems.length) % localItems.length);
-      } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-        // Handle Like Toggle
-        toggleLike(activeIndex);
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeIndex, localItems.length]);
 
   const toggleLike = (index: number) => {
     setLocalItems(prev => prev.map((item, i) => {
@@ -80,7 +54,6 @@ const Carousel: React.FC<CarouselProps> = ({ items, lineage, onExtract, isAdmin,
     }));
   };
 
-  // Touch Handlers
   const onTouchStart = (e: React.TouchEvent) => {
     setTouchEnd(null);
     setTouchStart(e.targetTouches[0].clientX);
@@ -96,29 +69,35 @@ const Carousel: React.FC<CarouselProps> = ({ items, lineage, onExtract, isAdmin,
     const isLeftSwipe = distance > minSwipeDistance;
     const isRightSwipe = distance < -minSwipeDistance;
     
-    if (isLeftSwipe) {
-       setActiveIndex((prev) => (prev + 1) % localItems.length);
-    }
-    if (isRightSwipe) {
-       setActiveIndex((prev) => (prev - 1 + localItems.length) % localItems.length);
-    }
+    if (isLeftSwipe) setActiveIndex((prev) => (prev + 1) % localItems.length);
+    if (isRightSwipe) setActiveIndex((prev) => (prev - 1 + localItems.length) % localItems.length);
+  };
+
+  const getTypeIcon = (type: string) => {
+      switch(type) {
+          case 'video': return <Video size={16} />;
+          case 'file': return <FileText size={16} />;
+          case 'mixed': return <Layers size={16} />;
+          case 'code': return <Code size={16} />;
+          case 'link': return <LinkIcon size={16} />;
+          default: return <Sparkles size={16} />;
+      }
   };
 
   if (localItems.length === 0) return null;
 
-  // Safety check to ensure we don't calculate NaN
   const safeLength = localItems.length || 1;
   const rotateY = -activeIndex * (360 / safeLength);
 
   return (
     <div 
-        className="relative w-full h-[400px] sm:h-[500px] flex items-center justify-center overflow-hidden perspective-container touch-pan-y"
+        className="relative w-full h-[450px] flex items-center justify-center overflow-hidden perspective-container touch-pan-y"
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
     >
       <div 
-        className="relative w-[280px] sm:w-[320px] h-[350px] sm:h-[450px] preserve-3d transition-transform duration-700 ease-out"
+        className="relative w-[300px] h-[400px] preserve-3d transition-transform duration-700 ease-out"
         style={{ transform: `translateZ(-${radius}px) rotateY(${rotateY}deg)` }}
       >
         {localItems.map((item, index) => {
@@ -132,92 +111,81 @@ const Carousel: React.FC<CarouselProps> = ({ items, lineage, onExtract, isAdmin,
           const titleColor = customStyle.titleColor || (lineage === Lineage.WIZARD ? '#d1fae5' : '#f5d0fe');
           const titleFont = customStyle.fontFamily === 'wizard' ? '"EB Garamond", serif' : customStyle.fontFamily === 'muggle' ? '"JetBrains Mono", monospace' : 'inherit';
 
-          // SECURITY: Sanitize content before render
-          const cleanContent = DOMPurify.sanitize(item.content);
-
           return (
             <div
               key={item.id}
-              className={`absolute top-0 left-0 w-full h-full rounded-2xl flex flex-col justify-between p-6 transition-all duration-500 cursor-pointer overflow-hidden border backdrop-blur-md
+              className={`absolute top-0 left-0 w-full h-full rounded-2xl flex flex-col transition-all duration-500 cursor-pointer overflow-hidden border backdrop-blur-md
                 ${lineage === Lineage.WIZARD 
-                  ? `bg-emerald-950/80 border-emerald-500/30 shadow-[0_0_20px_rgba(16,185,129,0.1)]` 
-                  : `bg-fuchsia-950/80 border-fuchsia-500/30 shadow-[0_0_20px_rgba(217,70,239,0.1)]`
+                  ? `bg-[#0a0f0a]/90 border-emerald-500/30 shadow-[0_0_20px_rgba(16,185,129,0.2)]` 
+                  : `bg-[#0f0a15]/90 border-fuchsia-500/30 shadow-[0_0_20px_rgba(217,70,239,0.2)]`
                 }
-                ${isActive ? 'opacity-100 scale-105 shadow-2xl z-10' : 'opacity-40 grayscale blur-[1px]'}
+                ${isActive ? 'opacity-100 z-10' : 'opacity-40 grayscale blur-[1px]'}
               `}
               style={{
                 transform: `rotateY(${angle}deg) translateZ(${radius}px)`,
               }}
               onClick={() => setActiveIndex(index)}
             >
-              {/* --- BACKGROUND IMAGE LAYER --- */}
-              {hasImage && (
-                <div className="absolute inset-0 z-0">
-                  <img src={item.image} alt={item.title} className="w-full h-full object-cover opacity-30" />
-                  <div className={`absolute inset-0 bg-gradient-to-t ${lineage === Lineage.WIZARD ? 'from-emerald-950' : 'from-fuchsia-950'} via-transparent to-transparent`}></div>
-                </div>
-              )}
-              
-              {/* --- CARD CONTENT LAYER --- */}
-              <div className="relative z-10 w-full h-full flex flex-col">
-                  
-                  {/* Header: Date + Badge */}
-                  <div className="flex justify-between items-start mb-2">
-                      <span className={`text-[10px] font-bold uppercase tracking-widest opacity-60 font-mono ${lineage === Lineage.WIZARD ? 'text-emerald-200' : 'text-fuchsia-200'}`}>
-                          {item.date}
-                      </span>
-                      {item.isUnread && (
-                          <div className={`w-2 h-2 rounded-full animate-pulse ${lineage === Lineage.WIZARD ? 'bg-emerald-400' : 'bg-fuchsia-400'}`}></div>
-                      )}
-                  </div>
+              {/* Image Section */}
+              <div className="h-40 bg-black/50 relative overflow-hidden shrink-0">
+                  {hasImage ? (
+                      <img src={item.image} alt="Header" className="w-full h-full object-cover" />
+                  ) : (
+                      <div className="w-full h-full flex items-center justify-center opacity-20">
+                          {getTypeIcon(item.type)}
+                      </div>
+                  )}
+                  {item.isUnread && (
+                      <div className={`absolute top-2 right-2 px-2 py-0.5 text-[10px] font-bold rounded bg-red-600 text-white`}>NEW</div>
+                  )}
+              </div>
 
-                  {/* Body: Title + Intro */}
-                  <div className="flex-1 overflow-hidden">
-                      <h2 
-                        className={`text-2xl font-bold leading-tight mb-2 ${customStyle.isGradient ? 'bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400' : ''}`}
-                        style={{ color: titleColor, fontFamily: titleFont }}
-                      >
-                          {item.title}
-                      </h2>
-                      <div 
-                        className="text-xs text-white/60 line-clamp-4 font-sans leading-relaxed"
-                        dangerouslySetInnerHTML={{__html: cleanContent}}
-                      ></div>
-                  </div>
+              {/* Content Section */}
+              <div className="flex-1 p-5 flex flex-col">
+                  <div className="text-[10px] opacity-60 font-mono mb-1">{item.date} • {item.sector?.toUpperCase()}</div>
+                  <h2 
+                    className={`text-xl font-bold leading-tight mb-2 line-clamp-2 ${customStyle.isGradient ? 'bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400' : ''}`}
+                    style={{ color: titleColor, fontFamily: titleFont }}
+                  >
+                      {item.title}
+                  </h2>
+                  <div 
+                    className="text-xs text-white/60 line-clamp-3 font-sans leading-relaxed mb-4"
+                    dangerouslySetInnerHTML={{__html: DOMPurify.sanitize(item.content)}}
+                  ></div>
 
-                  {/* Footer: Likes + Action Button */}
-                  <div className="mt-4 pt-4 border-t border-white/10 flex items-center justify-between">
+                  <div className="mt-auto flex items-center justify-between border-t border-white/10 pt-3">
                       <button 
                          onClick={(e) => { e.stopPropagation(); toggleLike(index); }}
-                         className={`flex items-center gap-2 transition-transform active:scale-95 ${item.isLiked ? 'text-red-500' : 'text-white/40 hover:text-white'}`}
+                         className={`flex items-center gap-1 transition-transform active:scale-95 ${item.isLiked ? 'text-red-500' : 'text-white/40 hover:text-white'}`}
                       >
-                          <Heart size={16} fill={item.isLiked ? "currentColor" : "none"} />
+                          <Heart size={14} fill={item.isLiked ? "currentColor" : "none"} />
                           <span className="font-bold text-xs">{item.likes || 0}</span>
                       </button>
 
                       {isActive && (
                           <button
                             onClick={(e) => { e.stopPropagation(); onExtract(item); }}
-                            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-[10px] uppercase tracking-widest transition-all hover:scale-105 active:scale-95 border backdrop-blur-md
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded font-bold text-[10px] uppercase tracking-widest transition-all hover:scale-105 active:scale-95 border
                                 ${lineage === Lineage.WIZARD 
                                     ? 'bg-emerald-900/40 border-emerald-500/50 text-white hover:bg-emerald-900/60' 
                                     : 'bg-fuchsia-900/40 border-fuchsia-500/50 text-white hover:bg-fuchsia-900/60'}
                             `}
                           >
                               {lineage === Lineage.WIZARD ? <Sparkles size={12}/> : <Download size={12}/>}
-                              <span>View</span>
+                              <span>OPEN</span>
                           </button>
                       )}
                   </div>
               </div>
 
-              {/* Admin Delete Overlay */}
+              {/* Admin Delete */}
               {isAdmin && onDelete && isActive && (
                 <button 
                   onClick={(e) => { e.stopPropagation(); if(confirm('Delete?')) onDelete(item.id); }}
-                  className="absolute top-2 right-2 z-30 p-2 bg-red-600/20 text-red-400 rounded hover:bg-red-600 hover:text-white transition-colors"
+                  className="absolute top-2 left-2 z-30 p-2 bg-red-600/80 text-white rounded-full hover:bg-red-500"
                 >
-                  <Trash2 size={14} />
+                  <Trash2 size={12} />
                 </button>
               )}
             </div>
