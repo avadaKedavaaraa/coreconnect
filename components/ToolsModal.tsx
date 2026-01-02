@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Lineage, type UserProfile, SECTORS } from '../types';
 import { GlobalConfig } from '../App';
-import { X, Clock, ClipboardList, User, Palette, Save, Type, PaintBucket, LayoutTemplate } from 'lucide-react';
+import { X, Clock, ClipboardList, User, Palette, Save, Type, PaintBucket, LayoutTemplate, Plus, Link as LinkIcon, Eye } from 'lucide-react';
 import Pomodoro from './Pomodoro';
 import Kanban from './Kanban';
 import StudentID from './StudentID';
@@ -16,37 +16,31 @@ interface ToolsModalProps {
 }
 
 const ToolsModal: React.FC<ToolsModalProps> = ({ lineage, onClose, profile, setProfile, config }) => {
-  // Default to profile to match "User Config Matrix" request
   const [activeTab, setActiveTab] = useState<'timer' | 'tasks' | 'profile'>('profile');
+  const [showFontPanel, setShowFontPanel] = useState(false);
   const isWizard = lineage === Lineage.WIZARD;
 
   // Local State for Profile Editing
-  // FIX: Initialize state ONCE. Do not sync with 'profile' prop in useEffect to avoid resetting while typing (due to time tracking updates).
   const [editProfile, setEditProfile] = useState<UserProfile>(profile);
   const [hasChanges, setHasChanges] = useState(false);
 
-  // Check for changes by comparing editable fields only, ignoring time/visits
+  // Check for changes
   useEffect(() => {
     const isDifferent = 
         editProfile.displayName !== profile.displayName ||
-        editProfile.defaultSector !== profile.defaultSector ||
         editProfile.preferredFont !== profile.preferredFont ||
         editProfile.themeColor !== profile.themeColor;
     setHasChanges(isDifferent);
-  }, [editProfile, profile.displayName, profile.defaultSector, profile.preferredFont, profile.themeColor]);
+  }, [editProfile, profile]);
 
   const handleSaveProfile = () => {
-    // Merge editable fields with current profile stats
     setProfile(prev => ({
         ...prev,
         displayName: editProfile.displayName,
-        defaultSector: editProfile.defaultSector,
         preferredFont: editProfile.preferredFont,
         themeColor: editProfile.themeColor
     }));
     setHasChanges(false);
-    
-    // Visual feedback
     const btn = document.getElementById('save-btn');
     if(btn) {
         const originalText = btn.innerText;
@@ -55,10 +49,14 @@ const ToolsModal: React.FC<ToolsModalProps> = ({ lineage, onClose, profile, setP
     }
   };
 
-  const fonts = [
-      { id: 'wizard', name: 'Wizard Serif (Default)', family: '"EB Garamond", serif' },
-      { id: 'muggle', name: 'Muggle Mono (Default)', family: '"JetBrains Mono", monospace' },
+  // EXTENDED FONTS LIST (Google Fonts mainly)
+  const defaultFonts = [
+      { id: 'wizard', name: 'Wizard Serif', family: '"EB Garamond", serif' },
+      { id: 'muggle', name: 'Muggle Mono', family: '"JetBrains Mono", monospace' },
       { id: 'sans', name: 'Modern Sans', family: '"Inter", sans-serif' },
+  ];
+
+  const extraFonts = [
       { id: 'playfair', name: 'Playfair Display', family: '"Playfair Display", serif' },
       { id: 'orbitron', name: 'Orbitron Cyber', family: '"Orbitron", sans-serif' },
       { id: 'montserrat', name: 'Montserrat Clean', family: '"Montserrat", sans-serif' },
@@ -66,44 +64,101 @@ const ToolsModal: React.FC<ToolsModalProps> = ({ lineage, onClose, profile, setP
       { id: 'cursive', name: 'Dancing Script', family: '"Dancing Script", cursive' },
       { id: 'tech', name: 'Audiowide Tech', family: '"Audiowide", sans-serif' },
       { id: 'retro', name: 'Righteous Retro', family: '"Righteous", cursive' },
+      { id: 'cinzel', name: 'Cinzel Cinematic', family: '"Cinzel", serif' },
+      { id: 'oswald', name: 'Oswald Bold', family: '"Oswald", sans-serif' },
+      { id: 'lato', name: 'Lato Neutral', family: '"Lato", sans-serif' },
+      { id: 'raleway', name: 'Raleway Elegant', family: '"Raleway", sans-serif' },
+      { id: 'lobster', name: 'Lobster Fun', family: '"Lobster", cursive' },
+      { id: 'abril', name: 'Abril Fatface', family: '"Abril Fatface", cursive' },
+      { id: 'shadows', name: 'Shadows Into Light', family: '"Shadows Into Light", cursive' },
+      { id: 'pacifico', name: 'Pacifico Brush', family: '"Pacifico", cursive' },
+      { id: 'exo', name: 'Exo 2 Sci-Fi', family: '"Exo 2", sans-serif' },
+      { id: 'ubuntu', name: 'Ubuntu Tech', family: '"Ubuntu", sans-serif' },
+      { id: 'vt323', name: 'VT323 Pixel', family: '"VT323", monospace' },
+      { id: 'press', name: 'Press Start 2P', family: '"Press Start 2P", cursive' },
+      { id: 'monoton', name: 'Monoton Lines', family: '"Monoton", cursive' },
   ];
 
   const themeColors = [
       { id: '', name: 'Default Lineage Color' },
-      { id: '#f43f5e', name: 'Crimson Red' }, // Rose 500
-      { id: '#d97706', name: 'Amber Gold' }, // Amber 600
-      { id: '#84cc16', name: 'Lime Venom' }, // Lime 500
-      { id: '#06b6d4', name: 'Cyan Neon' }, // Cyan 500
-      { id: '#6366f1', name: 'Indigo Spirit' }, // Indigo 500
-      { id: '#a855f7', name: 'Purple Haze' }, // Purple 500
-      { id: '#ec4899', name: 'Pink Punk' }, // Pink 500
+      { id: '#f43f5e', name: 'Crimson Red' }, 
+      { id: '#d97706', name: 'Amber Gold' }, 
+      { id: '#84cc16', name: 'Lime Venom' }, 
+      { id: '#06b6d4', name: 'Cyan Neon' }, 
+      { id: '#6366f1', name: 'Indigo Spirit' }, 
+      { id: '#a855f7', name: 'Purple Haze' }, 
+      { id: '#ec4899', name: 'Pink Punk' }, 
       { id: '#ffffff', name: 'Spectral White' },
   ];
 
-  // Component for Statistics to reuse in layout
-  const StatisticsWidget = () => (
-    <div className={`mt-6 p-4 rounded-lg border w-full ${isWizard ? 'bg-emerald-950/20 border-emerald-900/50' : 'bg-fuchsia-950/20 border-fuchsia-900/50'}`}>
-        {/* FIX: Explicit text colors to ensure visibility */}
-        <h5 className="font-bold mb-4 text-sm text-white border-b border-white/10 pb-2">Your Statistics</h5>
-        <div className="grid grid-cols-2 gap-4 text-xs text-zinc-200">
-            <div>
-                <span className="opacity-50 block mb-1">Total Visits</span>
-                <span className="text-lg font-mono font-bold text-white">{profile.visitCount}</span>
-            </div>
-            <div>
-                <span className="opacity-50 block mb-1">Time Spent</span>
-                <span className="text-lg font-mono font-bold text-white">{(profile.totalTimeSpent / 60).toFixed(1)} m</span>
-            </div>
-            <div className="col-span-2">
-                <span className="opacity-50 block mb-1">Last Active</span>
-                <span className="font-mono opacity-80 text-white">{new Date(profile.lastActive).toLocaleString()}</span>
-            </div>
-        </div>
-    </div>
+  // Helper to dynamically load a Google Font preview if needed
+  const loadFontPreview = (fontName: string) => {
+      const link = document.createElement('link');
+      link.href = `https://fonts.googleapis.com/css2?family=${fontName.replace(/ /g, '+')}&display=swap`;
+      link.rel = 'stylesheet';
+      document.head.appendChild(link);
+  };
+
+  const FontPanel = () => (
+      <div className={`fixed inset-0 z-[90] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4 animate-[fade-in_0.2s]`}>
+          <div className={`w-full max-w-3xl h-[80vh] flex flex-col rounded-xl border shadow-2xl relative
+             ${isWizard ? 'bg-[#0a0f0a] border-emerald-600' : 'bg-[#0f0a15] border-fuchsia-600'}
+          `}>
+              <div className="p-4 border-b flex justify-between items-center shrink-0 border-white/10">
+                  <h3 className="text-xl font-bold text-white flex items-center gap-2"><Type size={20}/> Font Treasury</h3>
+                  <button onClick={() => setShowFontPanel(false)} className="p-2 hover:bg-white/10 rounded-full text-white"><X size={24}/></button>
+              </div>
+              
+              <div className="p-4 flex gap-2 border-b border-white/10 bg-black/20">
+                  <input placeholder="Enter Custom Google Font Name (e.g. 'Roboto Slab')" className="flex-1 bg-black/40 border border-white/10 rounded px-3 py-2 text-white outline-none" id="custom-font-input" />
+                  <button 
+                    onClick={() => {
+                        const input = document.getElementById('custom-font-input') as HTMLInputElement;
+                        if(input.value) {
+                            loadFontPreview(input.value);
+                            setEditProfile({...editProfile, preferredFont: input.value as any});
+                            setShowFontPanel(false);
+                        }
+                    }}
+                    className="px-4 py-2 bg-white/10 rounded hover:bg-white/20 text-white text-xs font-bold"
+                  >
+                      LOAD
+                  </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {[...defaultFonts, ...extraFonts].map(font => {
+                      // Lazy load styling for preview
+                      // Note: In a real prod app, you'd manage this better than on-render injection
+                      const isSelected = editProfile.preferredFont === font.id;
+                      return (
+                          <button
+                              key={font.id}
+                              onClick={() => { setEditProfile({...editProfile, preferredFont: font.id as any}); setShowFontPanel(false); }}
+                              className={`p-4 rounded border text-left flex flex-col gap-2 transition-all hover:scale-[1.02]
+                                  ${isSelected 
+                                      ? (isWizard ? 'bg-emerald-900/40 border-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.2)]' : 'bg-fuchsia-900/40 border-fuchsia-500 text-white shadow-[0_0_15px_rgba(217,70,239,0.2)]') 
+                                      : 'bg-white/5 border-white/10 text-zinc-400 hover:bg-white/10 hover:text-white'}
+                              `}
+                          >
+                              <div className="flex justify-between items-center w-full">
+                                  <span className="text-xs font-bold uppercase tracking-wider opacity-50">{font.name}</span>
+                                  {isSelected && <Eye size={14} className={isWizard ? 'text-emerald-400' : 'text-fuchsia-400'}/>}
+                              </div>
+                              <div className="text-2xl truncate" style={{ fontFamily: font.family }}>
+                                  The quick brown fox jumps...
+                              </div>
+                          </button>
+                      );
+                  })}
+              </div>
+          </div>
+      </div>
   );
 
   return (
-    // FIX: Z-Index 80 to ensure it is above the Floating Bag (Z-40) and standard overlays
+    <>
+    {showFontPanel && <FontPanel />}
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-[fade-in-up_0.2s_ease-out]">
       <div className={`w-full max-w-4xl h-[90dvh] md:h-auto md:max-h-[85vh] rounded-xl border shadow-2xl flex flex-col overflow-hidden relative
          ${isWizard ? 'bg-[#0a0f0a] border-emerald-600' : 'bg-[#0f0a15] border-fuchsia-600'}
@@ -163,25 +218,17 @@ const ToolsModal: React.FC<ToolsModalProps> = ({ lineage, onClose, profile, setP
            {activeTab === 'tasks' && <Kanban lineage={lineage} />}
            {activeTab === 'profile' && (
                <div className="h-full flex flex-col md:flex-row gap-6">
-                   {/* Left: ID Card Preview + Desktop Stats */}
+                   {/* Left: ID Card Preview */}
                    <div className="flex-1 flex flex-col items-center shrink-0">
                        <h4 className={`mb-4 text-xs font-bold uppercase tracking-widest opacity-70 ${isWizard ? 'text-emerald-400' : 'text-fuchsia-400'}`}>Digital Identification</h4>
                        <div className="scale-90 md:scale-100 origin-top">
-                           {/* Use live profile data for ID card preview, or editProfile if you want real-time preview of edits. 
-                               Using editProfile gives immediate feedback. */}
                            <StudentID lineage={lineage} profile={editProfile} />
-                       </div>
-                       
-                       {/* FIX: Layout - Stats shown here ONLY on Desktop */}
-                       <div className="hidden md:block w-full max-w-sm">
-                           <StatisticsWidget />
                        </div>
                    </div>
 
-                   {/* Right: Customization Form + Mobile Stats */}
+                   {/* Right: Customization Form */}
                    <div className={`flex-1 overflow-y-auto pr-2 space-y-6 ${isWizard ? 'scrollbar-wizard' : 'scrollbar-muggle'}`}>
                        
-                       {/* Name Input */}
                        <div className="space-y-2">
                            <label className="flex items-center gap-2 text-sm font-bold text-white">
                                <User size={16} className={isWizard ? 'text-emerald-500' : 'text-fuchsia-500'}/> Display Name
@@ -191,59 +238,29 @@ const ToolsModal: React.FC<ToolsModalProps> = ({ lineage, onClose, profile, setP
                              value={editProfile.displayName}
                              onChange={(e) => setEditProfile({...editProfile, displayName: e.target.value})}
                              placeholder="Enter your name..."
-                             // FIX: text-base to prevent iPhone Zoom
                              className={`w-full p-3 rounded-lg border bg-black/40 outline-none transition-all text-base
                                 ${isWizard ? 'border-emerald-800 focus:border-emerald-500 text-emerald-100' : 'border-fuchsia-800 focus:border-fuchsia-500 text-fuchsia-100'}
                              `}
                            />
                        </div>
 
-                       {/* House/Sector Selector */}
-                       <div className="space-y-2">
-                           <label className="flex items-center gap-2 text-sm font-bold text-white">
-                               <LayoutTemplate size={16} className={isWizard ? 'text-emerald-500' : 'text-fuchsia-500'}/> Default Sector
-                           </label>
-                           <select 
-                             value={editProfile.defaultSector || 'announcements'}
-                             onChange={(e) => setEditProfile({...editProfile, defaultSector: e.target.value})}
-                             className={`w-full p-3 rounded-lg border bg-black/40 outline-none text-base
-                                ${isWizard ? 'border-emerald-800 focus:border-emerald-500 text-emerald-100' : 'border-fuchsia-800 focus:border-fuchsia-500 text-fuchsia-100'}
-                             `}
-                           >
-                               {SECTORS.map(s => (
-                                   // FIX: Explicit background for options to prevent white-on-white in dark mode on mobile
-                                   <option key={s.id} value={s.id} className="bg-black text-white">
-                                       {isWizard ? s.wizardName : s.muggleName}
-                                   </option>
-                               ))}
-                           </select>
-                           <p className="text-[10px] opacity-50">This sector will open automatically when you visit.</p>
-                       </div>
-
-                       {/* Font Selector */}
                        <div className="space-y-2">
                            <label className="flex items-center gap-2 text-sm font-bold text-white">
                                <Type size={16} className={isWizard ? 'text-emerald-500' : 'text-fuchsia-500'}/> Interface Font
                            </label>
-                           <div className="grid grid-cols-1 gap-2 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
-                               {fonts.map(font => (
-                                   <button
-                                     key={font.id}
-                                     onClick={() => setEditProfile({...editProfile, preferredFont: font.id as any})}
-                                     className={`flex items-center justify-between p-3 rounded border text-left transition-all
-                                        ${editProfile.preferredFont === font.id 
-                                            ? (isWizard ? 'bg-emerald-900/40 border-emerald-500 text-white' : 'bg-fuchsia-900/40 border-fuchsia-500 text-white')
-                                            : 'border-white/10 hover:bg-white/5 text-gray-400'}
-                                     `}
-                                   >
-                                       <span style={{ fontFamily: font.family }}>{font.name}</span>
-                                       {editProfile.preferredFont === font.id && <div className={`w-2 h-2 rounded-full ${isWizard ? 'bg-emerald-500' : 'bg-fuchsia-500'}`}></div>}
-                                   </button>
-                               ))}
+                           <div className="p-3 rounded-lg border bg-black/40 flex justify-between items-center text-white text-sm" style={{ borderColor: isWizard ? '#064e3b' : '#701a75' }}>
+                               <span>Currently: <b className="uppercase">{editProfile.preferredFont || 'Default'}</b></span>
                            </div>
+                           <button 
+                             onClick={() => setShowFontPanel(true)}
+                             className={`w-full py-3 rounded-lg border border-dashed flex items-center justify-center gap-2 transition-all hover:bg-white/5
+                                ${isWizard ? 'border-emerald-500/50 text-emerald-300' : 'border-fuchsia-500/50 text-fuchsia-300'}
+                             `}
+                           >
+                               <Plus size={16}/> EXPLORE 100+ FONTS
+                           </button>
                        </div>
 
-                       {/* Theme Color Picker */}
                        <div className="space-y-2">
                            <label className="flex items-center gap-2 text-sm font-bold text-white">
                                <PaintBucket size={16} className={isWizard ? 'text-emerald-500' : 'text-fuchsia-500'}/> Soul Color
@@ -263,7 +280,6 @@ const ToolsModal: React.FC<ToolsModalProps> = ({ lineage, onClose, profile, setP
                                    </button>
                                ))}
                            </div>
-                           <p className="text-[10px] opacity-50">This color will subtly override the default lineage theme.</p>
                        </div>
 
                        <div className="pt-4 sticky bottom-0 bg-gradient-to-t from-black via-black to-transparent pb-2 z-10">
@@ -280,18 +296,13 @@ const ToolsModal: React.FC<ToolsModalProps> = ({ lineage, onClose, profile, setP
                                <Save size={18} /> {hasChanges ? 'SAVE SETTINGS' : 'NO CHANGES'}
                            </button>
                        </div>
-
-                       {/* FIX: Layout - Stats shown here ONLY on Mobile/Tablet */}
-                       <div className="block md:hidden pb-6">
-                           <StatisticsWidget />
-                       </div>
-
                    </div>
                </div>
            )}
         </div>
       </div>
     </div>
+    </>
   );
 };
 

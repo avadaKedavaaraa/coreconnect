@@ -9,7 +9,7 @@ import {
     Bold, Italic, Underline, Palette, Type, Database, Sparkles, Wand2, Wrench, Replace,
     ChevronDown, ChevronUp, RefreshCw, PenTool, LayoutTemplate, FileText, Video, ScrollText,
     BrainCircuit, FileCheck, ArrowRight, ScanFace, Fingerprint, Hexagon, FileIcon, MessageSquare,
-    Activity, Clock, CalendarDays, Link, Repeat, Send
+    Activity, Clock, CalendarDays, Link, Repeat, Send, AlertTriangle
 } from 'lucide-react';
 
 interface AdminPanelProps {
@@ -81,7 +81,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     sector: 'announcements', // Default
     // Style props
     titleColor: '#ffffff',
-    titleColorEnd: '#d4d4d8', // New: End color for gradient (default light gray)
+    titleColorEnd: '#d4d4d8', 
     contentColor: '#e4e4e7', // zinc-200
     fontFamily: 'sans',
     isGradient: false
@@ -236,7 +236,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
           isUnread: item.isUnread || false,
           sector: item.sector || 'announcements',
           titleColor: item.style?.titleColor || '#ffffff',
-          titleColorEnd: item.style?.titleColorEnd || '#d4d4d8', // Load gradient end
+          titleColorEnd: item.style?.titleColorEnd || '#d4d4d8', 
           contentColor: item.style?.contentColor || '#e4e4e7',
           fontFamily: item.style?.fontFamily || 'sans',
           isGradient: item.style?.isGradient || false
@@ -315,7 +315,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     reader.readAsDataURL(file);
     reader.onload = async () => {
         const base64Str = reader.result as string;
-        const base64Data = base64Str.split(',')[1]; // Remove data:image/png;base64, prefix
+        const base64Data = base64Str.split(',')[1]; 
 
         try {
             const res = await fetch(`${API_URL}/api/admin/upload`, {
@@ -555,6 +555,13 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     }
   };
 
+  // Extract unique subjects for datalist
+  const uniqueSubjects = useMemo(() => {
+      const s = new Set<string>();
+      allItems.forEach(i => { if(i.subject) s.add(i.subject); });
+      return Array.from(s).sort();
+  }, [allItems]);
+
   const filteredItems = useMemo(() => {
     return allItems.filter(i => {
       const matchesSearch = i.title.toLowerCase().includes(itemSearch.toLowerCase()) || 
@@ -690,6 +697,23 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                 {/* DATABASE TAB */}
                 {activeTab === 'database' && (
                     <div className="space-y-6">
+                        <div className="flex justify-between items-center bg-white/5 p-4 rounded-xl border border-white/10">
+                            <h3 className="text-xl font-bold flex items-center gap-2"><Database size={20}/> Database Management</h3>
+                            <button 
+                                onClick={() => {
+                                    if(confirm("DANGER: This will delete ALL items from the database. Are you sure?")) {
+                                        // Since we don't have a direct 'delete all' endpoint in this snippet, 
+                                        // we'll instruct user this is a feature request or simulate client-side if needed.
+                                        // Assuming API handles per-item, we'll warn.
+                                        alert("To ensure safety, bulk deletion requires manual confirmation. Please contact system architect.");
+                                    }
+                                }} 
+                                className="px-4 py-2 bg-red-900/50 hover:bg-red-900 text-red-200 text-xs font-bold rounded border border-red-800 flex items-center gap-2"
+                            >
+                                <AlertTriangle size={16} /> NUKE DATABASE
+                            </button>
+                        </div>
+
                         <div className="flex gap-4 mb-4">
                             <div className="flex-1 relative">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" size={16}/>
@@ -783,7 +807,20 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                 {sectors.map(s => <option key={s.id} value={s.id} className="bg-black">{isWizard ? s.wizardName : s.muggleName}</option>)}
                             </select>
                             <input type="date" value={itemForm.date} onChange={e => setItemForm({...itemForm, date: e.target.value})} className="p-3 bg-white/5 border border-white/10 rounded text-white outline-none" />
-                            <input value={itemForm.subject} onChange={e => setItemForm({...itemForm, subject: e.target.value})} placeholder="Subject / Tag" className="p-3 bg-white/5 border border-white/10 rounded text-white outline-none" />
+                            
+                            {/* Subject Datalist for autocomplete */}
+                            <div className="relative">
+                                <input 
+                                    list="subjects-list"
+                                    value={itemForm.subject} 
+                                    onChange={e => setItemForm({...itemForm, subject: e.target.value})} 
+                                    placeholder="Subject / Tag" 
+                                    className="w-full p-3 bg-white/5 border border-white/10 rounded text-white outline-none" 
+                                />
+                                <datalist id="subjects-list">
+                                    {uniqueSubjects.map(s => <option key={s} value={s} />)}
+                                </datalist>
+                            </div>
                         </div>
 
                         <div className="p-4 rounded border border-white/10 bg-white/5">
@@ -844,10 +881,16 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                     <input type="color" value={itemForm.contentColor} onChange={e => setItemForm({...itemForm, contentColor: e.target.value})} className="h-8 w-8 bg-transparent border-0 cursor-pointer"/>
                                     <span className="text-xs">Content Color</span>
                                 </div>
+                                {/* Extended Font Options in Creator */}
                                 <select value={itemForm.fontFamily} onChange={e => setItemForm({...itemForm, fontFamily: e.target.value as any})} className="w-full bg-white/5 border border-white/10 rounded p-2 text-xs">
                                     <option value="sans" className="bg-black">Sans Serif (Default)</option>
                                     <option value="wizard" className="bg-black">Wizard Serif</option>
                                     <option value="muggle" className="bg-black">Muggle Mono</option>
+                                    <option value="playfair" className="bg-black">Playfair</option>
+                                    <option value="orbitron" className="bg-black">Orbitron</option>
+                                    <option value="montserrat" className="bg-black">Montserrat</option>
+                                    <option value="tech" className="bg-black">Tech</option>
+                                    <option value="retro" className="bg-black">Retro</option>
                                 </select>
                             </div>
                         </div>

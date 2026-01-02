@@ -110,7 +110,6 @@ router.post('/login', async (req, res) => {
         const hash = (await scrypt(process.env.ADMIN_PASSWORD || 'admin123', salt, 64)).toString('hex');
         await supabase.from('admin_users').insert({
             username: 'admin', salt, password_hash: hash,
-            // FIX: Added canViewLogs: true so the tab shows up
             permissions: { canEdit: true, canDelete: true, canManageUsers: true, canViewLogs: true, isGod: true }
         });
     }
@@ -138,18 +137,12 @@ router.get('/config', async (req, res) => {
 
 // NEW: Sectors Endpoints for Persistence
 router.get('/sectors', async (req, res) => {
-    // Attempt to fetch from 'sectors_config' table or a JSON blob
-    // Simpler approach: Store as a JSON blob in 'global_config' with id=2 or similar, 
-    // or assume a 'sectors' table exists. 
-    // Given previous setup, we'll try to use a dedicated row in global_config for simplicity if table doesn't exist,
-    // BUT best practice is a separate table. Let's try 'sectors' table first.
     try {
         const { data, error } = await supabase.from('sectors').select('*').order('created_at', { ascending: true });
         if (error || !data || data.length === 0) {
-             // Fallback: Check global_config for a 'sectors' entry
              const { data: configData } = await supabase.from('global_config').select('config').eq('id', 2).single();
              if (configData) return res.json(configData.config);
-             return res.json([]); // Return empty if nothing found, frontend uses defaults
+             return res.json([]); 
         }
         res.json(data);
     } catch(e) { res.json([]); }
@@ -158,8 +151,6 @@ router.get('/sectors', async (req, res) => {
 router.post('/admin/sectors', requireAuth, async (req, res) => {
     if(!req.user.permissions.canEdit) return res.status(403).json({error: "Forbidden"});
     try {
-        // We will store the entire array as a JSON blob in global_config with id=2 to avoid complex schema migrations
-        // This ensures "whatever I save... saves for all users"
         const { error } = await supabase.from('global_config').upsert({ id: 2, config: req.body });
         if (error) throw error;
         res.json({success: true});
@@ -195,7 +186,14 @@ router.post('/ai/chat', async (req, res) => {
     if (!aiClient) return res.status(503).json({ error: "Oracle Disconnected" });
     try {
         const { message, lineage, history, context } = req.body;
-        const systemInstruction = `${lineage === 'WIZARD' ? "You are a magical portrait." : "You are CORE.ARCH system."}\nCONTEXT:\n${context || ''}`;
+        // Stronger System Instruction
+        const systemInstruction = `You are the CORE.ARCH Central Intelligence (or a Magical Portrait in wizard mode).
+CRITICAL RULE: You MUST answer based ONLY on the provided DATABASE CONTEXT below.
+If the answer is not in the context, you must explicitly state that the information is missing from the archives.
+Do not invent facts. Do not answer general knowledge unless it relates to the context.
+CONTEXT:
+${context || 'No database items found.'}`;
+
         let contents = [];
         if (history) history.forEach(h => contents.push({ role: h.role, parts: [{ text: h.text }] }));
         contents.push({ role: 'user', parts: [{ text: message }] });

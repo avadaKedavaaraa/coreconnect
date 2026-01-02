@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Lineage, type CarouselItem, type LectureRule } from '../types';
 import { GlobalConfig } from '../App';
-import { Book, FileText, Video, Calendar, Search, Filter, X, Trash2, LayoutGrid, List, FolderOpen, ArrowLeft, Edit2, Plus, FolderPlus, Loader2, Image as ImageIcon, Send, Link, Repeat, ExternalLink, Hourglass, MonitorOff } from 'lucide-react';
+import { Book, FileText, Video, Calendar, Search, Filter, X, Trash2, LayoutGrid, List, FolderOpen, ArrowLeft, Edit2, Plus, FolderPlus, Loader2, Image as ImageIcon, Send, Link, Repeat, ExternalLink, Hourglass, MonitorOff, Clock } from 'lucide-react';
 import CalendarWidget from './CalendarWidget';
 import DOMPurify from 'dompurify';
 
@@ -67,8 +67,8 @@ const SectorView: React.FC<SectorViewProps> = ({
           // Create Virtual Items for display
           const virtualItems: CarouselItem[] = todaysRules.map(rule => ({
               id: `virtual-${rule.id}`,
-              title: `${rule.subject} - ${rule.startTime}`,
-              content: `Scheduled Lecture.`,
+              title: `${rule.subject}`,
+              content: `Scheduled Lecture at ${rule.startTime}.`,
               date: todayStr,
               type: 'video', 
               subject: rule.subject,
@@ -107,6 +107,10 @@ const SectorView: React.FC<SectorViewProps> = ({
     });
   }, [displayItems, search, dateFilter, subjectFilter]);
 
+  // --- SPECIAL HANDLING FOR LECTURES ---
+  // If sector is 'lectures', default viewMode is 'list' (Timeline) and folder navigation is skipped
+  const isLectureMode = sectorId === 'lectures';
+
   // --- EFFECTS ---
   useEffect(() => {
     if ((search || dateFilter) && viewMode === 'folders') {
@@ -118,8 +122,9 @@ const SectorView: React.FC<SectorViewProps> = ({
     setSearch('');
     setDateFilter('');
     setSubjectFilter('');
-    setViewMode('folders');
-  }, [sectorId]);
+    // Force list view for lectures, otherwise folders
+    setViewMode(isLectureMode ? 'list' : 'folders');
+  }, [sectorId, isLectureMode]);
 
   useEffect(() => {
     if (isCreatingSubject && inputRef.current) {
@@ -136,7 +141,7 @@ const SectorView: React.FC<SectorViewProps> = ({
     setSearch('');
     setDateFilter('');
     setSubjectFilter('');
-    if (viewMode !== 'folders') setViewMode('folders');
+    if (viewMode !== 'folders' && !isLectureMode) setViewMode('folders');
   };
 
   // --- LAZY QUICK POST ---
@@ -253,8 +258,8 @@ const SectorView: React.FC<SectorViewProps> = ({
                     <ArrowLeft size={16} /> Exit Sector
                 </button>
               )}
-              {/* Back to Folders */}
-              {!onBack && subjectFilter && viewMode !== 'folders' && (
+              {/* Back to Folders (Only if NOT lecture mode) */}
+              {!onBack && subjectFilter && viewMode !== 'folders' && !isLectureMode && (
                  <button 
                     onClick={clearFilters}
                     className={`flex items-center gap-2 text-sm font-bold uppercase tracking-wider transition-colors
@@ -267,21 +272,6 @@ const SectorView: React.FC<SectorViewProps> = ({
           </div>
           
           <div className="flex items-center gap-3">
-              {/* Telegram Icon - Only if configured */}
-              {config?.telegramLink && (
-                  <a 
-                    href={config.telegramLink} 
-                    target="_blank" 
-                    rel="noreferrer"
-                    className={`p-2 rounded-full border transition-all hover:scale-110 active:scale-95 animate-pulse
-                        ${isWizard ? 'bg-emerald-900/50 border-emerald-500 text-emerald-400' : 'bg-fuchsia-900/50 border-fuchsia-500 text-fuchsia-400'}
-                    `}
-                    title="Official Communication Channel"
-                  >
-                      <Send size={20} />
-                  </a>
-              )}
-
               {onAddItem && (
                  <button 
                     onClick={() => onAddItem(sectorId)}
@@ -298,7 +288,7 @@ const SectorView: React.FC<SectorViewProps> = ({
           </div>
       </div>
 
-      {/* LAZY QUICK ADD INPUT - VISIBLE TO ADMINS */}
+      {/* LAZY QUICK ADD INPUT */}
       {isAdmin && onQuickCreate && (
           <div className="mb-6 animate-[fade-in_0.5s]">
              <div className={`relative flex items-center p-3 rounded-xl border backdrop-blur-md transition-all shadow-lg
@@ -312,7 +302,7 @@ const SectorView: React.FC<SectorViewProps> = ({
                     value={quickPostText}
                     onChange={(e) => setQuickPostText(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleQuickPost()}
-                    placeholder={`Lazy Mode: Quickly post to '${sectorId}'... (Press Enter)`}
+                    placeholder={`Lazy Post: Quickly post to '${sectorId}'... (Press Enter)`}
                     className="flex-1 bg-transparent outline-none text-base text-white placeholder:text-white/40"
                     disabled={isPosting}
                 />
@@ -340,45 +330,56 @@ const SectorView: React.FC<SectorViewProps> = ({
                 `}
               />
             </div>
+            
+            {/* Calendar Integrated */}
             <div className="relative w-full md:w-auto z-[40]">
                <CalendarWidget 
                  lineage={lineage} items={displayItems} selectedDate={dateFilter} onSelectDate={setDateFilter}
                  isOpen={calendarOpen} setIsOpen={setCalendarOpen}
                />
             </div>
-            <div className="relative w-full md:w-auto min-w-[160px]">
-               <select 
-                 value={subjectFilter}
-                 onChange={(e) => {
-                    setSubjectFilter(e.target.value);
-                    if(e.target.value && viewMode === 'folders') setViewMode('masonry');
-                 }}
-                 className={`w-full px-4 py-2 rounded border bg-transparent outline-none appearance-none cursor-pointer text-base
-                   ${isWizard 
-                     ? 'border-emerald-700 text-emerald-100 bg-[#050a05] font-wizard' 
-                     : 'border-fuchsia-700 text-fuchsia-100 bg-[#09050f] font-muggle'}
-                 `}
-               >
-                 <option value="" className="bg-black text-white">{isWizard ? "All Subjects" : "All Directories"}</option>
-                 {subjects.map(sub => <option key={sub} value={sub} className="bg-black text-white">{sub}</option>)}
-               </select>
-               <Filter className={`absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none opacity-50`} />
-            </div>
+
+            {/* Subject Filter (Hidden in Lecture Mode) */}
+            {!isLectureMode && (
+                <div className="relative w-full md:w-auto min-w-[160px]">
+                <select 
+                    value={subjectFilter}
+                    onChange={(e) => {
+                        setSubjectFilter(e.target.value);
+                        if(e.target.value && viewMode === 'folders') setViewMode('masonry');
+                    }}
+                    className={`w-full px-4 py-2 rounded border bg-transparent outline-none appearance-none cursor-pointer text-base
+                    ${isWizard 
+                        ? 'border-emerald-700 text-emerald-100 bg-[#050a05] font-wizard' 
+                        : 'border-fuchsia-700 text-fuchsia-100 bg-[#09050f] font-muggle'}
+                    `}
+                >
+                    <option value="" className="bg-black text-white">{isWizard ? "All Subjects" : "All Directories"}</option>
+                    {subjects.map(sub => <option key={sub} value={sub} className="bg-black text-white">{sub}</option>)}
+                </select>
+                <Filter className={`absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none opacity-50`} />
+                </div>
+            )}
+
             {(search || dateFilter || subjectFilter) && (
               <button onClick={clearFilters} className={`p-2 rounded hover:bg-white/10 ${isWizard ? 'text-emerald-400' : 'text-fuchsia-400'} shrink-0 self-end md:self-auto`}>
                 <X size={20} />
               </button>
             )}
          </div>
-         <div className={`flex items-center gap-1 p-1 rounded border shrink-0 justify-center ${isWizard ? 'border-emerald-800 bg-black/40' : 'border-fuchsia-800 bg-black/40'}`}>
-            <button onClick={() => { setSubjectFilter(''); setViewMode('folders'); }} className={`p-2 rounded transition-all ${viewMode === 'folders' ? (isWizard ? 'bg-emerald-800 text-emerald-100' : 'bg-fuchsia-800 text-fuchsia-100') : 'text-white/40 hover:text-white'}`}><FolderOpen size={16} /></button>
-            <div className="w-px h-4 bg-white/10 mx-1"></div>
-            <button onClick={() => setViewMode('masonry')} className={`p-2 rounded transition-all ${viewMode === 'masonry' ? (isWizard ? 'bg-emerald-800 text-emerald-100' : 'bg-fuchsia-800 text-fuchsia-100') : 'text-white/40 hover:text-white'}`}><LayoutGrid size={16} /></button>
-            <button onClick={() => setViewMode('list')} className={`p-2 rounded transition-all ${viewMode === 'list' ? (isWizard ? 'bg-emerald-800 text-emerald-100' : 'bg-fuchsia-800 text-fuchsia-100') : 'text-white/40 hover:text-white'}`}><List size={16} /></button>
-         </div>
+         
+         {/* View Toggles (Hidden in Lecture Mode) */}
+         {!isLectureMode && (
+             <div className={`flex items-center gap-1 p-1 rounded border shrink-0 justify-center ${isWizard ? 'border-emerald-800 bg-black/40' : 'border-fuchsia-800 bg-black/40'}`}>
+                <button onClick={() => { setSubjectFilter(''); setViewMode('folders'); }} className={`p-2 rounded transition-all ${viewMode === 'folders' ? (isWizard ? 'bg-emerald-800 text-emerald-100' : 'bg-fuchsia-800 text-fuchsia-100') : 'text-white/40 hover:text-white'}`}><FolderOpen size={16} /></button>
+                <div className="w-px h-4 bg-white/10 mx-1"></div>
+                <button onClick={() => setViewMode('masonry')} className={`p-2 rounded transition-all ${viewMode === 'masonry' ? (isWizard ? 'bg-emerald-800 text-emerald-100' : 'bg-fuchsia-800 text-fuchsia-100') : 'text-white/40 hover:text-white'}`}><LayoutGrid size={16} /></button>
+                <button onClick={() => setViewMode('list')} className={`p-2 rounded transition-all ${viewMode === 'list' ? (isWizard ? 'bg-emerald-800 text-emerald-100' : 'bg-fuchsia-800 text-fuchsia-100') : 'text-white/40 hover:text-white'}`}><List size={16} /></button>
+             </div>
+         )}
       </div>
 
-      {viewMode === 'folders' && !search && !dateFilter ? (
+      {viewMode === 'folders' && !search && !dateFilter && !isLectureMode ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 animate-[fade-in_0.3s]">
           {subjects.map((subject, idx) => {
              const subjectItems = displayItems.filter(i => (i.subject || 'General') === subject);
@@ -509,7 +510,10 @@ const SectorView: React.FC<SectorViewProps> = ({
                  </div>
              )
            ) : (
-             <div className={viewMode === 'list' ? 'flex flex-col gap-3' : 'columns-1 md:columns-2 lg:columns-3 gap-6 space-y-6'}>
+             <div className={viewMode === 'list' || isLectureMode ? 'flex flex-col gap-3 relative' : 'columns-1 md:columns-2 lg:columns-3 gap-6 space-y-6'}>
+                {isLectureMode && (
+                    <div className={`absolute left-6 top-0 bottom-0 w-px ${isWizard ? 'bg-emerald-900' : 'bg-fuchsia-900'}`}></div>
+                )}
                 {filteredItems.map((item) => {
                   const customStyle = item.style || {};
                   const cleanContent = DOMPurify.sanitize(item.content);
@@ -519,7 +523,7 @@ const SectorView: React.FC<SectorViewProps> = ({
                   return (
                   <div key={item.id} onClick={() => onViewItem(item)}
                     className={`break-inside-avoid relative rounded-xl border backdrop-blur-md group transition-all duration-300 cursor-pointer overflow-hidden
-                      ${viewMode === 'list' ? 'p-4 flex items-center gap-4 hover:translate-x-1' : 'p-6 flex flex-col gap-4 hover:-translate-y-1'}
+                      ${(viewMode === 'list' || isLectureMode) ? 'p-4 flex items-center gap-4 hover:translate-x-1 ml-0 sm:ml-4' : 'p-6 flex flex-col gap-4 hover:-translate-y-1'}
                       ${isWizard ? 'bg-black/40 border-emerald-900/50 hover:bg-emerald-900/10' : 'bg-black/40 border-fuchsia-900/50 hover:bg-fuchsia-900/10'}
                       ${isVirtual ? 'border-l-4' : ''} 
                     `}
@@ -532,7 +536,7 @@ const SectorView: React.FC<SectorViewProps> = ({
                     )}
 
                     {isAdmin && !isVirtual && (
-                        <div className={`absolute top-2 right-2 flex gap-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity ${viewMode === 'list' ? 'order-last relative top-0 right-0 opacity-100' : ''}`}>
+                        <div className={`absolute top-2 right-2 flex gap-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity ${(viewMode === 'list' || isLectureMode) ? 'order-last relative top-0 right-0 opacity-100' : ''}`}>
                              {onEdit && (
                                  <button onClick={(e) => { e.stopPropagation(); onEdit(item); }} className="p-1.5 bg-yellow-600 rounded text-black hover:bg-yellow-500" title="Edit Item">
                                      <Edit2 size={14}/>
@@ -546,24 +550,27 @@ const SectorView: React.FC<SectorViewProps> = ({
                         </div>
                     )}
 
-                    <div className={`shrink-0 rounded-full flex items-center justify-center ${viewMode === 'list' ? 'w-10 h-10' : 'w-12 h-12 mb-2'} ${isWizard ? 'bg-emerald-900/30 text-emerald-400' : 'bg-fuchsia-900/30 text-fuchsia-400'}`}>
-                       {item.type === 'video' ? <Video size={viewMode==='list'?18:24} /> : item.type === 'file' ? <FileText size={viewMode==='list'?18:24} /> : <Link size={viewMode==='list'?18:24} />}
+                    <div className={`shrink-0 rounded-full flex items-center justify-center z-10 ${(viewMode === 'list' || isLectureMode) ? 'w-12 h-12' : 'w-12 h-12 mb-2'} ${isWizard ? 'bg-emerald-900/30 text-emerald-400' : 'bg-fuchsia-900/30 text-fuchsia-400'}`}>
+                       {item.type === 'video' ? <Video size={20} /> : isLectureMode ? <Clock size={20} /> : <FileText size={20} />}
                     </div>
+                    
                     <div className="flex-1 min-w-0">
                        <div className="flex items-center gap-2 mb-1">
-                          {item.subject && <span className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded border opacity-60 ${isWizard ? 'border-emerald-800 text-emerald-300' : 'border-fuchsia-800 text-fuchsia-300'}`}>{item.subject}</span>}
+                          {/* For Lectures, we hide Subject if it's redundant, but showing it as a tag is still useful for style */}
+                          {item.subject && !isLectureMode && <span className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded border opacity-60 ${isWizard ? 'border-emerald-800 text-emerald-300' : 'border-fuchsia-800 text-fuchsia-300'}`}>{item.subject}</span>}
                           <div className={`flex items-center gap-1 text-[10px] opacity-50 ${isWizard ? 'font-wizard' : 'font-muggle'}`}>
                              <Calendar size={10} />
                              <span>{item.date}</span>
                           </div>
                        </div>
                        <h4 
-                          className={`font-bold leading-tight truncate ${viewMode === 'list' ? 'text-sm' : 'text-lg mb-2'} ${customStyle.isGradient ? 'bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400' : ''} ${isWizard ? 'font-wizardTitle text-emerald-100' : 'font-muggle text-fuchsia-100'}`}
+                          className={`font-bold leading-tight truncate ${(viewMode === 'list' || isLectureMode) ? 'text-lg' : 'text-lg mb-2'} ${customStyle.isGradient ? 'bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400' : ''} ${isWizard ? 'font-wizardTitle text-emerald-100' : 'font-muggle text-fuchsia-100'}`}
                           style={{color: customStyle.titleColor}}
                        >
                            {item.title}
                        </h4>
-                       {viewMode !== 'list' && (
+                       {/* Show direct content preview for lectures */}
+                       {(viewMode !== 'list' || isLectureMode) && (
                            <div 
                               className={`text-sm opacity-60 line-clamp-4 ${isWizard ? 'font-wizard' : 'font-muggle'}`}
                               style={{color: customStyle.contentColor}}
@@ -572,18 +579,18 @@ const SectorView: React.FC<SectorViewProps> = ({
                        )}
                        
                        {/* GO TO CLASS BUTTON */}
-                       {(isVirtual || hasLink) && viewMode !== 'list' && (
-                           <div className="mt-4 pt-4 border-t border-white/5">
+                       {(isVirtual || hasLink) && (
+                           <div className="mt-2 pt-2 border-t border-white/5 flex">
                                <a 
                                  href={item.fileUrl} 
                                  target="_blank" 
                                  rel="noreferrer"
                                  onClick={(e) => e.stopPropagation()}
-                                 className={`w-full flex items-center justify-center gap-2 py-2 rounded font-bold text-xs uppercase tracking-widest transition-all hover:scale-[1.02] active:scale-95 shadow-lg
+                                 className={`flex items-center justify-center gap-2 px-4 py-2 rounded font-bold text-xs uppercase tracking-widest transition-all hover:scale-[1.02] active:scale-95 shadow-lg
                                     ${isWizard ? 'bg-emerald-600 hover:bg-emerald-500 text-black' : 'bg-fuchsia-600 hover:bg-fuchsia-500 text-black'}
                                  `}
                                >
-                                   <ExternalLink size={14} /> {isVirtual ? "Enter Classroom" : "Open Link"}
+                                   <ExternalLink size={14} /> {isVirtual ? "ENTER CLASSROOM" : "OPEN LINK"}
                                </a>
                            </div>
                        )}

@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { Lineage, type UserProfile } from '../types';
-import { ShieldCheck, RotateCw, Battery, BatteryMedium, BatteryFull, BatteryLow, MessageSquare, Terminal, Sparkles, WifiOff, Zap, User, Accessibility, Settings2 } from 'lucide-react';
+import { ShieldCheck, RotateCw, BatteryMedium, BatteryFull, BatteryLow, Terminal, Sparkles, WifiOff, Zap, User, Accessibility, Send, Edit2 } from 'lucide-react';
+import { GlobalConfig } from '../App';
 
 interface HUDProps {
   lineage: Lineage;
@@ -10,6 +11,8 @@ interface HUDProps {
   onOpenTools?: () => void;
   profile: UserProfile;
   isOffline?: boolean;
+  config?: GlobalConfig;
+  onEditConfig?: () => void; // Shortcut to open config
 }
 
 // Battery API Types (non-standard)
@@ -22,7 +25,7 @@ interface BatteryManager extends EventTarget {
   removeEventListener(type: string, listener: EventListenerOrEventListenerObject | null, options?: boolean | EventListenerOptions): void;
 }
 
-const HUD: React.FC<HUDProps> = ({ lineage, onToggleLineage, profile, onOpenOracle, onOpenTools, isOffline }) => {
+const HUD: React.FC<HUDProps> = ({ lineage, onToggleLineage, profile, onOpenOracle, onOpenTools, isOffline, config, onEditConfig }) => {
   const [time, setTime] = useState(new Date());
   const [battery, setBattery] = useState<{level: number, charging: boolean} | null>(null);
 
@@ -114,7 +117,7 @@ const HUD: React.FC<HUDProps> = ({ lineage, onToggleLineage, profile, onOpenOrac
         <button 
           onClick={onOpenOracle}
           className={`flex items-center gap-2 px-3 py-1 rounded-full border transition-all hover:scale-105 active:scale-95
-             ${isWizard ? 'bg-emerald-900/20 border-emerald-500/40 hover:bg-emerald-900/40' : 'bg-fuchsia-900/20 border-fuchsia-500/40 hover:bg-fuchsia-900/40'}
+             ${isWizard ? 'bg-emerald-900/20 border-emerald-500/40 hover:bg-emerald-900/40' : 'bg-fuchsia-900/20 border-fuchsia-900/40 hover:bg-fuchsia-900/40'}
           `}
           style={profile.themeColor ? { borderColor: `${profile.themeColor}60`, backgroundColor: `${profile.themeColor}20` } : {}}
         >
@@ -144,23 +147,38 @@ const HUD: React.FC<HUDProps> = ({ lineage, onToggleLineage, profile, onOpenOrac
       {/* Right: User Actions & Info */}
       <div className="flex items-center gap-3 sm:gap-4">
         
-        {/* Battery & Time (Hidden on very small screens if crowded) */}
-        <div className="text-right hidden md:block leading-tight opacity-70">
+        {/* Telegram - Always visible if link exists OR if we want to edit it */}
+        <button 
+            onClick={() => {
+                if (config?.telegramLink) {
+                    window.open(config.telegramLink, '_blank');
+                } else if (onEditConfig) {
+                    onEditConfig(); // Prompt to add link
+                }
+            }}
+            className={`p-2 rounded-full border transition-all hover:scale-110 active:scale-95 flex items-center justify-center relative group
+                ${isWizard ? 'bg-emerald-900/50 border-emerald-500 text-emerald-400' : 'bg-fuchsia-900/50 border-fuchsia-500 text-fuchsia-400'}
+            `}
+            title={config?.telegramLink ? "Join Telegram Channel" : "Configure Telegram Link"}
+        >
+            <Send size={16} />
+            {!config?.telegramLink && (
+                <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full animate-ping"></div>
+            )}
+        </button>
+
+        {/* Battery & Time (Visible on mobile now) */}
+        <div className="text-right leading-tight opacity-70">
           <div className="text-[10px] font-bold flex items-center justify-end gap-1">
              {getBatteryIcon()} {battery ? `${Math.round(battery.level * 100)}%` : ''}
           </div>
-          <div className="text-[10px] font-mono">{formatDate(time)} {formatTime(time)}</div>
+          <div className="text-[10px] font-mono hidden sm:block">{formatDate(time)} {formatTime(time)}</div>
         </div>
 
         <div className="h-6 w-px bg-white/10 hidden md:block"></div>
 
         {/* User Profile Action */}
         <div className="flex items-center gap-2">
-            <div className={`hidden sm:block text-right`}>
-                <div className="text-xs font-bold truncate max-w-[80px]">{profile.displayName || 'Guest'}</div>
-                <div className="text-[9px] opacity-60 uppercase">{profile.house}</div>
-            </div>
-            
             <button 
                 onClick={onOpenTools}
                 className={`w-8 h-8 rounded-full border flex items-center justify-center transition-all hover:scale-110 active:scale-95 overflow-hidden
@@ -169,16 +187,6 @@ const HUD: React.FC<HUDProps> = ({ lineage, onToggleLineage, profile, onOpenOrac
                 title="User Profile"
             >
                 <User size={16} />
-            </button>
-
-            <button 
-                onClick={onOpenTools}
-                className={`w-8 h-8 rounded-full border flex items-center justify-center transition-all hover:scale-110 active:scale-95
-                    ${isWizard ? 'bg-emerald-900/30 border-emerald-500/50 text-emerald-300' : 'bg-fuchsia-900/30 border-fuchsia-500/50 text-fuchsia-300'}
-                `}
-                title="User Config Matrix (Accessibility)"
-            >
-                <Accessibility size={18} />
             </button>
         </div>
 
