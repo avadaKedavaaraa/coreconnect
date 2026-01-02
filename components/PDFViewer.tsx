@@ -15,7 +15,6 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ item, lineage, onClose }) => {
   const [highContrast, setHighContrast] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(100);
 
-  // --- SECURITY: Protocol Sanitization ---
   const isValidUrl = (url?: string) => {
     if (!url) return false;
     try {
@@ -27,9 +26,6 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ item, lineage, onClose }) => {
   };
 
   const safePdfUrl = isValidUrl(item.fileUrl) ? item.fileUrl! : "https://pdfobject.com/pdf/sample.pdf";
-  
-  // Note: Google Viewer doesn't support programmatic zoom via URL params easily without refresh, 
-  // so zoom is handled by CSS scaling the container or iframe for visual aid.
   const viewerUrl = `https://docs.google.com/gview?url=${encodeURIComponent(safePdfUrl)}&embedded=true`;
 
   return (
@@ -130,11 +126,6 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ item, lineage, onClose }) => {
              </div>
            </div>
         </div>
-        
-        {/* Resize Handle (Visual Indicator only, as modal is fixed size unless fullscreen) */}
-        {!isFullScreen && (
-            <div className="absolute bottom-0 right-0 w-4 h-4 cursor-se-resize bg-white/10 rounded-tl"></div>
-        )}
       </div>
     </div>
   );

@@ -11,6 +11,7 @@ import {
     BrainCircuit, FileCheck, ArrowRight, ScanFace, Fingerprint, Hexagon, FileIcon, MessageSquare,
     Activity, Clock, CalendarDays, Link, Repeat, Send, AlertTriangle, HardDrive, Download, UploadCloud, MousePointer2
 } from 'lucide-react';
+import DOMPurify from 'dompurify';
 
 interface AdminPanelProps {
   lineage: Lineage;
@@ -22,7 +23,7 @@ interface AdminPanelProps {
   onLogout: () => void;
   currentUser: string;
   permissions: any; 
-  initialTab?: 'database' | 'creator' | 'scheduler' | 'config' | 'users' | 'visitors' | 'backup' | 'ai-lab' | 'structure';
+  initialTab?: 'database' | 'creator' | 'scheduler' | 'config' | 'users' | 'visitors' | 'backup' | 'ai-lab' | 'structure' | 'logs';
 
   // Data
   allItems?: CarouselItem[];
@@ -45,7 +46,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   onAddItem, onUpdateItem, onDeleteItem, onUpdateSectors, onUpdateConfig, allItems = [], sectors = [], globalConfig, onClearData, initialEditingItem, defaultSector
 }) => {
   const isWizard = lineage === Lineage.WIZARD;
-  const [activeTab, setActiveTab] = useState<'creator' | 'ai-lab' | 'database' | 'visitors' | 'structure' | 'users' | 'config' | 'backup' | 'scheduler'>(initialTab || 'database');
+  const [activeTab, setActiveTab] = useState<'creator' | 'ai-lab' | 'database' | 'visitors' | 'structure' | 'users' | 'logs' | 'config' | 'backup' | 'scheduler'>(initialTab || 'database');
   
   // Login State
   const [loginUser, setLoginUser] = useState('');
@@ -105,6 +106,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
   // Users & Logs
   const [users, setUsers] = useState<AdminUser[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [newUser, setNewUser] = useState('');
   const [newUserPass, setNewUserPass] = useState('');
   const [newPermissions, setNewPermissions] = useState({
@@ -136,6 +138,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     if (isAdmin) {
         if (activeTab === 'users' && permissions?.canManageUsers) fetchUsers();
         if (activeTab === 'visitors' && permissions?.canViewLogs) fetchVisitors();
+        if (activeTab === 'logs' && permissions?.canViewLogs) fetchAuditLogs();
     }
   }, [activeTab, isAdmin, permissions]);
 
@@ -165,6 +168,16 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
           if(res.ok) {
               const data = await res.json();
               setVisitors(Array.isArray(data) ? data : []);
+          }
+      } catch(e) {}
+  };
+
+  const fetchAuditLogs = async () => {
+      try {
+          const res = await fetch(`${API_URL}/api/admin/logs`, { headers: {'x-csrf-token': csrfToken}, credentials: 'include' });
+          if(res.ok) {
+              const data = await res.json();
+              setAuditLogs(Array.isArray(data) ? data : []);
           }
       } catch(e) {}
   };
@@ -532,11 +545,21 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   const uniqueSubjects = useMemo(() => Array.from(new Set(allItems.map(i => i.subject))).filter(Boolean).sort(), [allItems]);
   const filteredItems = useMemo(() => allItems.filter(i => (i.title.toLowerCase().includes(itemSearch.toLowerCase()) || i.content.toLowerCase().includes(itemSearch.toLowerCase())) && (typeFilter === 'all' || i.type === typeFilter)), [allItems, itemSearch, typeFilter]);
 
+  // Styles for Preview
+  const previewTitleStyle = {
+      color: itemForm.titleColor,
+      fontFamily: itemForm.fontFamily === 'wizard' ? '"EB Garamond", serif' : itemForm.fontFamily === 'muggle' ? '"JetBrains Mono", monospace' : 'inherit',
+      backgroundImage: itemForm.isGradient ? `linear-gradient(to right, ${itemForm.titleColor}, ${itemForm.titleColorEnd})` : 'none',
+      WebkitBackgroundClip: itemForm.isGradient ? 'text' : 'border-box',
+      WebkitTextFillColor: itemForm.isGradient ? 'transparent' : 'currentColor',
+      display: 'inline-block'
+  };
+
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/95 p-2 sm:p-4 animate-[fade-in_0.2s_ease-out]">
-      <div className={`w-full max-w-6xl rounded-xl border shadow-2xl overflow-hidden flex flex-col relative h-[100dvh] sm:h-full sm:max-h-[95vh] text-zinc-200 transition-colors duration-500
+      <div className={`w-full max-w-7xl rounded-xl border shadow-2xl overflow-hidden flex flex-col relative h-[100dvh] sm:h-full sm:max-h-[95vh] text-zinc-200 transition-colors duration-500
         ${isWizard ? 'bg-[#0a0505] border-red-900/50 shadow-red-900/30' : 'bg-[#050510] border-blue-900/50 shadow-blue-900/30'}
       `}>
         <button onClick={onClose} className="absolute top-4 right-4 text-white/50 hover:text-white z-30 p-2 hover:bg-white/10 rounded-full transition-colors">
@@ -621,6 +644,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                         { id: 'ai-lab', icon: BrainCircuit, label: 'AI Magic' },
                         { id: 'visitors', icon: ScanFace, label: 'Visitors' },
                         { id: 'users', icon: Users, label: 'Admins' },
+                        { id: 'logs', icon: Activity, label: 'Audit Logs' },
                         { id: 'config', icon: Settings, label: 'Config' },
                         { id: 'structure', icon: LayoutTemplate, label: 'Sectors' },
                     ].map(tab => (
@@ -703,71 +727,106 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                 
                 {/* CREATOR TAB */}
                 {activeTab === 'creator' && (
-                    <div className="max-w-3xl mx-auto space-y-6">
-                        <div className="grid grid-cols-2 gap-4">
-                            <input value={itemForm.title} onChange={e => setItemForm({...itemForm, title: e.target.value})} placeholder="Title" className="col-span-2 p-3 bg-white/5 border border-white/10 rounded text-white outline-none" />
-                            <select value={itemForm.type} onChange={e => setItemForm({...itemForm, type: e.target.value as any})} className="p-3 bg-white/5 border border-white/10 rounded text-white outline-none">
-                                <option value="announcement" className="bg-black">Announcement</option>
-                                <option value="file" className="bg-black">File</option>
-                                <option value="video" className="bg-black">Video</option>
-                                <option value="task" className="bg-black">Task / Tutorial</option>
-                                <option value="mixed" className="bg-black">Mixed Content</option>
-                                <option value="link" className="bg-black">External Link</option>
-                                <option value="code" className="bg-black">Code Snippet</option>
-                            </select>
-                            <select value={itemForm.sector} onChange={e => setItemForm({...itemForm, sector: e.target.value})} className="p-3 bg-white/5 border border-white/10 rounded text-white outline-none">
-                                {sectors.map(s => <option key={s.id} value={s.id} className="bg-black">{isWizard ? s.wizardName : s.muggleName}</option>)}
-                            </select>
-                            <input type="date" value={itemForm.date} onChange={e => setItemForm({...itemForm, date: e.target.value})} className="p-3 bg-white/5 border border-white/10 rounded text-white outline-none" />
-                            <div className="relative"><input list="subjects-list" value={itemForm.subject} onChange={e => setItemForm({...itemForm, subject: e.target.value})} placeholder="Subject" className="w-full p-3 bg-white/5 border border-white/10 rounded text-white outline-none" /><datalist id="subjects-list">{uniqueSubjects.map(s => <option key={s} value={s} />)}</datalist></div>
-                        </div>
-                        
-                        <div className="p-4 rounded border border-white/10 bg-white/5">
-                            <div className="flex justify-between items-center mb-2">
-                                <div className="flex gap-2 overflow-x-auto pb-2">
-                                    {['b','i','u','h1','code','quote'].map(tag => (
-                                        <button key={tag} onClick={() => insertTag(tag)} className="px-3 py-1 bg-black/40 rounded text-xs font-mono hover:bg-black/60">&lt;{tag}&gt;</button>
-                                    ))}
-                                </div>
-                                <span className="text-[10px] uppercase opacity-50 bg-white/10 px-2 py-1 rounded">HTML Supported</span>
+                    <div className="flex flex-col xl:flex-row gap-8">
+                        {/* Editor Column */}
+                        <div className="flex-1 space-y-6 max-w-2xl">
+                            <div className="grid grid-cols-2 gap-4">
+                                <input value={itemForm.title} onChange={e => setItemForm({...itemForm, title: e.target.value})} placeholder="Title" className="col-span-2 p-3 bg-white/5 border border-white/10 rounded text-white outline-none" />
+                                <select value={itemForm.type} onChange={e => setItemForm({...itemForm, type: e.target.value as any})} className="p-3 bg-white/5 border border-white/10 rounded text-white outline-none">
+                                    <option value="announcement" className="bg-black">Announcement</option>
+                                    <option value="file" className="bg-black">File</option>
+                                    <option value="video" className="bg-black">Video</option>
+                                    <option value="task" className="bg-black">Task / Tutorial</option>
+                                    <option value="mixed" className="bg-black">Mixed Content</option>
+                                    <option value="link" className="bg-black">External Link</option>
+                                    <option value="code" className="bg-black">Code Snippet</option>
+                                </select>
+                                <select value={itemForm.sector} onChange={e => setItemForm({...itemForm, sector: e.target.value})} className="p-3 bg-white/5 border border-white/10 rounded text-white outline-none">
+                                    {sectors.map(s => <option key={s.id} value={s.id} className="bg-black">{isWizard ? s.wizardName : s.muggleName}</option>)}
+                                </select>
+                                <input type="date" value={itemForm.date} onChange={e => setItemForm({...itemForm, date: e.target.value})} className="p-3 bg-white/5 border border-white/10 rounded text-white outline-none" />
+                                <div className="relative"><input list="subjects-list" value={itemForm.subject} onChange={e => setItemForm({...itemForm, subject: e.target.value})} placeholder="Subject" className="w-full p-3 bg-white/5 border border-white/10 rounded text-white outline-none" /><datalist id="subjects-list">{uniqueSubjects.map(s => <option key={s} value={s} />)}</datalist></div>
                             </div>
-                            <textarea ref={contentRef} value={itemForm.content} onChange={e => setItemForm({...itemForm, content: e.target.value})} placeholder="Content..." className="w-full h-64 bg-transparent outline-none text-sm font-mono text-zinc-300 resize-none"/>
+                            
+                            <div className="p-4 rounded border border-white/10 bg-white/5">
+                                <div className="flex justify-between items-center mb-2">
+                                    <div className="flex gap-2 overflow-x-auto pb-2">
+                                        {['b','i','u','h1','code','quote'].map(tag => (
+                                            <button key={tag} onClick={() => insertTag(tag)} className="px-3 py-1 bg-black/40 rounded text-xs font-mono hover:bg-black/60">&lt;{tag}&gt;</button>
+                                        ))}
+                                    </div>
+                                    <span className="text-[10px] uppercase opacity-50 bg-white/10 px-2 py-1 rounded">HTML Supported</span>
+                                </div>
+                                <textarea ref={contentRef} value={itemForm.content} onChange={e => setItemForm({...itemForm, content: e.target.value})} placeholder="Content..." className="w-full h-64 bg-transparent outline-none text-sm font-mono text-zinc-300 resize-none"/>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="space-y-4">
+                                    <h4 className="text-xs font-bold uppercase opacity-50">Media</h4>
+                                    <div className="flex gap-2"><input value={itemForm.image} onChange={e => setItemForm({...itemForm, image: e.target.value})} placeholder="Image URL" className="flex-1 bg-white/5 border border-white/10 rounded p-2 text-xs"/><label className="p-2 bg-white/10 rounded cursor-pointer hover:bg-white/20"><Upload size={14}/><input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'image')}/></label></div>
+                                    <div className="flex gap-2"><input value={itemForm.fileUrl} onChange={e => setItemForm({...itemForm, fileUrl: e.target.value})} placeholder="File/Video URL" className="flex-1 bg-white/5 border border-white/10 rounded p-2 text-xs"/><label className="p-2 bg-white/10 rounded cursor-pointer hover:bg-white/20"><Upload size={14}/><input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'fileUrl')}/></label></div>
+                                </div>
+                                <div className="space-y-4">
+                                    <h4 className="text-xs font-bold uppercase opacity-50">Item Styling</h4>
+                                    <div className="flex items-center gap-2">
+                                        <input type="color" value={itemForm.titleColor} onChange={e => setItemForm({...itemForm, titleColor: e.target.value})} className="h-8 w-8 bg-transparent border-0 cursor-pointer"/>
+                                        <span className="text-xs">Title Color</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <input type="checkbox" checked={itemForm.isGradient} onChange={e => setItemForm({...itemForm, isGradient: e.target.checked})} id="grad-check" className="cursor-pointer"/>
+                                        <label htmlFor="grad-check" className="text-xs cursor-pointer">Enable Gradient Title</label>
+                                    </div>
+                                    {itemForm.isGradient && (
+                                        <div className="flex items-center gap-2">
+                                            <input type="color" value={itemForm.titleColorEnd} onChange={e => setItemForm({...itemForm, titleColorEnd: e.target.value})} className="h-8 w-8 bg-transparent border-0 cursor-pointer"/>
+                                            <span className="text-xs">Gradient End Color</span>
+                                        </div>
+                                    )}
+                                    <div className="flex items-center gap-2">
+                                        <input type="color" value={itemForm.contentColor} onChange={e => setItemForm({...itemForm, contentColor: e.target.value})} className="h-8 w-8 bg-transparent border-0 cursor-pointer"/>
+                                        <span className="text-xs">Content Text Color</span>
+                                    </div>
+                                    <select value={itemForm.fontFamily} onChange={e => setItemForm({...itemForm, fontFamily: e.target.value as any})} className="w-full bg-white/5 border border-white/10 rounded p-2 text-xs">
+                                        <option value="sans" className="bg-black">Sans Serif (Readable)</option>
+                                        <option value="wizard" className="bg-black">Wizard Serif</option>
+                                        <option value="muggle" className="bg-black">Muggle Mono</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <button onClick={handleSaveItem} className="w-full py-4 bg-green-600 hover:bg-green-500 rounded font-bold text-lg shadow-lg">{isEditingItem ? 'UPDATE' : 'PUBLISH'}</button>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="space-y-4">
-                                <h4 className="text-xs font-bold uppercase opacity-50">Media</h4>
-                                <div className="flex gap-2"><input value={itemForm.image} onChange={e => setItemForm({...itemForm, image: e.target.value})} placeholder="Image URL" className="flex-1 bg-white/5 border border-white/10 rounded p-2 text-xs"/><label className="p-2 bg-white/10 rounded cursor-pointer hover:bg-white/20"><Upload size={14}/><input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'image')}/></label></div>
-                                <div className="flex gap-2"><input value={itemForm.fileUrl} onChange={e => setItemForm({...itemForm, fileUrl: e.target.value})} placeholder="File/Video URL" className="flex-1 bg-white/5 border border-white/10 rounded p-2 text-xs"/><label className="p-2 bg-white/10 rounded cursor-pointer hover:bg-white/20"><Upload size={14}/><input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'fileUrl')}/></label></div>
-                            </div>
-                            <div className="space-y-4">
-                                <h4 className="text-xs font-bold uppercase opacity-50">Item Styling</h4>
-                                <div className="flex items-center gap-2">
-                                    <input type="color" value={itemForm.titleColor} onChange={e => setItemForm({...itemForm, titleColor: e.target.value})} className="h-8 w-8 bg-transparent border-0 cursor-pointer"/>
-                                    <span className="text-xs">Title Color</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <input type="checkbox" checked={itemForm.isGradient} onChange={e => setItemForm({...itemForm, isGradient: e.target.checked})} id="grad-check" className="cursor-pointer"/>
-                                    <label htmlFor="grad-check" className="text-xs cursor-pointer">Enable Gradient Title</label>
-                                </div>
-                                {itemForm.isGradient && (
-                                    <div className="flex items-center gap-2">
-                                        <input type="color" value={itemForm.titleColorEnd} onChange={e => setItemForm({...itemForm, titleColorEnd: e.target.value})} className="h-8 w-8 bg-transparent border-0 cursor-pointer"/>
-                                        <span className="text-xs">Gradient End Color</span>
+                        {/* Live Preview Column */}
+                        <div className="flex-1 min-w-[300px] sticky top-4">
+                            <h4 className="text-xs font-bold uppercase opacity-50 mb-4">Live Preview</h4>
+                            <div className={`rounded-xl border backdrop-blur-md overflow-hidden p-6 shadow-2xl relative min-h-[300px]
+                                ${isWizard ? 'bg-black/60 border-emerald-500/30' : 'bg-black/60 border-fuchsia-500/30'}
+                            `}>
+                                {itemForm.image && (
+                                    <div className="absolute inset-0 z-0">
+                                        <img src={itemForm.image} alt="Preview" className="w-full h-full object-cover opacity-30" />
+                                        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent"></div>
                                     </div>
                                 )}
-                                <div className="flex items-center gap-2">
-                                    <input type="color" value={itemForm.contentColor} onChange={e => setItemForm({...itemForm, contentColor: e.target.value})} className="h-8 w-8 bg-transparent border-0 cursor-pointer"/>
-                                    <span className="text-xs">Content Text Color</span>
+                                <div className="relative z-10">
+                                    <div className="flex justify-between items-start mb-2">
+                                        <span className="text-[10px] font-bold uppercase tracking-widest opacity-60 font-mono text-white">{itemForm.date}</span>
+                                        {itemForm.isUnread && <div className={`w-2 h-2 rounded-full ${isWizard ? 'bg-emerald-400' : 'bg-fuchsia-400'}`}></div>}
+                                    </div>
+                                    <h2 
+                                        className="text-3xl font-bold leading-tight mb-4 drop-shadow-md"
+                                        style={previewTitleStyle}
+                                    >
+                                        {itemForm.title || "Untitled Item"}
+                                    </h2>
+                                    <div 
+                                        className="text-sm font-sans leading-relaxed"
+                                        style={{ color: itemForm.contentColor }}
+                                        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(itemForm.content || "Content preview...") }}
+                                    ></div>
                                 </div>
-                                <select value={itemForm.fontFamily} onChange={e => setItemForm({...itemForm, fontFamily: e.target.value as any})} className="w-full bg-white/5 border border-white/10 rounded p-2 text-xs">
-                                    <option value="sans" className="bg-black">Sans Serif (Readable)</option>
-                                    <option value="wizard" className="bg-black">Wizard Serif</option>
-                                    <option value="muggle" className="bg-black">Muggle Mono</option>
-                                </select>
                             </div>
                         </div>
-                        <button onClick={handleSaveItem} className="w-full py-4 bg-green-600 hover:bg-green-500 rounded font-bold text-lg shadow-lg">{isEditingItem ? 'UPDATE' : 'PUBLISH'}</button>
                     </div>
                 )}
 
@@ -931,6 +990,42 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                             <td className="p-3 font-mono text-xs opacity-40">{v.ip_hash}</td>
                                         </tr>
                                     ))}
+                                    {visitors.length === 0 && <tr><td colSpan={5} className="p-4 text-center opacity-50">No visitor data available.</td></tr>}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
+
+                {/* AUDIT LOGS TAB */}
+                {activeTab === 'logs' && (
+                    <div className="space-y-4">
+                        <div className="flex justify-between items-center">
+                            <h3 className="font-bold flex items-center gap-2"><Activity size={20}/> System Audit Logs</h3>
+                            <button onClick={fetchAuditLogs} className="p-2 hover:bg-white/10 rounded"><RefreshCw size={16}/></button>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left text-sm">
+                                <thead className="bg-white/5 uppercase text-xs">
+                                    <tr>
+                                        <th className="p-3">Admin</th>
+                                        <th className="p-3">Action</th>
+                                        <th className="p-3">Details</th>
+                                        <th className="p-3">Time</th>
+                                        <th className="p-3">IP</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {auditLogs.map((log) => (
+                                        <tr key={log.id} className="border-b border-white/5 hover:bg-white/5">
+                                            <td className="p-3 font-bold text-blue-300">{log.username}</td>
+                                            <td className="p-3 font-mono text-xs">{log.action}</td>
+                                            <td className="p-3 opacity-80 max-w-xs truncate" title={log.details}>{log.details}</td>
+                                            <td className="p-3 opacity-60 text-xs">{new Date(log.timestamp).toLocaleString()}</td>
+                                            <td className="p-3 opacity-40 text-xs">{log.ip}</td>
+                                        </tr>
+                                    ))}
+                                    {auditLogs.length === 0 && <tr><td colSpan={5} className="p-4 text-center opacity-50">No activity recorded.</td></tr>}
                                 </tbody>
                             </table>
                         </div>
