@@ -44,7 +44,24 @@ export interface Task {
 }
 
 export interface UserProfile {
+  id: string; // Visitor ID (UUID)
+  displayName: string;
   house: 'Griffindor' | 'Slytherin' | 'Ravenclaw' | 'Hufflepuff' | 'Sector-7' | 'Sector-3' | 'Sector-1' | 'Sector-9';
+  themeColor?: string; // Hex Override
+  preferredFont?: 'wizard' | 'muggle' | 'sans' | 'playfair' | 'orbitron' | 'montserrat' | 'courier';
+  defaultSector?: string;
+  totalTimeSpent: number; // in seconds
+  visitCount: number;
+  lastActive: string;
+}
+
+export interface VisitorLog {
+  visitor_id: string;
+  display_name: string;
+  total_time_spent: number;
+  visit_count: number;
+  last_active: string;
+  ip_hash?: string; // Anonymized
 }
 
 export interface AdminPermissions {

@@ -1,13 +1,14 @@
+
 <!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <link id="dynamic-favicon" rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>✨</text></svg>" />
     <title>CoreConnect</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=EB+Garamond:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=EB+Garamond:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600&family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Orbitron:wght@400;700&family=Montserrat:wght@400;600&family=Courier+Prime&display=swap" rel="stylesheet">
     
     <!-- Configure Tailwind BEFORE loading the script to prevent race conditions -->
     <script>
@@ -34,6 +35,10 @@
                 wizardTitle: ['"Cinzel"', 'serif'],
                 muggle: ['"JetBrains Mono"', 'monospace'],
                 sans: ['"Inter"', 'sans-serif'],
+                playfair: ['"Playfair Display"', 'serif'],
+                orbitron: ['"Orbitron"', 'sans-serif'],
+                montserrat: ['"Montserrat"', 'sans-serif'],
+                courier: ['"Courier Prime"', 'monospace'],
               },
               animation: {
                 'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
@@ -69,6 +74,7 @@
         margin: 0;
         overflow: hidden; /* App handles scrolling */
         background-color: #000; /* Fallback for slow load */
+        touch-action: pan-y; /* Allow vertical scroll, handle horizontal in JS */
       }
       
       /* Custom Cursors */
@@ -86,26 +92,20 @@
       .preserve-3d {
         transform-style: preserve-3d;
       }
-      /* Wizard Scrollbar */
-      .scrollbar-wizard::-webkit-scrollbar {
-        width: 8px;
-      }
-      .scrollbar-wizard::-webkit-scrollbar-track {
-        background: #022c22; 
-      }
-      .scrollbar-wizard::-webkit-scrollbar-thumb {
-        background: #10b981; 
-        border-radius: 4px;
-      }
-      /* Muggle Scrollbar */
-      .scrollbar-muggle::-webkit-scrollbar {
+      /* Custom Scrollbar */
+      ::-webkit-scrollbar {
         width: 6px;
+        height: 6px;
       }
-      .scrollbar-muggle::-webkit-scrollbar-track {
-        background: #1a0b2e; 
+      ::-webkit-scrollbar-track {
+        background: rgba(0, 0, 0, 0.3); 
       }
-      .scrollbar-muggle::-webkit-scrollbar-thumb {
-        background: #d946ef; 
+      ::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.2); 
+        border-radius: 3px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: rgba(255, 255, 255, 0.4);
       }
 
       /* Particle & Texture Classes */
@@ -188,11 +188,9 @@
   }
 }
 </script>
-<link rel="stylesheet" href="/index.css">
 </head>
   <body>
     <div id="root"></div>
     <script type="module" src="./index.tsx"></script>
-  <script type="module" src="/index.tsx"></script>
-</body>
+  </body>
 </html>

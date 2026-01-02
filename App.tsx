@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo, Suspense, lazy } from 'react';
+import React, { useState, useEffect, useMemo, Suspense, lazy, useRef } from 'react';
 import IdentityGate from './components/IdentityGate';
 import Sidebar from './components/Sidebar';
 import Carousel from './components/Carousel';
@@ -80,8 +80,8 @@ const DEFAULT_CONFIG: GlobalConfig = {
   muggleImage: 'https://images.unsplash.com/photo-1480714378408-67cf0d13bc1b?q=80&w=2070&auto=format&fit=crop'
 };
 
-const LoadingSpinner = ({ lineage }: { lineage: Lineage | null }) => (
-    <div className={`fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm ${lineage === Lineage.WIZARD ? 'text-emerald-500' : 'text-fuchsia-500'}`}>
+const LoadingSpinner = ({ lineage, color }: { lineage: Lineage | null, color?: string }) => (
+    <div className={`fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm`} style={{color: color || (lineage === Lineage.WIZARD ? '#10b981' : '#d946ef')}}>
         <Loader2 size={40} className="animate-spin" />
     </div>
 );
@@ -98,7 +98,6 @@ const App: React.FC = () => {
   const [sectors, setSectors] = useState<Sector[]>(SECTORS);
 
   // Initialize Config from LocalStorage to prevent flicker/reset
-  // Uses v2 key to ensure a fresh start with showDemoData=false for existing users
   const [globalConfig, setGlobalConfig] = useState<GlobalConfig>(() => {
     try {
       const saved = localStorage.getItem('core_connect_global_config_v2');
@@ -109,7 +108,6 @@ const App: React.FC = () => {
   });
 
   const [isOffline, setIsOffline] = useState(false);
-
   const [announcementViewMode, setAnnouncementViewMode] = useState<'carousel' | 'list'>('carousel');
 
   // Security State
@@ -119,14 +117,81 @@ const App: React.FC = () => {
   const [permissions, setPermissions] = useState<AdminPermissions | null>(null);
   
   const [adminPanelOpen, setAdminPanelOpen] = useState(false);
-  const [profile, setProfile] = useState<UserProfile>({ house: 'Griffindor' });
+  
+  // --- USER PROFILE & VISITOR TRACKING ---
+  const [profile, setProfile] = useState<UserProfile>(() => {
+      try {
+          const saved = localStorage.getItem('core_connect_profile');
+          if (saved) return JSON.parse(saved);
+      } catch (e) {}
+      // Default Profile
+      return {
+          id: crypto.randomUUID(), // Generate visitor ID
+          displayName: '',
+          house: 'Griffindor',
+          totalTimeSpent: 0,
+          visitCount: 1,
+          lastActive: new Date().toISOString()
+      };
+  });
+
   const [toolsOpen, setToolsOpen] = useState(false);
   const [commandCenterOpen, setCommandCenterOpen] = useState(false);
   const [oracleOpen, setOracleOpen] = useState(false); 
   const [viewingItem, setViewingItem] = useState<CarouselItem | null>(null);
   const [cmdOpen, setCmdOpen] = useState(false);
-  
   const [editingItem, setEditingItem] = useState<CarouselItem | null>(null);
+
+  // Track Time Spent
+  useEffect(() => {
+      const interval = setInterval(() => {
+          setProfile(prev => ({
+              ...prev,
+              totalTimeSpent: prev.totalTimeSpent + 1,
+              lastActive: new Date().toISOString()
+          }));
+      }, 1000);
+      return () => clearInterval(interval);
+  }, []);
+
+  // Persist Profile & Send Heartbeat
+  useEffect(() => {
+      localStorage.setItem('core_connect_profile', JSON.stringify(profile));
+      
+      // Send Heartbeat every 30 seconds to update server stats
+      if (profile.totalTimeSpent % 30 === 0) {
+          safeFetch(`${API_URL}/api/visitor/heartbeat`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                  visitorId: profile.id,
+                  displayName: profile.displayName,
+                  timeSpent: profile.totalTimeSpent,
+                  visitCount: profile.visitCount
+              })
+          });
+      }
+  }, [profile]);
+
+  // Apply User Preferences
+  useEffect(() => {
+      if (profile.preferredFont) {
+          const fontMap: Record<string, string> = {
+              'wizard': '"EB Garamond", serif',
+              'muggle': '"JetBrains Mono", monospace',
+              'sans': '"Inter", sans-serif',
+              'playfair': '"Playfair Display", serif',
+              'orbitron': '"Orbitron", sans-serif',
+              'montserrat': '"Montserrat", sans-serif',
+              'courier': '"Courier Prime", monospace',
+          };
+          document.body.style.fontFamily = fontMap[profile.preferredFont] || '';
+      }
+      if (profile.defaultSector && !lineage) {
+          // Logic handled in IdentityGate or initialization if needed,
+          // but usually we wait for user to pick lineage.
+      }
+  }, [profile.preferredFont, profile.defaultSector, lineage]);
 
   // --- DYNAMIC FAVICON LOGIC ---
   useEffect(() => {
@@ -153,10 +218,8 @@ const App: React.FC = () => {
       const { ok, data, status } = await safeFetch(`${API_URL}/api/config`);
       if (ok && data) {
           setGlobalConfig(prev => {
-             // Ensure we don't accidentally merge in old boolean keys if they exist in DB
              const { showDemoData, ...cleanData } = data;
              const newData = {...prev, ...cleanData};
-             // Sync with LocalStorage immediately
              localStorage.setItem('core_connect_global_config_v2', JSON.stringify(newData));
              return newData;
           });
@@ -175,7 +238,6 @@ const App: React.FC = () => {
 
   const saveGlobalConfig = async (newConfig: GlobalConfig) => {
     setGlobalConfig(newConfig);
-    // Persist locally first for instant feedback/offline support
     localStorage.setItem('core_connect_global_config_v2', JSON.stringify(newConfig));
     
     if (isAdmin && csrfToken && permissions?.canEdit) {
@@ -244,25 +306,68 @@ const App: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // --- ORACLE CONTEXT AGGREGATION & SORTING ---
+  // --- SWIPE GESTURE LOGIC ---
+  const touchStartX = useRef<number | null>(null);
+  const touchStartY = useRef<number | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+      touchStartX.current = e.touches[0].clientX;
+      touchStartY.current = e.touches[0].clientY;
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+      if (!touchStartX.current || !touchStartY.current) return;
+      
+      // Ignore swipes on sliders/carousels or inner scroll areas
+      const target = e.target as HTMLElement;
+      if (target.closest('.overflow-x-auto') || target.closest('.carousel-container') || target.closest('.no-swipe')) {
+          return;
+      }
+
+      const diffX = touchStartX.current - e.changedTouches[0].clientX;
+      const diffY = touchStartY.current - e.changedTouches[0].clientY;
+
+      // Ensure horizontal swipe is dominant and significant
+      if (Math.abs(diffX) > 50 && Math.abs(diffX) > Math.abs(diffY)) {
+          const currentIdx = sectors.findIndex(s => s.id === activeSectorId);
+          if (diffX > 0) { // Swipe Left -> Next
+              const nextIdx = (currentIdx + 1) % sectors.length;
+              setActiveSectorId(sectors[nextIdx].id);
+          } else { // Swipe Right -> Prev
+              const prevIdx = (currentIdx - 1 + sectors.length) % sectors.length;
+              setActiveSectorId(sectors[prevIdx].id);
+          }
+      }
+      
+      touchStartX.current = null;
+      touchStartY.current = null;
+  };
+
+  // --- ORACLE CONTEXT ---
   const allGameData = useMemo(() => {
       if (!lineage) return [];
-      
       let combined = [...dbItems];
-
-      // SORT DESCENDING BY DATE
       return combined.sort((a, b) => {
           const dateA = new Date(a.date.replace(/\./g, '-'));
           const dateB = new Date(b.date.replace(/\./g, '-'));
           return dateB.getTime() - dateA.getTime();
       });
-
   }, [lineage, dbItems]);
 
-  // --- VIEW SPECIFIC ITEMS ---
   const currentViewItems = useMemo(() => {
       return allGameData.filter(i => i.sector === activeSectorId);
   }, [allGameData, activeSectorId]);
+
+  // Initial Lineage Selection Logic
+  const handleLineageSelect = (l: Lineage) => {
+      setLineage(l);
+      // Increment stats
+      setProfile(prev => ({ ...prev, visitCount: prev.visitCount + 1 }));
+      // Set default sector from profile if available
+      if (profile.defaultSector) {
+          setActiveSectorId(profile.defaultSector);
+      }
+  };
 
   useEffect(() => {
       if (lineage) {
@@ -334,9 +439,9 @@ const App: React.FC = () => {
     if(confirm("Are you sure? This will delete all custom settings locally. Database items require manual deletion.")) {
       localStorage.removeItem('core_connect_sectors');
       localStorage.removeItem('core_connect_global_config_v2');
+      localStorage.removeItem('core_connect_profile');
       setSectors(SECTORS);
       setGlobalConfig(DEFAULT_CONFIG);
-      // Reload to ensure fresh state
       window.location.reload();
     }
   };
@@ -362,7 +467,7 @@ const App: React.FC = () => {
   if (!lineage) {
     return (
       <IdentityGate 
-        onSelect={setLineage} 
+        onSelect={handleLineageSelect} 
         config={globalConfig}
       />
     );
@@ -372,7 +477,11 @@ const App: React.FC = () => {
   const activeSector = sectors.find(s => s.id === activeSectorId) || sectors[0];
 
   return (
-    <div className={`flex h-screen overflow-hidden transition-colors duration-1000 relative ${isWizard ? 'bg-[#050a05] cursor-wizard' : 'bg-[#09050f] cursor-muggle'}`}>
+    <div 
+        className={`flex h-screen overflow-hidden transition-colors duration-1000 relative ${isWizard ? 'bg-[#050a05] cursor-wizard' : 'bg-[#09050f] cursor-muggle'}`}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+    >
       
       <div className={`absolute inset-0 z-50 pointer-events-none ${isWizard ? 'parchment-grain' : 'crt-scanlines'}`}></div>
       {!isWizard && <div className="absolute inset-0 z-50 pointer-events-none crt-vignette"></div>}
@@ -380,13 +489,13 @@ const App: React.FC = () => {
       <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
           {isWizard ? (
              <>
-               <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-emerald-900/10 blur-[120px] rounded-full animate-pulse-slow"></div>
+               <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[800px] bg-emerald-900/10 blur-[120px] rounded-full animate-pulse-slow" style={profile.themeColor ? {backgroundColor: `${profile.themeColor}10`} : {}}></div>
                <div className="firefly" style={{ top: '20%', left: '30%', animationDelay: '0s' }}></div>
                <div className="firefly" style={{ top: '60%', left: '70%', animationDelay: '2s' }}></div>
              </>
           ) : (
              <>
-               <div className="absolute bottom-0 right-0 w-[600px] h-[600px] bg-fuchsia-900/10 blur-[100px] rounded-full animate-pulse-slow"></div>
+               <div className="absolute bottom-0 right-0 w-[600px] h-[600px] bg-fuchsia-900/10 blur-[100px] rounded-full animate-pulse-slow" style={profile.themeColor ? {backgroundColor: `${profile.themeColor}10`} : {}}></div>
                <div className="matrix-rain" style={{ top: '10%', left: '20%', animationDuration: '3s' }}>101010</div>
              </>
           )}
@@ -413,11 +522,12 @@ const App: React.FC = () => {
           isOffline={isOffline}
         />
 
-        <div className="flex-1 overflow-y-auto relative z-10 flex flex-col pb-24 md:pb-0">
+        <div className="flex-1 overflow-y-auto relative z-10 flex flex-col pb-24 md:pb-0" id="main-scroll-area">
           <div className="lg:hidden p-4">
             <button 
               onClick={() => setSidebarOpen(true)}
               className={`p-2 rounded border ${isWizard ? 'border-emerald-500/30 text-emerald-400' : 'border-fuchsia-500/30 text-fuchsia-400'}`}
+              style={profile.themeColor ? {borderColor: profile.themeColor, color: profile.themeColor} : {}}
             >
               <Menu />
             </button>
@@ -433,7 +543,9 @@ const App: React.FC = () => {
              )}
              <h2 className={`text-3xl md:text-5xl font-bold mb-4 tracking-wider
                ${isWizard ? 'font-wizardTitle text-emerald-100 drop-shadow-[0_0_10px_rgba(16,185,129,0.5)]' : 'font-muggle text-fuchsia-100 drop-shadow-[0_0_10px_rgba(217,70,239,0.5)]'}
-             `}>
+             `}
+             style={profile.themeColor ? { color: profile.themeColor, textShadow: `0 0 20px ${profile.themeColor}50` } : {}}
+             >
                {isWizard ? activeSector.wizardName : activeSector.muggleName}
              </h2>
              <p className={`max-w-2xl mx-auto text-sm md:text-base opacity-80 ${isWizard ? 'font-wizard text-emerald-200' : 'font-muggle text-fuchsia-200'}`}>
@@ -443,7 +555,7 @@ const App: React.FC = () => {
 
           <div className="flex-1 flex flex-col items-center justify-center py-4">
             {activeSectorId === 'announcements' && announcementViewMode === 'carousel' ? (
-              <div className="w-full flex flex-col items-center gap-6 animate-[fade-in_0.5s]">
+              <div className="w-full flex flex-col items-center gap-6 animate-[fade-in_0.5s] carousel-container">
                  <Carousel 
                     items={currentViewItems} 
                     lineage={lineage} 
@@ -458,6 +570,7 @@ const App: React.FC = () => {
                         ? 'bg-emerald-900/20 border-emerald-500/50 text-emerald-300 hover:bg-emerald-900/40' 
                         : 'bg-fuchsia-900/20 border-fuchsia-500/50 text-fuchsia-300 hover:bg-fuchsia-900/40'}
                     `}
+                    style={profile.themeColor ? {borderColor: profile.themeColor, color: profile.themeColor, backgroundColor: `${profile.themeColor}20`} : {}}
                   >
                      <LayoutList size={18} />
                      <span className={isWizard ? 'font-wizard' : 'font-muggle text-sm'}>
@@ -466,7 +579,7 @@ const App: React.FC = () => {
                   </button>
               </div>
             ) : (
-              <Suspense fallback={<LoadingSpinner lineage={lineage}/>}>
+              <Suspense fallback={<LoadingSpinner lineage={lineage} color={profile.themeColor}/>}>
                   <SectorView 
                     items={currentViewItems} 
                     lineage={lineage} 
@@ -492,7 +605,8 @@ const App: React.FC = () => {
                  ? 'bg-emerald-900/30 border-emerald-500/50 text-emerald-400 hover:bg-emerald-900/60' 
                  : 'bg-fuchsia-900/30 border-fuchsia-500/50 text-fuchsia-400 hover:bg-fuchsia-900/60'}
               `}
-              title="Student Tools"
+              style={profile.themeColor ? {borderColor: profile.themeColor, color: profile.themeColor, backgroundColor: `${profile.themeColor}30`} : {}}
+              title="Student Tools & Profile"
             >
               <Briefcase size={20} />
             </button>
@@ -504,6 +618,7 @@ const App: React.FC = () => {
                 lineage={lineage} 
                 onClose={() => setToolsOpen(false)} 
                 profile={profile} 
+                setProfile={setProfile}
                 config={globalConfig}
               />
             )}
@@ -519,7 +634,7 @@ const App: React.FC = () => {
                lineage={lineage}
                isOpen={oracleOpen}
                onClose={() => setOracleOpen(false)}
-               items={allGameData} // Pass ALL items, sorted by newest
+               items={allGameData} 
             />
 
             <AdminPanel 
