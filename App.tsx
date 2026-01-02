@@ -1,18 +1,21 @@
-import React, { useState, useEffect, useMemo } from 'react';
+
+import React, { useState, useEffect, useMemo, Suspense, lazy } from 'react';
 import IdentityGate from './components/IdentityGate';
 import Sidebar from './components/Sidebar';
 import Carousel from './components/Carousel';
-import SectorView from './components/SectorViews';
 import HUD from './components/HUD';
-import ToolsModal from './components/ToolsModal';
-import ItemViewer from './components/ItemViewer';
-import CommandPalette from './components/CommandPalette';
-import CommandCenter from './components/CommandCenter';
-import AdminPanel from './components/AdminPanel';
-import OracleInterface from './components/OracleInterface'; 
 import { Lineage, SECTORS, type CarouselItem, type UserProfile, type Sector, type AdminPermissions } from './types';
-import { Menu, Briefcase, Lock, LayoutList } from 'lucide-react';
+import { Menu, Briefcase, Lock, LayoutList, Loader2 } from 'lucide-react';
 import { supabase } from './lib/supabase';
+
+// Lazy Load Heavy/Modal Components
+const SectorView = lazy(() => import('./components/SectorViews'));
+const ToolsModal = lazy(() => import('./components/ToolsModal'));
+const ItemViewer = lazy(() => import('./components/ItemViewer'));
+const CommandPalette = lazy(() => import('./components/CommandPalette'));
+const CommandCenter = lazy(() => import('./components/CommandCenter'));
+const AdminPanel = lazy(() => import('./components/AdminPanel'));
+const OracleInterface = lazy(() => import('./components/OracleInterface'));
 
 // SECURITY: Define the API URL based on environment.
 // On Vercel, we can use an empty string to denote "same origin" (relative path), eliminating CORS.
@@ -133,6 +136,12 @@ const DEFAULT_CONFIG: GlobalConfig = {
   muggleImage: 'https://images.unsplash.com/photo-1480714378408-67cf0d13bc1b?q=80&w=2070&auto=format&fit=crop',
   showDemoData: true
 };
+
+const LoadingSpinner = ({ lineage }: { lineage: Lineage | null }) => (
+    <div className={`fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm ${lineage === Lineage.WIZARD ? 'text-emerald-500' : 'text-fuchsia-500'}`}>
+        <Loader2 size={40} className="animate-spin" />
+    </div>
+);
 
 const App: React.FC = () => {
   const [lineage, setLineage] = useState<Lineage | null>(null);
@@ -504,18 +513,20 @@ const App: React.FC = () => {
                   </button>
               </div>
             ) : (
-              <SectorView 
-                items={currentViewItems} 
-                lineage={lineage} 
-                sectorId={activeSectorId}
-                onViewItem={handleViewItem}
-                isAdmin={isAdmin}
-                onDelete={permissions?.canDelete ? handleDeleteItem : undefined}
-                onEdit={permissions?.canEdit ? handleEditItemRequest : undefined}
-                onBack={activeSectorId === 'announcements' ? () => setAnnouncementViewMode('carousel') : undefined}
-                onAddItem={(sector) => { setEditingItem(null); setActiveSectorId(sector); setAdminPanelOpen(true); }}
-                onQuickCreate={handleCreateItem}
-              />
+              <Suspense fallback={<LoadingSpinner lineage={lineage}/>}>
+                  <SectorView 
+                    items={currentViewItems} 
+                    lineage={lineage} 
+                    sectorId={activeSectorId}
+                    onViewItem={handleViewItem}
+                    isAdmin={isAdmin}
+                    onDelete={permissions?.canDelete ? handleDeleteItem : undefined}
+                    onEdit={permissions?.canEdit ? handleEditItemRequest : undefined}
+                    onBack={activeSectorId === 'announcements' ? () => setAnnouncementViewMode('carousel') : undefined}
+                    onAddItem={(sector) => { setEditingItem(null); setActiveSectorId(sector); setAdminPanelOpen(true); }}
+                    onQuickCreate={handleCreateItem}
+                  />
+              </Suspense>
             )}
           </div>
         </div>
@@ -534,68 +545,70 @@ const App: React.FC = () => {
             </button>
         </div>
 
-        {toolsOpen && (
-          <ToolsModal 
-            lineage={lineage} 
-            onClose={() => setToolsOpen(false)} 
-            profile={profile} 
-            config={globalConfig}
-          />
-        )}
+        <Suspense fallback={null}>
+            {toolsOpen && (
+              <ToolsModal 
+                lineage={lineage} 
+                onClose={() => setToolsOpen(false)} 
+                profile={profile} 
+                config={globalConfig}
+              />
+            )}
 
-        <CommandCenter 
-          lineage={lineage} 
-          isOpen={commandCenterOpen} 
-          onClose={() => setCommandCenterOpen(false)} 
-          onImportItems={handleImportItems}
-        />
+            <CommandCenter 
+              lineage={lineage} 
+              isOpen={commandCenterOpen} 
+              onClose={() => setCommandCenterOpen(false)} 
+              onImportItems={handleImportItems}
+            />
 
-        <OracleInterface
-           lineage={lineage}
-           isOpen={oracleOpen}
-           onClose={() => setOracleOpen(false)}
-           items={allGameData} // Pass ALL items, sorted by newest
-        />
+            <OracleInterface
+               lineage={lineage}
+               isOpen={oracleOpen}
+               onClose={() => setOracleOpen(false)}
+               items={allGameData} // Pass ALL items, sorted by newest
+            />
 
-        <AdminPanel 
-          lineage={lineage}
-          isOpen={adminPanelOpen}
-          onClose={() => { setAdminPanelOpen(false); setEditingItem(null); }}
-          isAdmin={isAdmin}
-          csrfToken={csrfToken}
-          currentUser={currentUser}
-          permissions={permissions}
-          onLogin={handleLoginSuccess}
-          onLogout={handleLogout}
-          
-          allItems={dbItems} 
-          sectors={sectors}
-          globalConfig={globalConfig}
-          initialEditingItem={editingItem}
-          defaultSector={activeSectorId}
-          
-          onAddItem={handleCreateItem}
-          onUpdateItem={handleUpdateItem}
-          onDeleteItem={handleDeleteItem}
-          onUpdateSectors={saveSectors}
-          onUpdateConfig={saveGlobalConfig}
-          onClearData={handleFactoryReset}
-        />
+            <AdminPanel 
+              lineage={lineage}
+              isOpen={adminPanelOpen}
+              onClose={() => { setAdminPanelOpen(false); setEditingItem(null); }}
+              isAdmin={isAdmin}
+              csrfToken={csrfToken}
+              currentUser={currentUser}
+              permissions={permissions}
+              onLogin={handleLoginSuccess}
+              onLogout={handleLogout}
+              
+              allItems={dbItems} 
+              sectors={sectors}
+              globalConfig={globalConfig}
+              initialEditingItem={editingItem}
+              defaultSector={activeSectorId}
+              
+              onAddItem={handleCreateItem}
+              onUpdateItem={handleUpdateItem}
+              onDeleteItem={handleDeleteItem}
+              onUpdateSectors={saveSectors}
+              onUpdateConfig={saveGlobalConfig}
+              onClearData={handleFactoryReset}
+            />
 
-        {viewingItem && (
-          <ItemViewer 
-            item={viewingItem} 
-            lineage={lineage} 
-            onClose={() => setViewingItem(null)} 
-          />
-        )}
-        
-        <CommandPalette 
-          lineage={lineage} 
-          isOpen={cmdOpen} 
-          onClose={() => setCmdOpen(false)} 
-          onNavigate={(id) => setActiveSectorId(id)}
-        />
+            {viewingItem && (
+              <ItemViewer 
+                item={viewingItem} 
+                lineage={lineage} 
+                onClose={() => setViewingItem(null)} 
+              />
+            )}
+            
+            <CommandPalette 
+              lineage={lineage} 
+              isOpen={cmdOpen} 
+              onClose={() => setCmdOpen(false)} 
+              onNavigate={(id) => setActiveSectorId(id)}
+            />
+        </Suspense>
       </main>
     </div>
   );
