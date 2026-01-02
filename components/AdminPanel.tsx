@@ -46,6 +46,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 }) => {
   const isWizard = lineage === Lineage.WIZARD;
   const [activeTab, setActiveTab] = useState<'creator' | 'ai-lab' | 'database' | 'visitors' | 'structure' | 'users' | 'config' | 'tools'>('database');
+  const [showMobilePreview, setShowMobilePreview] = useState(false);
   
   // Login State
   const [loginUser, setLoginUser] = useState('');
@@ -215,24 +216,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     } catch (err: any) { setError(err.message); } finally { setIsLoading(false); }
   };
 
-  const handleChangePassword = async () => {
-      try {
-          const res = await fetch(`${API_URL}/api/admin/change-password`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrfToken },
-              body: JSON.stringify({ currentPassword: currPass, newPassword: newPass }),
-              credentials: 'include'
-          });
-          if(res.ok) {
-              setPassMsg("Password updated successfully.");
-              setCurrPass(''); setNewPass('');
-          } else {
-              const d = await res.json();
-              setPassMsg(`Error: ${d.error}`);
-          }
-      } catch(e) { setPassMsg("Connection error."); }
-  };
-
   const startEditItem = (item: CarouselItem) => {
       if (!permissions?.canEdit) return;
       setItemForm({
@@ -336,10 +319,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     }
     
     setAiLoading(true);
-    
-    // For Serverless stability, we only send text prompts right now.
-    // File uploads to AI via Vercel require edge handling or external storage first.
-    // Simplification:
     let instructions = aiPrompt;
     if (file) {
         instructions += " [File analysis temporarily disabled in serverless mode - please paste text content instead]";
@@ -564,7 +543,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 p-2 sm:p-4 animate-[fade-in_0.2s_ease-out]">
-      <div className={`w-full max-w-6xl rounded-xl border shadow-2xl overflow-hidden flex flex-col relative h-full max-h-[95vh] text-zinc-200 transition-colors duration-500
+      <div className={`w-full max-w-6xl rounded-xl border shadow-2xl overflow-hidden flex flex-col relative h-[calc(100dvh-20px)] sm:h-full sm:max-h-[95vh] text-zinc-200 transition-colors duration-500
         ${isWizard ? 'bg-[#0a0505] border-red-900/50 shadow-red-900/30' : 'bg-[#050510] border-blue-900/50 shadow-blue-900/30'}
       `}>
         <button onClick={onClose} className="absolute top-4 right-4 text-white/50 hover:text-white z-30 p-2 hover:bg-white/10 rounded-full transition-colors">
@@ -691,7 +670,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                   { id: 'creator', label: 'Item Creator', icon: PenTool, show: permissions?.canEdit },
                   { id: 'ai-lab', label: 'The Lab (AI)', icon: BrainCircuit, show: permissions?.canEdit },
                   { id: 'database', label: 'Database', icon: Database, show: true },
-                  { id: 'visitors', label: 'Visitor Intelligence', icon: Activity, show: permissions?.canViewLogs }, // NEW TAB
+                  { id: 'visitors', label: 'Visitor Intelligence', icon: Activity, show: permissions?.canViewLogs }, 
                   { id: 'structure', label: 'Sectors', icon: Edit3, show: permissions?.canEdit },
                   { id: 'config', label: 'Global Config', icon: Settings, show: permissions?.canEdit },
                   { id: 'users', label: 'Users & Security', icon: Users, show: true },
@@ -712,13 +691,24 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
             </div>
 
             {/* TAB CONTENT */}
-            <div className="flex-1 overflow-y-auto p-4 sm:p-6 pb-20 relative">
+            <div className="flex-1 overflow-y-auto p-2 sm:p-6 pb-20 relative">
                 
                 {/* --- TAB: CREATOR (THE FORGE) --- */}
                 {activeTab === 'creator' && (
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full">
+                        
+                        {/* MOBILE TOGGLE FOR PREVIEW */}
+                        <div className="lg:hidden col-span-1 flex justify-end">
+                            <button 
+                                onClick={() => setShowMobilePreview(!showMobilePreview)}
+                                className={`px-4 py-2 text-xs font-bold rounded border ${isWizard ? 'border-emerald-500 text-emerald-400' : 'border-fuchsia-500 text-fuchsia-400'}`}
+                            >
+                                {showMobilePreview ? 'Hide Preview' : 'Show Preview'}
+                            </button>
+                        </div>
+
                         {/* FORM COLUMN */}
-                        <div className={`lg:col-span-7 flex flex-col p-6 rounded-xl border relative overflow-y-auto z-0 ${isWizard ? 'border-red-800/30 bg-[#0f0a0a]' : 'border-blue-800/30 bg-[#0a0a12]'}`}>
+                        <div className={`lg:col-span-7 flex flex-col p-4 sm:p-6 rounded-xl border relative overflow-y-auto z-0 ${showMobilePreview ? 'hidden lg:flex' : 'flex'} ${isWizard ? 'border-red-800/30 bg-[#0f0a0a]' : 'border-blue-800/30 bg-[#0a0a12]'}`}>
                            <div className="font-bold mb-6 flex items-center justify-between text-xl border-b border-white/10 pb-4 text-white">
                                <div className="flex items-center gap-2">
                                    {isEditingItem ? <Edit3 size={20} className="text-yellow-500" /> : <Plus size={20} className="text-green-500" />} 
@@ -735,7 +725,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                            </div>
                            
                            <div className="space-y-6 pb-20">
-                              <div className="grid grid-cols-2 gap-6">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                                   <div>
                                     <label className="text-xs font-bold opacity-70 block mb-1.5 text-white">TITLE</label>
                                     <input value={itemForm.title} onChange={e => setItemForm({...itemForm, title: e.target.value})} disabled={!permissions?.canEdit}
@@ -893,8 +883,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                            )}
                         </div>
 
-                        {/* LIVE PREVIEW COLUMN */}
-                        <div className="lg:col-span-5 hidden lg:flex flex-col h-full overflow-hidden">
+                        {/* LIVE PREVIEW COLUMN - VISIBLE ON MOBILE IF TOGGLED */}
+                        <div className={`lg:col-span-5 flex flex-col h-full overflow-hidden ${showMobilePreview ? 'flex' : 'hidden lg:flex'}`}>
                             <div className="mb-4 text-xs font-bold opacity-50 uppercase tracking-widest text-center">Live Preview</div>
                             <div className="flex items-center justify-center h-full p-8 border border-white/10 rounded-xl bg-black/20 relative">
                                 <div className="w-[300px] h-[450px] relative rounded-xl border flex flex-col justify-between overflow-hidden
@@ -933,6 +923,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                     </div>
                 )}
 
+                {/* ... (Rest of tabs remain mostly same, ensure container heights are appropriate) ... */}
                 {/* --- TAB: AI LAB --- */}
                 {activeTab === 'ai-lab' && (
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full max-w-7xl mx-auto">
@@ -1199,7 +1190,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
                 {activeTab === 'users' && (
                     <div className="h-full flex flex-col max-w-4xl mx-auto">
-                        <div className="flex gap-6 mb-8">
+                        <div className="flex flex-col sm:flex-row gap-6 mb-8">
                             <div className="flex-1 p-6 border border-white/10 rounded-lg bg-white/5">
                                 <h3 className="font-bold text-white mb-4 flex items-center gap-2"><Shield size={18}/> Create Admin</h3>
                                 <div className="space-y-3">

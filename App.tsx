@@ -142,11 +142,13 @@ const App: React.FC = () => {
 
   // Load Config
   useEffect(() => {
+    // 1. Load Local
     const savedSectors = localStorage.getItem('core_connect_sectors');
     if (savedSectors) setSectors(JSON.parse(savedSectors));
     const savedConfig = localStorage.getItem('core_connect_global_config_v2');
     if (savedConfig) setGlobalConfig({ ...DEFAULT_CONFIG, ...JSON.parse(savedConfig) });
 
+    // 2. Fetch Config
     const fetchConfig = async () => {
       const { ok, data } = await safeFetch(`${API_URL}/api/config`);
       if (ok && data) {
@@ -158,12 +160,30 @@ const App: React.FC = () => {
           setIsOffline(false);
       }
     };
+    
+    // 3. Fetch Sectors (NEW)
+    const fetchSectors = async () => {
+        const { ok, data } = await safeFetch(`${API_URL}/api/sectors`);
+        if (ok && data && Array.isArray(data) && data.length > 0) {
+            setSectors(data);
+            localStorage.setItem('core_connect_sectors', JSON.stringify(data));
+        }
+    };
+
     fetchConfig();
+    fetchSectors();
   }, []);
 
-  const saveSectors = (newSectors: Sector[]) => {
+  const saveSectors = async (newSectors: Sector[]) => {
     setSectors(newSectors);
     localStorage.setItem('core_connect_sectors', JSON.stringify(newSectors));
+    // Persist to Backend if Admin
+    if (isAdmin && csrfToken) {
+        await safeFetch(`${API_URL}/api/admin/sectors`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrfToken },
+            body: JSON.stringify(newSectors)
+        });
+    }
   };
 
   const saveGlobalConfig = async (newConfig: GlobalConfig) => {
@@ -233,9 +253,13 @@ const App: React.FC = () => {
   const allGameData = useMemo(() => dbItems.sort((a, b) => new Date(b.date.replace(/\./g, '-')).getTime() - new Date(a.date.replace(/\./g, '-')).getTime()), [dbItems]);
   const currentViewItems = useMemo(() => allGameData.filter(i => i.sector === activeSectorId), [allGameData, activeSectorId]);
 
-  const handleLineageSelect = (l: Lineage) => {
+  const handleLineageSelect = (l: Lineage, name?: string) => {
       setLineage(l);
-      setProfile(prev => ({ ...prev, visitCount: prev.visitCount + 1 }));
+      setProfile(prev => ({ 
+          ...prev, 
+          displayName: name || prev.displayName, 
+          visitCount: prev.visitCount + 1 
+      }));
       if (profile.defaultSector) setActiveSectorId(profile.defaultSector);
   };
 
@@ -294,7 +318,14 @@ const App: React.FC = () => {
       />
 
       <main className="flex-1 flex flex-col relative overflow-hidden z-10 transition-all lg:ml-20">
-        <HUD lineage={lineage} onToggleLineage={() => setLineage(prev => prev === Lineage.WIZARD ? Lineage.MUGGLE : Lineage.WIZARD)} profile={profile} onOpenOracle={() => setOracleOpen(true)} isOffline={isOffline} />
+        <HUD 
+            lineage={lineage} 
+            onToggleLineage={() => setLineage(prev => prev === Lineage.WIZARD ? Lineage.MUGGLE : Lineage.WIZARD)} 
+            profile={profile} 
+            onOpenOracle={() => setOracleOpen(true)}
+            onOpenTools={() => setToolsOpen(true)}
+            isOffline={isOffline} 
+        />
 
         <div className="flex-1 overflow-y-auto relative z-10 flex flex-col pb-24 md:pb-0">
           <div className="lg:hidden p-4">
@@ -328,8 +359,9 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        <div className="absolute bottom-6 left-6 z-30">
-            <button onClick={() => setToolsOpen(true)} className={`p-3 rounded-full border shadow-lg transition-all hover:scale-110 active:scale-95 ${isWizard ? 'bg-emerald-900/30 border-emerald-500/50 text-emerald-400' : 'bg-fuchsia-900/30 border-fuchsia-500/50 text-fuchsia-400'}`} style={profile.themeColor ? {borderColor: profile.themeColor, color: profile.themeColor, backgroundColor: `${profile.themeColor}30`} : {}}><Briefcase size={20} /></button>
+        {/* RESTORED FLOATING BAG ICON WITH HIGHER Z-INDEX */}
+        <div className="absolute bottom-6 left-6 z-[60]">
+            <button onClick={() => setToolsOpen(true)} className={`p-3 rounded-full border shadow-lg transition-all hover:scale-110 active:scale-95 ${isWizard ? 'bg-emerald-900/80 border-emerald-500/50 text-emerald-400' : 'bg-fuchsia-900/80 border-fuchsia-500/50 text-fuchsia-400'}`} style={profile.themeColor ? {borderColor: profile.themeColor, color: profile.themeColor, backgroundColor: `${profile.themeColor}30`} : {}}><Briefcase size={20} /></button>
         </div>
 
         <Suspense fallback={null}>

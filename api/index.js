@@ -110,7 +110,8 @@ router.post('/login', async (req, res) => {
         const hash = (await scrypt(process.env.ADMIN_PASSWORD || 'admin123', salt, 64)).toString('hex');
         await supabase.from('admin_users').insert({
             username: 'admin', salt, password_hash: hash,
-            permissions: { canEdit: true, canDelete: true, canManageUsers: true, isGod: true }
+            // FIX: Added canViewLogs: true so the tab shows up
+            permissions: { canEdit: true, canDelete: true, canManageUsers: true, canViewLogs: true, isGod: true }
         });
     }
     const { data: user } = await supabase.from('admin_users').select('*').eq('username', username).single();
@@ -133,6 +134,36 @@ router.get('/me', (req, res) => {
 router.get('/config', async (req, res) => {
     const { data } = await supabase.from('global_config').select('config').limit(1).single();
     res.json(data?.config || {});
+});
+
+// NEW: Sectors Endpoints for Persistence
+router.get('/sectors', async (req, res) => {
+    // Attempt to fetch from 'sectors_config' table or a JSON blob
+    // Simpler approach: Store as a JSON blob in 'global_config' with id=2 or similar, 
+    // or assume a 'sectors' table exists. 
+    // Given previous setup, we'll try to use a dedicated row in global_config for simplicity if table doesn't exist,
+    // BUT best practice is a separate table. Let's try 'sectors' table first.
+    try {
+        const { data, error } = await supabase.from('sectors').select('*').order('created_at', { ascending: true });
+        if (error || !data || data.length === 0) {
+             // Fallback: Check global_config for a 'sectors' entry
+             const { data: configData } = await supabase.from('global_config').select('config').eq('id', 2).single();
+             if (configData) return res.json(configData.config);
+             return res.json([]); // Return empty if nothing found, frontend uses defaults
+        }
+        res.json(data);
+    } catch(e) { res.json([]); }
+});
+
+router.post('/admin/sectors', requireAuth, async (req, res) => {
+    if(!req.user.permissions.canEdit) return res.status(403).json({error: "Forbidden"});
+    try {
+        // We will store the entire array as a JSON blob in global_config with id=2 to avoid complex schema migrations
+        // This ensures "whatever I save... saves for all users"
+        const { error } = await supabase.from('global_config').upsert({ id: 2, config: req.body });
+        if (error) throw error;
+        res.json({success: true});
+    } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 // --- VISITOR TRACKING ---

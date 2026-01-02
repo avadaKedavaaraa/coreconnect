@@ -1,12 +1,13 @@
 
 import React, { useState, useEffect } from 'react';
 import { Lineage, type UserProfile } from '../types';
-import { ShieldCheck, RotateCw, Battery, BatteryMedium, BatteryFull, BatteryLow, MessageSquare, Terminal, Sparkles, WifiOff, Zap } from 'lucide-react';
+import { ShieldCheck, RotateCw, Battery, BatteryMedium, BatteryFull, BatteryLow, MessageSquare, Terminal, Sparkles, WifiOff, Zap, User, Accessibility, Settings2 } from 'lucide-react';
 
 interface HUDProps {
   lineage: Lineage;
   onToggleLineage: () => void;
   onOpenOracle?: () => void;
+  onOpenTools?: () => void;
   profile: UserProfile;
   isOffline?: boolean;
 }
@@ -21,7 +22,7 @@ interface BatteryManager extends EventTarget {
   removeEventListener(type: string, listener: EventListenerOrEventListenerObject | null, options?: boolean | EventListenerOptions): void;
 }
 
-const HUD: React.FC<HUDProps> = ({ lineage, onToggleLineage, profile, onOpenOracle, isOffline }) => {
+const HUD: React.FC<HUDProps> = ({ lineage, onToggleLineage, profile, onOpenOracle, onOpenTools, isOffline }) => {
   const [time, setTime] = useState(new Date());
   const [battery, setBattery] = useState<{level: number, charging: boolean} | null>(null);
 
@@ -123,7 +124,7 @@ const HUD: React.FC<HUDProps> = ({ lineage, onToggleLineage, profile, onOpenOrac
       </div>
 
       {/* Center: Reality Switcher */}
-      <div className="flex items-center">
+      <div className="flex items-center hidden sm:flex">
         <button
           onClick={onToggleLineage}
           className={`flex items-center gap-2 px-3 py-1 rounded-full border transition-all duration-300 hover:scale-105
@@ -140,20 +141,47 @@ const HUD: React.FC<HUDProps> = ({ lineage, onToggleLineage, profile, onOpenOrac
         </button>
       </div>
 
-      {/* Right Time & Info */}
-      <div className="flex items-center gap-4">
-        <div className="text-right hidden sm:block leading-tight">
-          <div className="text-xs font-bold flex items-center justify-end gap-1 max-w-[100px] truncate">
-             {profile.displayName || 'Guest'}
-          </div>
-          <div className="text-[10px] opacity-60 font-mono">{formatDate(time)} {formatTime(time)}</div>
-        </div>
+      {/* Right: User Actions & Info */}
+      <div className="flex items-center gap-3 sm:gap-4">
         
-        {/* Battery Widget */}
-        <div className="flex items-center gap-1 opacity-80" title={battery ? `Battery: ${Math.round(battery.level * 100)}%` : "Checking Power..."}>
-            <span className="text-[10px] font-bold hidden sm:inline">{battery ? `${Math.round(battery.level * 100)}%` : ''}</span>
-            {getBatteryIcon()}
+        {/* Battery & Time (Hidden on very small screens if crowded) */}
+        <div className="text-right hidden md:block leading-tight opacity-70">
+          <div className="text-[10px] font-bold flex items-center justify-end gap-1">
+             {getBatteryIcon()} {battery ? `${Math.round(battery.level * 100)}%` : ''}
+          </div>
+          <div className="text-[10px] font-mono">{formatDate(time)} {formatTime(time)}</div>
         </div>
+
+        <div className="h-6 w-px bg-white/10 hidden md:block"></div>
+
+        {/* User Profile Action */}
+        <div className="flex items-center gap-2">
+            <div className={`hidden sm:block text-right`}>
+                <div className="text-xs font-bold truncate max-w-[80px]">{profile.displayName || 'Guest'}</div>
+                <div className="text-[9px] opacity-60 uppercase">{profile.house}</div>
+            </div>
+            
+            <button 
+                onClick={onOpenTools}
+                className={`w-8 h-8 rounded-full border flex items-center justify-center transition-all hover:scale-110 active:scale-95 overflow-hidden
+                    ${isWizard ? 'bg-emerald-900/50 border-emerald-500' : 'bg-fuchsia-900/50 border-fuchsia-500'}
+                `}
+                title="User Profile"
+            >
+                <User size={16} />
+            </button>
+
+            <button 
+                onClick={onOpenTools}
+                className={`w-8 h-8 rounded-full border flex items-center justify-center transition-all hover:scale-110 active:scale-95
+                    ${isWizard ? 'bg-emerald-900/30 border-emerald-500/50 text-emerald-300' : 'bg-fuchsia-900/30 border-fuchsia-500/50 text-fuchsia-300'}
+                `}
+                title="User Config Matrix (Accessibility)"
+            >
+                <Accessibility size={18} />
+            </button>
+        </div>
+
       </div>
     </div>
   );

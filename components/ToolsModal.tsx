@@ -16,7 +16,8 @@ interface ToolsModalProps {
 }
 
 const ToolsModal: React.FC<ToolsModalProps> = ({ lineage, onClose, profile, setProfile, config }) => {
-  const [activeTab, setActiveTab] = useState<'timer' | 'tasks' | 'profile'>('timer');
+  // Default to profile to match "User Config Matrix" request
+  const [activeTab, setActiveTab] = useState<'timer' | 'tasks' | 'profile'>('profile');
   const isWizard = lineage === Lineage.WIZARD;
 
   // Local State for Profile Editing
@@ -88,6 +89,17 @@ const ToolsModal: React.FC<ToolsModalProps> = ({ lineage, onClose, profile, setP
         {/* Tabs */}
         <div className={`flex border-b shrink-0 overflow-x-auto ${isWizard ? 'border-emerald-900' : 'border-fuchsia-900'}`}>
            <button 
+             onClick={() => setActiveTab('profile')}
+             className={`flex-1 min-w-[120px] p-3 flex items-center justify-center gap-2 text-sm transition-colors whitespace-nowrap
+               ${activeTab === 'profile' 
+                 ? (isWizard ? 'bg-emerald-900/30 text-emerald-100' : 'bg-fuchsia-900/30 text-fuchsia-100') 
+                 : 'opacity-50 hover:opacity-100'}
+               ${isWizard ? 'font-wizard' : 'font-muggle'}
+             `}
+           >
+             <User size={16} /> <span>{isWizard ? 'Identity & Style' : 'Profile & UI'}</span>
+           </button>
+           <button 
              onClick={() => setActiveTab('timer')}
              className={`flex-1 min-w-[100px] p-3 flex items-center justify-center gap-2 text-sm transition-colors whitespace-nowrap
                ${activeTab === 'timer' 
@@ -108,17 +120,6 @@ const ToolsModal: React.FC<ToolsModalProps> = ({ lineage, onClose, profile, setP
              `}
            >
              <ClipboardList size={16} /> <span className="hidden sm:inline">{isWizard ? 'Tasks' : 'Tickets'}</span>
-           </button>
-           <button 
-             onClick={() => setActiveTab('profile')}
-             className={`flex-1 min-w-[120px] p-3 flex items-center justify-center gap-2 text-sm transition-colors whitespace-nowrap
-               ${activeTab === 'profile' 
-                 ? (isWizard ? 'bg-emerald-900/30 text-emerald-100' : 'bg-fuchsia-900/30 text-fuchsia-100') 
-                 : 'opacity-50 hover:opacity-100'}
-               ${isWizard ? 'font-wizard' : 'font-muggle'}
-             `}
-           >
-             <User size={16} /> <span>{isWizard ? 'Identity & Style' : 'Profile & UI'}</span>
            </button>
         </div>
 
