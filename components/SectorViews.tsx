@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Lineage, type CarouselItem, type LectureRule } from '../types';
 import { GlobalConfig } from '../App';
-import { Book, FileText, Video, Calendar, Search, Filter, X, Trash2, LayoutGrid, List, FolderOpen, ArrowLeft, Edit2, Plus, FolderPlus, Loader2, Image as ImageIcon, Send, Link, Repeat, ExternalLink, Hourglass, MonitorOff, Clock, Bell } from 'lucide-react';
+import { Book, FileText, Video, Calendar, Search, Filter, X, Trash2, LayoutGrid, List, FolderOpen, ArrowLeft, Edit2, Plus, FolderPlus, Loader2, Image as ImageIcon, Send, Link as LinkIcon, Repeat, ExternalLink, Hourglass, MonitorOff, Clock, Bell, Layers, Code, Link } from 'lucide-react';
 import CalendarWidget from './CalendarWidget';
 import DOMPurify from 'dompurify';
 
@@ -168,10 +168,45 @@ const SectorView: React.FC<SectorViewProps> = ({
           setIsPosting(false);
       }
   };
+  
+  // --- SUBJECT MANAGEMENT HANDLERS ---
+  const handleCreateSubject = async () => {
+      if (!newSubjectName.trim() || !onQuickCreate) return;
+      setIsProcessing(true);
+      const today = new Date().toISOString().split('T')[0].replace(/-/g, '.');
+      const genesisItem: CarouselItem = {
+          id: crypto.randomUUID(), title: `Welcome to ${newSubjectName}`, content: `This folder has been created for ${newSubjectName} resources.`, date: today,
+          type: 'announcement', sector: sectorId, subject: newSubjectName, image: newSubjectImage || undefined, author: 'System', isUnread: true, likes: 0
+      };
+      try {
+          await onQuickCreate(genesisItem);
+          setNewSubjectName(''); setNewSubjectImage(''); setIsCreatingSubject(false);
+      } catch (e) { console.error(e); alert("Failed to create subject."); } finally { setIsProcessing(false); }
+  };
 
-  // --- RENDER QUICK INPUT ONLY ---
+  const handleDeleteSubject = async (e: React.MouseEvent, subject: string) => {
+      e.stopPropagation();
+      if (!onDelete) return;
+      const count = items.filter(i => (i.subject || 'General') === subject).length;
+      if (!confirm(`WARNING: This will delete the subject "${subject}" and ALL ${count} items inside it.\n\nThis action cannot be undone.\n\nAre you sure?`)) { return; }
+      const itemsToDelete = items.filter(i => (i.subject || 'General') === subject);
+      for (const item of itemsToDelete) { onDelete(item.id); }
+  };
+
+  // Helper for icons based on type
+  const getTypeIcon = (type: string) => {
+      switch(type) {
+          case 'video': return <Video size={20} />;
+          case 'file': return <FileText size={20} />;
+          case 'mixed': return <Layers size={20} />;
+          case 'code': return <Code size={20} />;
+          case 'link': return <LinkIcon size={20} />;
+          default: return <FileText size={20} />;
+      }
+  };
+
   if (quickInputOnly) {
-      return (
+     return (
         <div className={`relative flex items-center p-2 rounded-lg border backdrop-blur-sm transition-all
             ${isWizard ? 'bg-emerald-950/40 border-emerald-500/30 focus-within:border-emerald-400' : 'bg-fuchsia-950/40 border-fuchsia-500/30 focus-within:border-fuchsia-400'}
         `}>
@@ -194,53 +229,6 @@ const SectorView: React.FC<SectorViewProps> = ({
         </div>
       );
   }
-
-  // --- SUBJECT MANAGEMENT HANDLERS ---
-
-  const handleCreateSubject = async () => {
-      if (!newSubjectName.trim() || !onQuickCreate) return;
-      setIsProcessing(true);
-
-      const today = new Date().toISOString().split('T')[0].replace(/-/g, '.');
-      const genesisItem: CarouselItem = {
-          id: crypto.randomUUID(), 
-          title: `Welcome to ${newSubjectName}`,
-          content: `This folder has been created for ${newSubjectName} resources.`,
-          date: today,
-          type: 'announcement',
-          sector: sectorId,
-          subject: newSubjectName,
-          image: newSubjectImage || undefined,
-          author: 'System',
-          isUnread: true,
-          likes: 0
-      };
-
-      try {
-          await onQuickCreate(genesisItem);
-          setNewSubjectName('');
-          setNewSubjectImage('');
-          setIsCreatingSubject(false);
-      } catch (e) {
-          console.error(e);
-          alert("Failed to create subject.");
-      } finally {
-          setIsProcessing(false);
-      }
-  };
-
-  const handleDeleteSubject = async (e: React.MouseEvent, subject: string) => {
-      e.stopPropagation();
-      if (!onDelete) return;
-      const count = items.filter(i => (i.subject || 'General') === subject).length;
-      if (!confirm(`WARNING: This will delete the subject "${subject}" and ALL ${count} items inside it.\n\nThis action cannot be undone.\n\nAre you sure?`)) {
-          return;
-      }
-      const itemsToDelete = items.filter(i => (i.subject || 'General') === subject);
-      for (const item of itemsToDelete) {
-          onDelete(item.id);
-      }
-  };
 
   return (
     <div className={`w-full max-w-7xl mx-auto px-4 sm:px-6 pb-20 animate-[fade-in-up_0.3s_ease-out] ${isWizard ? 'scrollbar-wizard' : 'scrollbar-muggle'}`}>
@@ -288,29 +276,6 @@ const SectorView: React.FC<SectorViewProps> = ({
           </div>
       </div>
 
-      {/* LAZY QUICK ADD INPUT */}
-      {isAdmin && onQuickCreate && (
-          <div className="mb-6 animate-[fade-in_0.5s]">
-             <div className={`relative flex items-center p-3 rounded-xl border backdrop-blur-md transition-all shadow-lg
-                ${isWizard ? 'bg-emerald-950/30 border-emerald-500/40' : 'bg-fuchsia-950/30 border-fuchsia-500/40'}
-             `}>
-                <div className={`mr-3 p-2 rounded-full ${isWizard ? 'bg-emerald-900/50 text-emerald-400' : 'bg-fuchsia-900/50 text-fuchsia-400'}`}>
-                    <Plus size={20} />
-                </div>
-                <input 
-                    type="text"
-                    value={quickPostText}
-                    onChange={(e) => setQuickPostText(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleQuickPost()}
-                    placeholder={`Lazy Post: Quickly post to '${sectorId}'... (Press Enter)`}
-                    className="flex-1 bg-transparent outline-none text-base text-white placeholder:text-white/40"
-                    disabled={isPosting}
-                />
-                {isPosting && <Loader2 size={20} className="animate-spin text-white opacity-50 mr-2"/>}
-             </div>
-          </div>
-      )}
-
       {/* FILTER BAR - Mobile Responsive */}
       <div className={`mb-8 p-4 rounded-xl border backdrop-blur-md flex flex-col lg:flex-row gap-4 items-stretch lg:items-center justify-between sticky top-0 z-30 shadow-xl transition-all
         ${isWizard ? 'bg-emerald-900/20 border-emerald-500/30' : 'bg-fuchsia-900/20 border-fuchsia-500/30'}
@@ -331,7 +296,6 @@ const SectorView: React.FC<SectorViewProps> = ({
               />
             </div>
             
-            {/* Calendar Integrated */}
             <div className="relative w-full md:w-auto z-[40]">
                <CalendarWidget 
                  lineage={lineage} items={displayItems} selectedDate={dateFilter} onSelectDate={setDateFilter}
@@ -339,7 +303,6 @@ const SectorView: React.FC<SectorViewProps> = ({
                />
             </div>
 
-            {/* Subject Filter (Hidden in Lecture Mode) */}
             {!isLectureMode && (
                 <div className="relative w-full md:w-auto min-w-[160px]">
                 <select 
@@ -368,7 +331,6 @@ const SectorView: React.FC<SectorViewProps> = ({
             )}
          </div>
          
-         {/* View Toggles (Hidden in Lecture Mode) */}
          {!isLectureMode && (
              <div className={`flex items-center gap-1 p-1 rounded border shrink-0 justify-center ${isWizard ? 'border-emerald-800 bg-black/40' : 'border-fuchsia-800 bg-black/40'}`}>
                 <button onClick={() => { setSubjectFilter(''); setViewMode('folders'); }} className={`p-2 rounded transition-all ${viewMode === 'folders' ? (isWizard ? 'bg-emerald-800 text-emerald-100' : 'bg-fuchsia-800 text-fuchsia-100') : 'text-white/40 hover:text-white'}`}><FolderOpen size={16} /></button>
@@ -428,7 +390,7 @@ const SectorView: React.FC<SectorViewProps> = ({
               </button>
             );
           })}
-
+          
           {/* ADD NEW FOLDER CARD (ADMIN ONLY) */}
           {isAdmin && onQuickCreate && (
               <div
@@ -488,7 +450,6 @@ const SectorView: React.FC<SectorViewProps> = ({
               Found {filteredItems.length} {isWizard ? 'artifacts' : 'records'}
            </div>
            
-           {/* EMPTY STATE FOR LECTURES */}
            {filteredItems.length === 0 ? (
              sectorId === 'lectures' ? (
                  <div className={`flex flex-col items-center justify-center py-20 animate-[fade-in_0.5s] relative overflow-hidden rounded-xl border border-dashed border-white/10 ${isWizard ? 'bg-emerald-950/10' : 'bg-fuchsia-950/10'}`}>
@@ -512,19 +473,17 @@ const SectorView: React.FC<SectorViewProps> = ({
            ) : (
              <div className={
                  isLectureMode 
-                    ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' // CARD GRID FOR LECTURES
+                    ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' 
                     : viewMode === 'list' 
                         ? 'flex flex-col gap-3' 
                         : 'columns-1 md:columns-2 lg:columns-3 gap-6 space-y-6'
              }>
                 {filteredItems.map((item) => {
                   const customStyle = item.style || {};
-                  const cleanContent = DOMPurify.sanitize(item.content);
                   const isVirtual = item.id.startsWith('virtual-');
                   const hasLink = item.fileUrl && (item.fileUrl.startsWith('http') || item.fileUrl.startsWith('https'));
 
                   if (isLectureMode) {
-                      // --- LECTURE CARD UI ---
                       return (
                           <div 
                             key={item.id}
@@ -607,7 +566,7 @@ const SectorView: React.FC<SectorViewProps> = ({
                     )}
 
                     <div className={`shrink-0 rounded-full flex items-center justify-center z-10 ${viewMode === 'list' ? 'w-12 h-12' : 'w-12 h-12 mb-2'} ${isWizard ? 'bg-emerald-900/30 text-emerald-400' : 'bg-fuchsia-900/30 text-fuchsia-400'}`}>
-                       {item.type === 'video' ? <Video size={20} /> : <FileText size={20} />}
+                       {getTypeIcon(item.type)}
                     </div>
                     
                     <div className="flex-1 min-w-0">

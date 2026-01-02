@@ -11,14 +11,14 @@ const LiveBackground: React.FC<LiveBackgroundProps> = ({ lineage }) => {
   const isWizard = lineage === Lineage.WIZARD;
 
   useEffect(() => {
-    // 1. Capture the ref value
-    const canvasEl = canvasRef.current;
+    // 1. Capture ref to local variable
+    const canvasNode = canvasRef.current;
     
-    // 2. Explicit null check
-    if (!canvasEl) return;
+    // 2. Strict null check
+    if (!canvasNode) return;
 
-    // 3. Create a non-nullable reference for closures
-    const canvas = canvasEl;
+    // 3. Create a strictly typed const for closure use
+    const canvas = canvasNode as HTMLCanvasElement;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
@@ -27,8 +27,10 @@ const LiveBackground: React.FC<LiveBackgroundProps> = ({ lineage }) => {
     let animationFrameId: number;
 
     const resize = () => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
+      if (canvas) {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+      }
       initParticles();
     };
 
@@ -43,6 +45,7 @@ const LiveBackground: React.FC<LiveBackgroundProps> = ({ lineage }) => {
       baseY: number;
 
       constructor() {
+        // Use the local 'canvas' variable which is guaranteed HTMLCanvasElement
         this.x = Math.random() * canvas.width;
         this.y = Math.random() * canvas.height;
         this.baseX = this.x;
@@ -50,16 +53,18 @@ const LiveBackground: React.FC<LiveBackgroundProps> = ({ lineage }) => {
         
         if (isWizard) {
             // Fireflies / Magic Motes
-            this.vx = (Math.random() - 0.5) * 0.5;
-            this.vy = -(Math.random() * 1 + 0.5); // Float up
-            this.size = Math.random() * 2 + 1;
-            this.color = `rgba(16, 185, 129, ${Math.random() * 0.5})`; // Emerald
+            this.vx = (Math.random() - 0.5) * 0.8; // Slightly faster
+            this.vy = -(Math.random() * 1.5 + 0.5); // Float up faster
+            this.size = Math.random() * 2.5 + 1; // Slightly larger
+            // Increased Opacity: 0.4 to 1.0 (was 0.0 to 0.5)
+            this.color = `rgba(16, 185, 129, ${0.4 + Math.random() * 0.6})`; 
         } else {
             // Neural Grid Points
-            this.vx = (Math.random() - 0.5) * 1;
-            this.vy = (Math.random() - 0.5) * 1;
-            this.size = Math.random() * 1.5 + 1;
-            this.color = `rgba(217, 70, 239, ${Math.random() * 0.5})`; // Fuchsia
+            this.vx = (Math.random() - 0.5) * 1.5;
+            this.vy = (Math.random() - 0.5) * 1.5;
+            this.size = Math.random() * 2 + 1;
+            // Increased Opacity: 0.4 to 1.0
+            this.color = `rgba(217, 70, 239, ${0.4 + Math.random() * 0.6})`; 
         }
       }
 
@@ -69,11 +74,14 @@ const LiveBackground: React.FC<LiveBackgroundProps> = ({ lineage }) => {
             this.x += this.vx;
             this.y += this.vy;
 
-            // Reset if off screen
+            // Reset if off screen (Loop from bottom)
             if (this.y < -10) {
                 this.y = canvas.height + 10;
                 this.x = Math.random() * canvas.width;
             }
+            // Loop sides
+            if (this.x < -10) this.x = canvas.width + 10;
+            if (this.x > canvas.width + 10) this.x = -10;
 
             // Mouse Repel
             const dx = mouse.x - this.x;
@@ -104,8 +112,8 @@ const LiveBackground: React.FC<LiveBackgroundProps> = ({ lineage }) => {
             
             // Subtle pull
             if (distance < 200) {
-                this.x += dx * 0.01;
-                this.y += dy * 0.01;
+                this.x += dx * 0.02;
+                this.y += dy * 0.02;
             }
         }
       }
@@ -121,14 +129,16 @@ const LiveBackground: React.FC<LiveBackgroundProps> = ({ lineage }) => {
 
     function initParticles() {
       particles = [];
-      const count = isWizard ? 50 : 80; // More for grid, less for fireflies
+      // Significantly increased count for "everywhere" effect
+      const count = isWizard ? 120 : 180; 
+      
       for (let i = 0; i < count; i++) {
         particles.push(new Particle());
       }
     }
 
     function animate() {
-      if (!ctx) return;
+      if (!ctx || !canvas) return;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       
       particles.forEach(p => {
@@ -141,14 +151,29 @@ const LiveBackground: React.FC<LiveBackgroundProps> = ({ lineage }) => {
             const dx = mouse.x - p.x;
             const dy = mouse.y - p.y;
             const dist = Math.sqrt(dx*dx + dy*dy);
-            if (dist < 150) {
-                ctx.strokeStyle = `rgba(217, 70, 239, ${1 - dist/150})`;
+            if (dist < 200) {
+                // Brighter lines
+                ctx.strokeStyle = `rgba(217, 70, 239, ${0.5 * (1 - dist/200)})`;
                 ctx.lineWidth = 0.5;
                 ctx.beginPath();
                 ctx.moveTo(p.x, p.y);
                 ctx.lineTo(mouse.x, mouse.y);
                 ctx.stroke();
             }
+            
+            // Connect to nearby particles (Grid effect)
+            particles.forEach(p2 => {
+                const dx2 = p.x - p2.x;
+                const dy2 = p.y - p2.y;
+                const dist2 = Math.sqrt(dx2*dx2 + dy2*dy2);
+                if (dist2 < 100) {
+                    ctx.strokeStyle = `rgba(217, 70, 239, ${0.2 * (1 - dist2/100)})`;
+                    ctx.beginPath();
+                    ctx.moveTo(p.x, p.y);
+                    ctx.lineTo(p2.x, p2.y);
+                    ctx.stroke();
+                }
+            });
         }
       });
 

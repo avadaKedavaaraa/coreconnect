@@ -37,7 +37,7 @@ export interface CarouselItem {
   title: string;
   date: string;
   content: string;
-  type: 'announcement' | 'file' | 'video' | 'task';
+  type: 'announcement' | 'file' | 'video' | 'task' | 'mixed' | 'link' | 'code';
   sector?: string;
   style?: ItemStyle;
   subject?: string;
@@ -61,6 +61,7 @@ export interface UserProfile {
   house: 'Griffindor' | 'Slytherin' | 'Ravenclaw' | 'Hufflepuff' | 'Sector-7' | 'Sector-3' | 'Sector-1' | 'Sector-9';
   themeColor?: string; // User selected accent color
   preferredFont?: 'wizard' | 'muggle' | 'sans' | 'playfair' | 'orbitron' | 'montserrat' | 'courier' | 'cursive' | 'tech' | 'retro';
+  highContrast?: boolean; // Accessibility setting
   defaultSector?: string;
   visitCount: number;
   totalTimeSpent: number; // Seconds

@@ -211,7 +211,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                   setImportStatus("Restoring Config...");
                   await fetch(`${API_URL}/api/admin/import`, {
                       method: 'POST', headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrfToken },
-                      body: JSON.stringify({ data: { ...json.data, items: [] } }), // Send everything except items
+                      body: JSON.stringify({ data: { ...json.data, items: [] } }), 
                       credentials: 'include'
                   });
               }
@@ -327,7 +327,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
           const url = window.URL.createObjectURL(blob);
           const a = document.createElement('a'); a.href = url; a.download = `core_backup_${Date.now()}.json`;
           document.body.appendChild(a); a.click(); a.remove(); window.URL.revokeObjectURL(url);
-      } catch (e: any) { alert("Error: " + e.message); } finally { setIsLoading(false); }
+      } catch (e: any) { alert("Error: " + e.message); } finally { setIsUploading(false); }
   };
 
   const handleSaveConfig = () => {
@@ -415,30 +415,29 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   const handleAiParse = async () => {
     const file = selectedFile || fileInputRef.current?.files?.[0];
     if (!aiPrompt && !file) {
-        alert("Please provide text instructions.");
+        alert("Please provide text instructions or upload a file.");
         return;
     }
     
     setAiLoading(true);
-    let instructions = aiPrompt;
-    if (file) {
-        instructions += " [File analysis temporarily disabled in serverless mode - please paste text content instead]";
-    }
     
     try {
+        const formData = new FormData();
+        if (aiPrompt) formData.append('prompt', aiPrompt);
+        if (file) formData.append('file', file);
+
         const res = await fetch(`${API_URL}/api/ai/parse`, {
             method: 'POST',
             headers: { 
-                'Content-Type': 'application/json',
                 'x-csrf-token': csrfToken 
             },
-            body: JSON.stringify({ prompt: instructions }),
+            body: formData,
             credentials: 'include'
         });
         const data = await res.json();
         
         if (res.ok) {
-            const allowedTypes = ['announcement', 'file', 'video', 'task'];
+            const allowedTypes = ['announcement', 'file', 'video', 'task', 'mixed', 'link', 'code'];
             const normalizedType = data.type && allowedTypes.includes(data.type.toLowerCase()) 
                                     ? data.type.toLowerCase() 
                                     : 'announcement';
@@ -559,7 +558,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
         {!isAdmin ? (
           <div className="flex-1 flex items-center justify-center p-6 w-full relative overflow-hidden h-full">
-             {/* 3D Animated Background */}
              <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-30">
                 <div className={`w-[600px] h-[600px] border-[2px] rounded-full absolute animate-spin-slow ${isWizard ? 'border-red-600/20' : 'border-blue-600/20'}`}></div>
                 <div className={`w-[500px] h-[500px] border-[4px] border-dashed rounded-full absolute animate-reverse-spin ${isWizard ? 'border-red-500/30' : 'border-blue-500/30'}`}></div>
@@ -638,158 +636,67 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
             <main className="flex-1 overflow-y-auto p-4 sm:p-8 relative custom-scrollbar">
                 
-                {/* CONFIG TAB */}
-                {activeTab === 'config' && (
-                    <div className="max-w-2xl mx-auto space-y-6">
-                        <div className="space-y-4">
-                            <h4 className="font-bold opacity-70 border-b border-white/10 pb-2">Interface Experience</h4>
-                            <div className="grid grid-cols-1 gap-4">
-                                <label className="block text-xs mb-1 opacity-70">Global Cursor Style</label>
-                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                                    {['classic', 'minimal', 'blade', 'enchanted'].map(style => (
-                                        <button 
-                                            key={style}
-                                            onClick={() => setEditedConfig({...editedConfig, cursorStyle: style as any})}
-                                            className={`p-3 rounded border text-xs font-bold uppercase transition-all
-                                                ${editedConfig.cursorStyle === style 
-                                                    ? 'bg-white/20 border-white text-white' 
-                                                    : 'bg-black/20 border-white/10 text-white/50 hover:bg-white/10'}
-                                            `}
-                                        >
-                                            {style}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div className="space-y-4">
-                            <h4 className="font-bold opacity-70 border-b border-white/10 pb-2 flex items-center gap-2"><Send size={16} /> Telegram Integration</h4>
-                            <div className="grid grid-cols-1 gap-4">
-                                <input value={editedConfig.telegramLink || ''} onChange={e => setEditedConfig({...editedConfig, telegramLink: e.target.value})} placeholder="https://t.me/your_channel" className="w-full p-2 bg-white/5 border border-white/10 rounded text-sm"/>
-                            </div>
-                        </div>
-
-                        <div className="pt-4">
-                            <button onClick={handleSaveConfig} className="w-full py-3 bg-red-600 hover:bg-red-500 rounded font-bold shadow-lg">DEPLOY CONFIGURATION</button>
-                        </div>
-                    </div>
-                )}
-
-                {/* BACKUP TAB (Chunked) */}
-                {activeTab === 'backup' && (
-                    <div className="max-w-3xl mx-auto space-y-8 animate-[fade-in_0.5s]">
-                        <div className="text-center mb-8">
-                            <HardDrive size={48} className={`mx-auto mb-4 ${isWizard ? 'text-emerald-500' : 'text-fuchsia-500'}`}/>
-                            <h2 className={`text-2xl font-bold mb-2 ${isWizard ? 'font-wizardTitle text-emerald-100' : 'font-muggle text-fuchsia-100'}`}>System Archives</h2>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="p-6 rounded-xl border border-white/10 bg-white/5 flex flex-col items-center text-center hover:bg-white/10 transition-colors">
-                                <Download size={32} className="mb-4 text-blue-400"/>
-                                <h3 className="font-bold text-lg mb-2">Export Data</h3>
-                                <button onClick={handleExportData} disabled={isLoading} className="w-full py-3 bg-blue-600 hover:bg-blue-500 rounded font-bold flex items-center justify-center gap-2">
-                                    {isLoading ? <Loader2 className="animate-spin"/> : 'GENERATE BACKUP'}
-                                </button>
-                            </div>
-
-                            <div className="p-6 rounded-xl border border-white/10 bg-white/5 flex flex-col items-center text-center hover:bg-white/10 transition-colors relative overflow-hidden">
-                                <UploadCloud size={32} className="mb-4 text-green-400"/>
-                                <h3 className="font-bold text-lg mb-2">Import Restore</h3>
-                                <label className="w-full py-3 bg-green-600 hover:bg-green-500 rounded font-bold flex items-center justify-center gap-2 cursor-pointer">
-                                    {isLoading ? <Loader2 className="animate-spin"/> : 'UPLOAD BACKUP FILE'}
-                                    <input type="file" accept=".json" className="hidden" ref={importFileRef} onChange={handleImportData} disabled={isLoading}/>
-                                </label>
-                                {importStatus && (
-                                    <div className="absolute inset-0 bg-black/95 flex flex-col items-center justify-center text-xs font-mono text-green-400 animate-pulse p-4 text-center">
-                                        <div className="mb-2">{importStatus}</div>
-                                        <div className="w-full h-1 bg-white/20 rounded overflow-hidden">
-                                            <div className="h-full bg-green-500 transition-all duration-300" style={{width: `${importProgress}%`}}></div>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* VISITORS TAB */}
-                {activeTab === 'visitors' && permissions?.canViewLogs && (
-                    <div className="overflow-x-auto rounded border border-white/10 max-h-[70vh]">
-                        <table className="w-full text-left text-sm">
-                            <thead className="bg-white/10 text-xs uppercase font-bold sticky top-0 z-10 backdrop-blur-md">
-                                <tr>
-                                    <th className="p-3">Visitor Name</th>
-                                    <th className="p-3">Last Active</th>
-                                    <th className="p-3">Visits</th>
-                                    <th className="p-3">Time</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {visitors.length === 0 ? (
-                                    <tr><td colSpan={4} className="p-8 text-center opacity-50">No visitor logs found.</td></tr>
-                                ) : (
-                                    visitors.map(v => (
-                                        <tr key={v.visitor_id} className="border-t border-white/5 hover:bg-white/5">
-                                            <td className="p-3 font-bold flex items-center gap-2">
-                                                <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                                                {v.display_name}
-                                            </td>
-                                            <td className="p-3 opacity-70">{new Date(v.last_active).toLocaleString()}</td>
-                                            <td className="p-3">{v.visit_count}</td>
-                                            <td className="p-3">{(v.total_time_spent / 60).toFixed(1)}m</td>
-                                        </tr>
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
-
                 {/* DATABASE TAB */}
                 {activeTab === 'database' && (
                     <div className="space-y-6">
                         <div className="flex gap-4">
                             <div className="flex-1 relative">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" size={16}/>
-                                <input value={itemSearch} onChange={(e) => setItemSearch(e.target.value)} placeholder="Search DB..." className="w-full bg-white/5 border border-white/10 rounded pl-10 p-2 text-white outline-none"/>
+                                <Search className="absolute left-3 top-3 text-white/50" size={18} />
+                                <input value={itemSearch} onChange={e => setItemSearch(e.target.value)} placeholder="Search DB..." className="w-full pl-10 p-3 bg-white/5 border border-white/10 rounded outline-none" />
                             </div>
-                            <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className="bg-white/5 border border-white/10 rounded px-4 text-white outline-none">
-                                <option value="all" className="bg-black">All</option>
-                                <option value="announcement" className="bg-black">News</option>
-                                <option value="file" className="bg-black">Files</option>
-                            </select>
+                            <div className="relative">
+                                <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none"><Filter size={14}/></div>
+                                <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} className="h-full pl-9 pr-4 bg-white/5 border border-white/10 rounded appearance-none outline-none cursor-pointer">
+                                    <option value="all" className="bg-black">All Types</option>
+                                    <option value="announcement" className="bg-black">Announcements</option>
+                                    <option value="file" className="bg-black">Files</option>
+                                    <option value="video" className="bg-black">Videos</option>
+                                    <option value="task" className="bg-black">Tasks</option>
+                                    <option value="mixed" className="bg-black">Mixed</option>
+                                    <option value="link" className="bg-black">Links</option>
+                                    <option value="code" className="bg-black">Code</option>
+                                </select>
+                            </div>
+                            <div className="relative">
+                                <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none"><Replace size={14}/></div>
+                                <input value={findText} onChange={e => setFindText(e.target.value)} placeholder="Find..." className="h-full pl-9 p-3 bg-white/5 border border-white/10 rounded outline-none w-32 focus:w-48 transition-all" />
+                                {findText && <button onClick={scanForMatches} className="absolute right-2 top-2 p-1 bg-white/10 rounded hover:bg-white/20"><Search size={14}/></button>}
+                            </div>
                         </div>
 
-                        {/* Find & Replace */}
-                        <div className="p-4 rounded border border-white/10 bg-white/5 mb-6">
-                            <h4 className="text-xs font-bold uppercase opacity-50 mb-3 flex items-center gap-2"><Replace size={14}/> Batch Operation</h4>
-                            <div className="flex gap-2">
-                                <input value={findText} onChange={e => setFindText(e.target.value)} placeholder="Find..." className="bg-black/20 p-2 rounded text-xs text-white border border-white/10 flex-1"/>
-                                <input value={replaceText} onChange={e => setReplaceText(e.target.value)} placeholder="Replace with..." className="bg-black/20 p-2 rounded text-xs text-white border border-white/10 flex-1"/>
-                                <button onClick={scanForMatches} className="px-3 py-1 bg-blue-600 rounded text-xs font-bold hover:bg-blue-500">SCAN</button>
-                            </div>
-                            {foundMatches.length > 0 && (
-                                <div className="mt-2 text-xs flex justify-between items-center">
-                                    <span className="text-yellow-400">Found {foundMatches.length} matches.</span>
-                                    <button onClick={executeReplaceAll} className="px-3 py-1 bg-red-600 rounded font-bold hover:bg-red-500">REPLACE ALL</button>
+                        {foundMatches.length > 0 && (
+                            <div className="p-4 bg-yellow-900/30 border border-yellow-500/30 rounded-lg">
+                                <div className="flex justify-between items-center mb-2">
+                                    <span className="text-yellow-200 font-bold">Found {foundMatches.length} occurrences of "{findText}"</span>
+                                    <div className="flex gap-2">
+                                        <input value={replaceText} onChange={e => setReplaceText(e.target.value)} placeholder="Replace with..." className="p-1 px-2 bg-black/50 border border-yellow-500/30 rounded text-sm text-white" />
+                                        <button onClick={executeReplaceAll} className="px-3 py-1 bg-yellow-600 rounded text-black font-bold text-xs hover:bg-yellow-500">REPLACE ALL</button>
+                                        <button onClick={() => setFoundMatches([])} className="p-1 hover:bg-white/10 rounded"><X size={14}/></button>
+                                    </div>
                                 </div>
-                            )}
-                        </div>
+                                <div className="max-h-32 overflow-y-auto text-xs text-white/60">
+                                    {foundMatches.slice(0, 10).map((m, i) => <div key={i}>Match in: {m.title} ({m.context})</div>)}
+                                    {foundMatches.length > 10 && <div>...and {foundMatches.length - 10} more</div>}
+                                </div>
+                            </div>
+                        )}
 
-                        <div className="space-y-2">
+                        <div className="grid gap-4">
                             {filteredItems.map(item => (
-                                <div key={item.id} className="p-3 rounded bg-white/5 border border-white/10 flex justify-between group">
+                                <div key={item.id} className="p-4 rounded bg-white/5 border border-white/10 flex justify-between items-center group hover:bg-white/10 transition-colors">
                                     <div>
                                         <div className="font-bold">{item.title}</div>
-                                        <div className="text-xs opacity-50">{item.date} • {item.type}</div>
+                                        <div className="text-xs opacity-50 flex gap-2">
+                                            <span>{item.date}</span> • <span>{item.type}</span> • <span>{item.sector}</span>
+                                        </div>
                                     </div>
                                     <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button onClick={() => startEditItem(item)} className="p-2 bg-blue-600 rounded"><Edit3 size={14}/></button>
-                                        <button onClick={() => { if(confirm('Delete?')) onDeleteItem && onDeleteItem(item.id) }} className="p-2 bg-red-600 rounded"><Trash2 size={14}/></button>
+                                        <button onClick={() => startEditItem(item)} className="p-2 bg-blue-600 rounded hover:bg-blue-500"><Edit3 size={16}/></button>
+                                        <button onClick={() => { if(confirm('Delete?')) onDeleteItem?.(item.id) }} className="p-2 bg-red-600 rounded hover:bg-red-500"><Trash2 size={16}/></button>
                                     </div>
                                 </div>
                             ))}
+                            {filteredItems.length === 0 && <div className="text-center opacity-50 py-10">No items found</div>}
                         </div>
                     </div>
                 )}
@@ -803,6 +710,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                 <option value="announcement" className="bg-black">Announcement</option>
                                 <option value="file" className="bg-black">File</option>
                                 <option value="video" className="bg-black">Video</option>
+                                <option value="task" className="bg-black">Task / Tutorial</option>
+                                <option value="mixed" className="bg-black">Mixed Content</option>
+                                <option value="link" className="bg-black">External Link</option>
+                                <option value="code" className="bg-black">Code Snippet</option>
                             </select>
                             <select value={itemForm.sector} onChange={e => setItemForm({...itemForm, sector: e.target.value})} className="p-3 bg-white/5 border border-white/10 rounded text-white outline-none">
                                 {sectors.map(s => <option key={s.id} value={s.id} className="bg-black">{isWizard ? s.wizardName : s.muggleName}</option>)}
@@ -812,10 +723,13 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                         </div>
                         
                         <div className="p-4 rounded border border-white/10 bg-white/5">
-                            <div className="flex gap-2 mb-2 overflow-x-auto pb-2">
-                                {['b','i','u','h1','code','quote'].map(tag => (
-                                    <button key={tag} onClick={() => insertTag(tag)} className="px-3 py-1 bg-black/40 rounded text-xs font-mono hover:bg-black/60">&lt;{tag}&gt;</button>
-                                ))}
+                            <div className="flex justify-between items-center mb-2">
+                                <div className="flex gap-2 overflow-x-auto pb-2">
+                                    {['b','i','u','h1','code','quote'].map(tag => (
+                                        <button key={tag} onClick={() => insertTag(tag)} className="px-3 py-1 bg-black/40 rounded text-xs font-mono hover:bg-black/60">&lt;{tag}&gt;</button>
+                                    ))}
+                                </div>
+                                <span className="text-[10px] uppercase opacity-50 bg-white/10 px-2 py-1 rounded">HTML Supported</span>
                             </div>
                             <textarea ref={contentRef} value={itemForm.content} onChange={e => setItemForm({...itemForm, content: e.target.value})} placeholder="Content..." className="w-full h-64 bg-transparent outline-none text-sm font-mono text-zinc-300 resize-none"/>
                         </div>
@@ -827,56 +741,33 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                 <div className="flex gap-2"><input value={itemForm.fileUrl} onChange={e => setItemForm({...itemForm, fileUrl: e.target.value})} placeholder="File/Video URL" className="flex-1 bg-white/5 border border-white/10 rounded p-2 text-xs"/><label className="p-2 bg-white/10 rounded cursor-pointer hover:bg-white/20"><Upload size={14}/><input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'fileUrl')}/></label></div>
                             </div>
                             <div className="space-y-4">
-                                <h4 className="text-xs font-bold uppercase opacity-50">Style Override</h4>
-                                <div className="flex items-center gap-2"><input type="color" value={itemForm.titleColor} onChange={e => setItemForm({...itemForm, titleColor: e.target.value})} className="h-8 w-8 bg-transparent border-0 cursor-pointer"/><span className="text-xs">Title</span></div>
-                                <select value={itemForm.fontFamily} onChange={e => setItemForm({...itemForm, fontFamily: e.target.value as any})} className="w-full bg-white/5 border border-white/10 rounded p-2 text-xs"><option value="sans" className="bg-black">Sans</option><option value="wizard" className="bg-black">Wizard</option><option value="muggle" className="bg-black">Muggle</option></select>
+                                <h4 className="text-xs font-bold uppercase opacity-50">Item Styling</h4>
+                                <div className="flex items-center gap-2">
+                                    <input type="color" value={itemForm.titleColor} onChange={e => setItemForm({...itemForm, titleColor: e.target.value})} className="h-8 w-8 bg-transparent border-0 cursor-pointer"/>
+                                    <span className="text-xs">Title Color</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <input type="checkbox" checked={itemForm.isGradient} onChange={e => setItemForm({...itemForm, isGradient: e.target.checked})} id="grad-check" className="cursor-pointer"/>
+                                    <label htmlFor="grad-check" className="text-xs cursor-pointer">Enable Gradient Title</label>
+                                </div>
+                                {itemForm.isGradient && (
+                                    <div className="flex items-center gap-2">
+                                        <input type="color" value={itemForm.titleColorEnd} onChange={e => setItemForm({...itemForm, titleColorEnd: e.target.value})} className="h-8 w-8 bg-transparent border-0 cursor-pointer"/>
+                                        <span className="text-xs">Gradient End Color</span>
+                                    </div>
+                                )}
+                                <div className="flex items-center gap-2">
+                                    <input type="color" value={itemForm.contentColor} onChange={e => setItemForm({...itemForm, contentColor: e.target.value})} className="h-8 w-8 bg-transparent border-0 cursor-pointer"/>
+                                    <span className="text-xs">Content Text Color</span>
+                                </div>
+                                <select value={itemForm.fontFamily} onChange={e => setItemForm({...itemForm, fontFamily: e.target.value as any})} className="w-full bg-white/5 border border-white/10 rounded p-2 text-xs">
+                                    <option value="sans" className="bg-black">Sans Serif (Readable)</option>
+                                    <option value="wizard" className="bg-black">Wizard Serif</option>
+                                    <option value="muggle" className="bg-black">Muggle Mono</option>
+                                </select>
                             </div>
                         </div>
                         <button onClick={handleSaveItem} className="w-full py-4 bg-green-600 hover:bg-green-500 rounded font-bold text-lg shadow-lg">{isEditingItem ? 'UPDATE' : 'PUBLISH'}</button>
-                    </div>
-                )}
-
-                {/* SCHEDULER TAB */}
-                {activeTab === 'scheduler' && (
-                    <div className="space-y-6">
-                        <div className="flex justify-between items-center mb-6">
-                             <h3 className="text-xl font-bold flex items-center gap-2"><CalendarDays size={20}/> Lecture Schedule</h3>
-                        </div>
-                        <div className="p-4 rounded border border-white/10 bg-white/5 flex flex-wrap gap-4 items-end">
-                            <div className="flex-1 min-w-[200px]">
-                                <label className="block text-xs mb-1 opacity-70">Subject</label>
-                                <input value={newRule.subject} onChange={e => setNewRule({...newRule, subject: e.target.value})} placeholder="e.g. Potions 101" className="w-full p-2 rounded bg-black/20 border border-white/10 text-sm"/>
-                            </div>
-                            <div className="w-32">
-                                <label className="block text-xs mb-1 opacity-70">Day</label>
-                                <select value={newRule.dayOfWeek} onChange={e => setNewRule({...newRule, dayOfWeek: e.target.value})} className="w-full p-2 rounded bg-black/20 border border-white/10 text-sm">
-                                    {['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'].map(d => <option key={d} value={d} className="bg-black">{d}</option>)}
-                                </select>
-                            </div>
-                            <div className="w-24">
-                                <label className="block text-xs mb-1 opacity-70">Time</label>
-                                <input type="time" value={newRule.startTime} onChange={e => setNewRule({...newRule, startTime: e.target.value})} className="w-full p-2 rounded bg-black/20 border border-white/10 text-sm"/>
-                            </div>
-                            <div className="flex-1 min-w-[200px]">
-                                <label className="block text-xs mb-1 opacity-70">Join Link</label>
-                                <input value={newRule.link} onChange={e => setNewRule({...newRule, link: e.target.value})} placeholder="https://zoom.us/..." className="w-full p-2 rounded bg-black/20 border border-white/10 text-sm"/>
-                            </div>
-                            <button onClick={handleAddRule} className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded font-bold text-sm h-[38px]">ADD</button>
-                        </div>
-                        <div className="space-y-2">
-                            {schedules.map((rule) => (
-                                <div key={rule.id} className="p-3 rounded bg-white/5 border border-white/10 flex items-center justify-between">
-                                    <div className="flex items-center gap-4">
-                                        <div className={`p-2 rounded-full ${rule.isActive ? 'bg-green-900/50 text-green-400' : 'bg-red-900/50 text-red-400'}`}><Repeat size={16}/></div>
-                                        <div>
-                                            <div className="font-bold">{rule.subject}</div>
-                                            <div className="text-xs opacity-50">{rule.dayOfWeek}s at {rule.startTime}</div>
-                                        </div>
-                                    </div>
-                                    <button onClick={() => handleDeleteRule(rule.id)} className="p-2 hover:bg-red-900/30 rounded text-red-400"><Trash2 size={14}/></button>
-                                </div>
-                            ))}
-                        </div>
                     </div>
                 )}
 
@@ -885,64 +776,280 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                     <div className="max-w-2xl mx-auto space-y-6 text-center">
                         <BrainCircuit size={48} className="mx-auto mb-4 text-purple-500" />
                         <h3 className="text-xl font-bold">The Oracle's Parser</h3>
-                        <textarea value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)} placeholder="Paste raw text here..." className="w-full h-32 p-4 rounded bg-white/5 border border-white/10 outline-none"/>
-                        <button onClick={handleAiParse} disabled={aiLoading} className="px-8 py-3 rounded-full font-bold bg-purple-600 hover:bg-purple-500">{aiLoading ? <Loader2 className="animate-spin"/> : "ANALYZE"}</button>
+                        
+                        <textarea 
+                            value={aiPrompt} 
+                            onChange={(e) => setAiPrompt(e.target.value)} 
+                            placeholder="Describe the item to generate, or upload an image/PDF..." 
+                            className="w-full h-32 p-4 rounded bg-white/5 border border-white/10 outline-none"
+                        />
+                        
+                        {/* File Upload UI */}
+                        <div className="flex items-center gap-2 justify-center">
+                            <label className={`px-4 py-2 rounded-lg cursor-pointer flex items-center gap-2 border border-dashed transition-all
+                                ${selectedFile 
+                                    ? 'bg-green-900/30 border-green-500 text-green-300' 
+                                    : 'bg-white/5 border-white/20 text-white/50 hover:bg-white/10'}
+                            `}>
+                                <Upload size={16}/> 
+                                {selectedFile ? selectedFile.name : "Attach Image/PDF Context"}
+                                <input 
+                                    type="file" 
+                                    ref={fileInputRef} 
+                                    className="hidden" 
+                                    accept="image/*,application/pdf"
+                                    onChange={(e) => setSelectedFile(e.target.files?.[0] || null)} 
+                                />
+                            </label>
+                            {selectedFile && (
+                                <button onClick={() => { setSelectedFile(null); if(fileInputRef.current) fileInputRef.current.value = ''; }} className="p-2 hover:bg-red-900/50 text-red-400 rounded">
+                                    <X size={16} />
+                                </button>
+                            )}
+                        </div>
+
+                        <button onClick={handleAiParse} disabled={aiLoading} className="px-8 py-3 rounded-full font-bold bg-purple-600 hover:bg-purple-500 w-full sm:w-auto">
+                            {aiLoading ? <Loader2 className="animate-spin inline mr-2"/> : "ANALYZE & GENERATE"}
+                        </button>
+                        
                         {aiResult && (
                             <div className="mt-8 p-6 rounded bg-green-900/20 border border-green-500/30 text-left">
-                                <pre className="text-xs overflow-x-auto bg-black/40 p-2 rounded mb-4">{JSON.stringify(aiResult, null, 2)}</pre>
+                                <pre className="text-xs overflow-x-auto bg-black/40 p-2 rounded mb-4 max-h-40">{JSON.stringify(aiResult, null, 2)}</pre>
                                 <button onClick={transferAiToForm} className="w-full py-2 bg-green-600 hover:bg-green-500 rounded font-bold">USE THIS DATA</button>
                             </div>
                         )}
                     </div>
                 )}
-
-                {/* USERS TAB */}
-                {activeTab === 'users' && permissions?.canManageUsers && (
-                    <div className="space-y-8">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {users.map(u => (
-                                <div key={u.username} className="p-4 rounded bg-white/5 border border-white/10 flex justify-between items-center">
-                                    <div className="flex items-center gap-3">
-                                        <div className={`p-2 rounded-full ${u.role === 'god' ? 'bg-yellow-500/20 text-yellow-500' : 'bg-blue-500/20 text-blue-500'}`}><UserIcon role={u.permissions?.isGod ? 'god' : 'admin'} /></div>
-                                        <div><div className="font-bold">{u.username}</div></div>
-                                    </div>
-                                    {!u.permissions?.isGod && <button onClick={() => handleDeleteUser(u.username)} className="text-red-500 hover:text-red-400 p-2"><Trash2 size={16}/></button>}
-                                </div>
-                            ))}
-                        </div>
-                        <div className="p-6 rounded border border-white/10 bg-white/5">
-                            <h4 className="font-bold mb-4 flex items-center gap-2"><Plus size={16}/> Add New Admin</h4>
+                
+                {/* SCHEDULER TAB */}
+                {activeTab === 'scheduler' && (
+                    <div className="max-w-4xl mx-auto space-y-6">
+                        <div className="p-6 rounded bg-white/5 border border-white/10">
+                            <h3 className="font-bold mb-4 flex items-center gap-2"><CalendarDays size={20}/> Lecture Rules</h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                                <input value={newUser} onChange={e => setNewUser(e.target.value)} placeholder="Username" className="p-2 bg-black/20 border border-white/10 rounded"/>
-                                <input value={newUserPass} onChange={e => setNewUserPass(e.target.value)} type="password" placeholder="Password" className="p-2 bg-black/20 border border-white/10 rounded"/>
+                                <input value={newRule.subject} onChange={e => setNewRule({...newRule, subject: e.target.value})} placeholder="Subject Name" className="p-2 rounded bg-black/50 border border-white/10 outline-none" />
+                                <input value={newRule.link} onChange={e => setNewRule({...newRule, link: e.target.value})} placeholder="Join Link" className="p-2 rounded bg-black/50 border border-white/10 outline-none" />
+                                <div className="flex gap-2">
+                                    <select value={newRule.dayOfWeek} onChange={e => setNewRule({...newRule, dayOfWeek: e.target.value})} className="flex-1 p-2 rounded bg-black/50 border border-white/10 outline-none">
+                                        {['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'].map(d => <option key={d} value={d}>{d}</option>)}
+                                    </select>
+                                    <input type="time" value={newRule.startTime} onChange={e => setNewRule({...newRule, startTime: e.target.value})} className="flex-1 p-2 rounded bg-black/50 border border-white/10 outline-none" />
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <button onClick={handleAddRule} className="px-4 py-2 bg-green-600 hover:bg-green-500 rounded font-bold">ADD RULE</button>
+                                </div>
                             </div>
-                            <div className="flex gap-4 mb-4 text-sm">
-                                <label><input type="checkbox" checked={newPermissions.canEdit} onChange={e => setNewPermissions({...newPermissions, canEdit: e.target.checked})}/> Can Edit</label>
-                                <label><input type="checkbox" checked={newPermissions.canDelete} onChange={e => setNewPermissions({...newPermissions, canDelete: e.target.checked})}/> Can Delete</label>
-                                {permissions?.isGod && <label className="text-yellow-400"><input type="checkbox" checked={newPermissions.isGod} onChange={e => setNewPermissions({...newPermissions, isGod: e.target.checked})}/> God Mode</label>}
+                            
+                            <div className="space-y-2">
+                                {schedules.map(rule => (
+                                    <div key={rule.id} className="p-3 rounded bg-black/30 border border-white/5 flex justify-between items-center">
+                                        <div className="flex-1 grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
+                                            <span className="font-bold text-white">{rule.subject}</span>
+                                            <span className="opacity-70">{rule.dayOfWeek} @ {rule.startTime}</span>
+                                            <a href={rule.link} target="_blank" className="text-blue-400 hover:underline truncate">{rule.link}</a>
+                                            <span className="opacity-50 capitalize">{rule.recurrence}</span>
+                                        </div>
+                                        <button onClick={() => handleDeleteRule(rule.id)} className="p-2 text-red-500 hover:bg-white/10 rounded"><Trash2 size={14}/></button>
+                                    </div>
+                                ))}
+                                {schedules.length === 0 && <div className="text-center opacity-50 text-xs">No active schedule rules.</div>}
                             </div>
-                            <button onClick={handleCreateUser} className="px-6 py-2 bg-blue-600 hover:bg-blue-500 rounded font-bold">CREATE USER</button>
                         </div>
                     </div>
                 )}
 
-                {/* STRUCTURE TAB */}
-                {activeTab === 'structure' && (
-                    <div className="space-y-6">
-                        <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-xl font-bold">Sector Configuration</h3>
-                            <button onClick={handleSaveSectors} className="px-4 py-2 bg-green-600 rounded font-bold hover:bg-green-500">Save Layout</button>
+                {/* BACKUP TAB */}
+                {activeTab === 'backup' && (
+                    <div className="max-w-xl mx-auto space-y-8 text-center pt-10">
+                        <div className="p-8 border border-white/10 rounded-2xl bg-white/5">
+                            <HardDrive size={48} className="mx-auto mb-4 text-blue-400" />
+                            <h3 className="text-xl font-bold mb-2">System Backup</h3>
+                            <p className="text-sm opacity-60 mb-6">Download a complete JSON snapshot of all items, settings, and logs.</p>
+                            <button onClick={handleExportData} disabled={isLoading} className="w-full py-3 bg-blue-600 hover:bg-blue-500 rounded font-bold">
+                                {isLoading ? <Loader2 className="animate-spin mx-auto"/> : 'EXPORT DATABASE'}
+                            </button>
                         </div>
-                        <div className="grid grid-cols-1 gap-4">
-                            {editedSectors.map((sector, idx) => (
-                                <div key={sector.id} className="p-4 rounded bg-white/5 border border-white/10 grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div className="col-span-1 md:col-span-2 text-xs font-bold opacity-50 uppercase tracking-widest border-b border-white/5 pb-1 mb-1">ID: {sector.id}</div>
-                                    <div><label className="text-xs opacity-50 block mb-1">Wizard Name</label><input value={sector.wizardName} onChange={e => handleUpdateSector(idx, 'wizardName', e.target.value)} className="w-full p-2 bg-black/20 rounded border border-white/10 text-sm"/></div>
-                                    <div><label className="text-xs opacity-50 block mb-1">Muggle Name</label><input value={sector.muggleName} onChange={e => handleUpdateSector(idx, 'muggleName', e.target.value)} className="w-full p-2 bg-black/20 rounded border border-white/10 text-sm"/></div>
-                                    <div className="col-span-1 md:col-span-2"><label className="text-xs opacity-50 block mb-1">Description</label><input value={sector.description} onChange={e => handleUpdateSector(idx, 'description', e.target.value)} className="w-full p-2 bg-black/20 rounded border border-white/10 text-sm"/></div>
+
+                        <div className="p-8 border border-red-500/30 rounded-2xl bg-red-900/10">
+                            <AlertTriangle size={48} className="mx-auto mb-4 text-red-400" />
+                            <h3 className="text-xl font-bold mb-2 text-red-200">System Restore</h3>
+                            <p className="text-sm opacity-60 mb-6">Overwrite current database with a backup file. <b className="text-red-400">Irreversible.</b></p>
+                            
+                            <input 
+                                type="file" 
+                                ref={importFileRef}
+                                onChange={handleImportData}
+                                accept=".json"
+                                className="hidden"
+                            />
+                            
+                            <button 
+                                onClick={() => importFileRef.current?.click()} 
+                                disabled={isLoading} 
+                                className="w-full py-3 border border-red-500 text-red-400 hover:bg-red-500/10 rounded font-bold"
+                            >
+                                {isLoading ? <Loader2 className="animate-spin mx-auto"/> : 'UPLOAD BACKUP FILE'}
+                            </button>
+                            
+                            {importStatus && (
+                                <div className="mt-4 text-xs font-mono bg-black/50 p-2 rounded">
+                                    <div>{importStatus}</div>
+                                    <div className="w-full bg-gray-700 h-1 mt-2 rounded overflow-hidden">
+                                        <div className="bg-red-500 h-full transition-all duration-300" style={{width: `${importProgress}%`}}></div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* VISITORS TAB */}
+                {activeTab === 'visitors' && (
+                    <div className="space-y-4">
+                        <div className="flex justify-between items-center">
+                            <h3 className="font-bold flex items-center gap-2"><ScanFace size={20}/> Recent Signals</h3>
+                            <button onClick={fetchVisitors} className="p-2 hover:bg-white/10 rounded"><RefreshCw size={16}/></button>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left text-sm">
+                                <thead className="bg-white/5 uppercase text-xs">
+                                    <tr>
+                                        <th className="p-3">Visitor</th>
+                                        <th className="p-3">Visits</th>
+                                        <th className="p-3">Time</th>
+                                        <th className="p-3">Last Active</th>
+                                        <th className="p-3">IP Hash</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {visitors.map((v) => (
+                                        <tr key={v.visitor_id} className="border-b border-white/5 hover:bg-white/5">
+                                            <td className="p-3 font-mono">{v.display_name}</td>
+                                            <td className="p-3">{v.visit_count}</td>
+                                            <td className="p-3">{(v.total_time_spent / 60).toFixed(1)}m</td>
+                                            <td className="p-3 opacity-60">{new Date(v.last_active).toLocaleString()}</td>
+                                            <td className="p-3 font-mono text-xs opacity-40">{v.ip_hash}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
+
+                {/* USERS TAB */}
+                {activeTab === 'users' && (
+                    <div className="max-w-2xl mx-auto space-y-8">
+                        <div className="p-6 border border-white/10 rounded bg-white/5">
+                            <h3 className="font-bold mb-4 flex items-center gap-2"><Plus size={18}/> Create Administrator</h3>
+                            <div className="grid gap-4">
+                                <input value={newUser} onChange={e => setNewUser(e.target.value)} placeholder="Username" className="p-3 rounded bg-black border border-white/10 outline-none" />
+                                <input value={newUserPass} onChange={e => setNewUserPass(e.target.value)} type="password" placeholder="Password" className="p-3 rounded bg-black border border-white/10 outline-none" />
+                                <div className="grid grid-cols-2 gap-2 text-xs">
+                                    <label className="flex items-center gap-2 p-2 border border-white/10 rounded cursor-pointer hover:bg-white/5">
+                                        <input type="checkbox" checked={newPermissions.canEdit} onChange={e => setNewPermissions({...newPermissions, canEdit: e.target.checked})} /> Can Edit Content
+                                    </label>
+                                    <label className="flex items-center gap-2 p-2 border border-white/10 rounded cursor-pointer hover:bg-white/5">
+                                        <input type="checkbox" checked={newPermissions.canDelete} onChange={e => setNewPermissions({...newPermissions, canDelete: e.target.checked})} /> Can Delete Content
+                                    </label>
+                                    <label className="flex items-center gap-2 p-2 border border-white/10 rounded cursor-pointer hover:bg-white/5">
+                                        <input type="checkbox" checked={newPermissions.canViewLogs} onChange={e => setNewPermissions({...newPermissions, canViewLogs: e.target.checked})} /> Can View Logs
+                                    </label>
+                                    <label className="flex items-center gap-2 p-2 border border-white/10 rounded cursor-pointer hover:bg-white/5">
+                                        <input type="checkbox" checked={newPermissions.canManageUsers} onChange={e => setNewPermissions({...newPermissions, canManageUsers: e.target.checked})} /> Can Manage Users
+                                    </label>
+                                </div>
+                                <button onClick={handleCreateUser} className="w-full py-3 bg-purple-600 hover:bg-purple-500 rounded font-bold">CREATE USER</button>
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <h3 className="font-bold flex items-center gap-2"><Users size={18}/> Active Administrators</h3>
+                            {users.map(u => (
+                                <div key={u.username} className="p-4 border border-white/10 rounded flex justify-between items-center bg-black/40">
+                                    <div className="flex items-center gap-3">
+                                        <UserIcon role={u.permissions.isGod ? 'god' : 'admin'} />
+                                        <div>
+                                            <div className="font-bold">{u.username}</div>
+                                            <div className="text-xs opacity-50 flex gap-2">
+                                                {u.permissions.isGod ? 'GOD MODE' : [u.permissions.canEdit && 'Edit', u.permissions.canDelete && 'Del', u.permissions.canManageUsers && 'Mgmt'].filter(Boolean).join(', ')}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {!u.permissions.isGod && (
+                                        <button onClick={() => handleDeleteUser(u.username)} className="p-2 text-red-500 hover:bg-red-900/20 rounded"><Trash2 size={16}/></button>
+                                    )}
                                 </div>
                             ))}
                         </div>
+                    </div>
+                )}
+
+                {/* CONFIG TAB */}
+                {activeTab === 'config' && (
+                    <div className="max-w-3xl mx-auto space-y-6">
+                        <div className="p-6 border border-white/10 rounded bg-white/5 space-y-4">
+                            <h3 className="font-bold flex items-center gap-2"><Settings size={18}/> Global Identity</h3>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-xs opacity-50 mb-1 block">Wizard Title</label>
+                                    <input value={editedConfig.wizardTitle} onChange={e => setEditedConfig({...editedConfig, wizardTitle: e.target.value})} className="w-full p-2 bg-black border border-white/10 rounded" />
+                                </div>
+                                <div>
+                                    <label className="text-xs opacity-50 mb-1 block">Muggle Title</label>
+                                    <input value={editedConfig.muggleTitle} onChange={e => setEditedConfig({...editedConfig, muggleTitle: e.target.value})} className="w-full p-2 bg-black border border-white/10 rounded" />
+                                </div>
+                                <div className="col-span-2">
+                                    <label className="text-xs opacity-50 mb-1 block">Telegram Link</label>
+                                    <input value={editedConfig.telegramLink || ''} onChange={e => setEditedConfig({...editedConfig, telegramLink: e.target.value})} placeholder="https://t.me/..." className="w-full p-2 bg-black border border-white/10 rounded" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="p-6 border border-white/10 rounded bg-white/5 space-y-4">
+                            <h3 className="font-bold flex items-center gap-2"><ImageIcon size={18}/> Assets & Media</h3>
+                            <div className="grid gap-4">
+                                <div>
+                                    <label className="text-xs opacity-50 mb-1 block">Wizard Background URL</label>
+                                    <input value={editedConfig.wizardImage} onChange={e => setEditedConfig({...editedConfig, wizardImage: e.target.value})} className="w-full p-2 bg-black border border-white/10 rounded" />
+                                </div>
+                                <div>
+                                    <label className="text-xs opacity-50 mb-1 block">Muggle Background URL</label>
+                                    <input value={editedConfig.muggleImage} onChange={e => setEditedConfig({...editedConfig, muggleImage: e.target.value})} className="w-full p-2 bg-black border border-white/10 rounded" />
+                                </div>
+                                <div>
+                                    <label className="text-xs opacity-50 mb-1 block">Cursor Style</label>
+                                    <select value={editedConfig.cursorStyle || 'classic'} onChange={e => setEditedConfig({...editedConfig, cursorStyle: e.target.value as any})} className="w-full p-2 bg-black border border-white/10 rounded">
+                                        <option value="classic">Classic (Quill / Crosshair)</option>
+                                        <option value="minimal">Minimal (Dot / Square)</option>
+                                        <option value="blade">Blade (Sharp)</option>
+                                        <option value="enchanted">Enchanted (Glowing)</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div className="flex justify-end gap-4">
+                            <button onClick={onClearData} className="px-6 py-3 border border-red-500 text-red-500 rounded font-bold hover:bg-red-900/10">RESET LOCAL</button>
+                            <button onClick={handleSaveConfig} className="px-6 py-3 bg-blue-600 rounded font-bold hover:bg-blue-500 shadow-lg">SAVE CONFIGURATION</button>
+                        </div>
+                    </div>
+                )}
+
+                {/* SECTORS TAB */}
+                {activeTab === 'structure' && (
+                    <div className="space-y-4">
+                        {editedSectors.map((sector, idx) => (
+                            <div key={sector.id} className="p-4 border border-white/10 rounded bg-white/5 flex flex-col md:flex-row gap-4 items-start md:items-center">
+                                <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-2 w-full">
+                                    <input value={sector.wizardName} onChange={(e) => handleUpdateSector(idx, 'wizardName', e.target.value)} className="p-2 bg-black border border-white/10 rounded" placeholder="Wizard Name" />
+                                    <input value={sector.muggleName} onChange={(e) => handleUpdateSector(idx, 'muggleName', e.target.value)} className="p-2 bg-black border border-white/10 rounded" placeholder="Muggle Name" />
+                                    <input value={sector.description} onChange={(e) => handleUpdateSector(idx, 'description', e.target.value)} className="p-2 bg-black border border-white/10 rounded" placeholder="Description" />
+                                </div>
+                                <div className="text-xs opacity-50 font-mono">{sector.id}</div>
+                            </div>
+                        ))}
+                        <button onClick={handleSaveSectors} className="w-full py-4 bg-green-600 hover:bg-green-500 rounded font-bold shadow-lg">UPDATE STRUCTURE</button>
                     </div>
                 )}
 

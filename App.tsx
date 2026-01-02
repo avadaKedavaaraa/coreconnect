@@ -260,21 +260,38 @@ const App: React.FC = () => {
       }
   };
 
-  // Swipe Logic
+  // Swipe Logic (Fixed for Scroll Jitter)
   const touchStartX = useRef<number | null>(null);
-  const handleTouchStart = (e: React.TouchEvent) => { touchStartX.current = e.touches[0].clientX; };
+  const touchStartY = useRef<number | null>(null); // Add vertical tracker
+
+  const handleTouchStart = (e: React.TouchEvent) => { 
+      touchStartX.current = e.touches[0].clientX; 
+      touchStartY.current = e.touches[0].clientY;
+  };
+
   const handleTouchEnd = (e: React.TouchEvent) => {
-      if (!touchStartX.current) return;
+      if (!touchStartX.current || !touchStartY.current) return;
       const target = e.target as HTMLElement;
+      // Ignore if on interactive elements
       if (target.closest('.no-swipe') || target.closest('.overflow-x-auto') || target.closest('.overflow-y-auto') || target.closest('input') || target.closest('textarea')) return;
       
       const diffX = touchStartX.current - e.changedTouches[0].clientX;
+      const diffY = touchStartY.current - e.changedTouches[0].clientY;
+
+      // CRITICAL FIX: If vertical movement is larger than horizontal, assume scroll and ignore swipe
+      if (Math.abs(diffY) > Math.abs(diffX)) {
+           touchStartX.current = null;
+           touchStartY.current = null;
+           return;
+      }
+
       if (Math.abs(diffX) > 60) { 
           const currentIdx = sectors.findIndex(s => s.id === activeSectorId);
           if (diffX > 0) setActiveSectorId(sectors[(currentIdx + 1) % sectors.length].id);
           else setActiveSectorId(sectors[(currentIdx - 1 + sectors.length) % sectors.length].id);
       }
       touchStartX.current = null;
+      touchStartY.current = null;
   };
 
   const allGameData = useMemo(() => dbItems.sort((a, b) => new Date(b.date.replace(/\./g, '-')).getTime() - new Date(a.date.replace(/\./g, '-')).getTime()), [dbItems]);
@@ -332,8 +349,11 @@ const App: React.FC = () => {
   const cursorStyle = globalConfig.cursorStyle || 'classic';
   const cursorClass = `cursor-${cursorStyle}-${isWizard ? 'wizard' : 'muggle'}`;
 
+  // Accessibility Class
+  const a11yClass = profile.highContrast ? 'contrast-125 brightness-110 saturate-150' : '';
+
   return (
-    <div className={`flex h-[100dvh] overflow-hidden transition-colors duration-1000 relative ${isWizard ? 'bg-[#050a05]' : 'bg-[#09050f]'} ${cursorClass}`} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+    <div className={`flex h-[100dvh] overflow-hidden transition-colors duration-1000 relative ${isWizard ? 'bg-[#050a05]' : 'bg-[#09050f]'} ${cursorClass} ${a11yClass}`} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
       <div className={`absolute inset-0 z-50 pointer-events-none ${isWizard ? 'parchment-grain' : 'crt-scanlines'}`}></div>
       
       {/* New Live Background */}

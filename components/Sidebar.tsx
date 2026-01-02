@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Lineage, Sector } from '../types';
 import { GlobalConfig } from '../App';
@@ -62,24 +63,24 @@ const Sidebar: React.FC<SidebarProps> = ({ lineage, sectors, config, selectedSec
         ${isOpen ? 'w-64 translate-x-0' : '-translate-x-full lg:translate-x-0 lg:w-20 lg:hover:w-64'} 
         group
         ${isWizard 
-          ? 'bg-[#050a05]/95 border-emerald-900/50 text-emerald-100 shadow-[2px_0_20px_rgba(0,0,0,0.5)]' 
-          : 'bg-[#09050f]/95 border-fuchsia-900/50 text-fuchsia-100 shadow-[2px_0_20px_rgba(0,0,0,0.5)]'}
+          ? 'bg-[#0a150a] border-emerald-800 shadow-[2px_0_20px_rgba(0,0,0,0.8)]' 
+          : 'bg-[#150a1f] border-fuchsia-800 shadow-[2px_0_20px_rgba(0,0,0,0.8)]'}
       `}>
         {/* Header (Logo) */}
-        <div className="h-20 flex items-center justify-center border-b border-white/5 overflow-hidden whitespace-nowrap relative shrink-0">
+        <div className="h-20 flex items-center justify-center border-b border-white/10 overflow-hidden whitespace-nowrap relative shrink-0">
           <div className="absolute left-0 w-20 flex justify-center items-center h-full">
              {logoUrl ? (
-                <div className={`w-12 h-12 rounded-lg overflow-hidden border ${isWizard ? 'border-emerald-500/30' : 'border-fuchsia-500/30'}`}>
+                <div className={`w-12 h-12 rounded-lg overflow-hidden border-2 ${isWizard ? 'border-emerald-400' : 'border-fuchsia-400'}`}>
                     <img src={logoUrl} alt="Logo" className="w-full h-full object-cover" />
                 </div>
              ) : (
-                <div className={`w-10 h-10 rounded flex items-center justify-center font-bold text-xl ${isWizard ? 'bg-emerald-900/30 text-emerald-400 font-wizardTitle' : 'bg-fuchsia-900/30 text-fuchsia-400 font-muggle'}`}>
+                <div className={`w-10 h-10 rounded flex items-center justify-center font-bold text-xl shadow-lg ${isWizard ? 'bg-emerald-900 text-emerald-300 font-wizardTitle border border-emerald-500' : 'bg-fuchsia-900 text-fuchsia-300 font-muggle border border-fuchsia-500'}`}>
                    {isWizard ? (config.wizardLogoText || 'C') : (config.muggleLogoText || 'CC')}
                 </div>
              )}
           </div>
           {/* Label is visible if group-hover OR if sidebar is explicitly open (mobile) */}
-          <div className={`transition-opacity duration-300 pl-20 pr-4 font-bold text-xl ${isOpen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} ${isWizard ? 'font-wizardTitle text-emerald-400' : 'font-muggle text-fuchsia-400'}`}>
+          <div className={`transition-opacity duration-300 pl-20 pr-4 font-bold text-xl ${isOpen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} ${isWizard ? 'font-wizardTitle text-emerald-300' : 'font-muggle text-fuchsia-300'}`}>
              {isWizard ? config.wizardTitle : config.muggleTitle}
           </div>
         </div>
@@ -104,9 +105,9 @@ const Sidebar: React.FC<SidebarProps> = ({ lineage, sectors, config, selectedSec
                       relative w-full h-12 flex items-center rounded-lg transition-all duration-300
                       ${isSelected 
                         ? (isWizard 
-                            ? 'bg-emerald-900/40 text-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.2)]' 
-                            : 'bg-fuchsia-900/40 text-fuchsia-300 shadow-[0_0_15px_rgba(217,70,239,0.2)]') 
-                        : 'opacity-50 hover:opacity-100 hover:bg-white/5'}
+                            ? 'bg-emerald-800 text-white shadow-[0_0_15px_rgba(16,185,129,0.4)] border border-emerald-500/50' 
+                            : 'bg-fuchsia-800 text-white shadow-[0_0_15px_rgba(217,70,239,0.4)] border border-fuchsia-500/50') 
+                        : 'text-white/70 hover:text-white hover:bg-white/10'}
                     `}
                   >
                     {/* Icon Container (Always visible) */}
@@ -121,7 +122,7 @@ const Sidebar: React.FC<SidebarProps> = ({ lineage, sectors, config, selectedSec
                     
                     {/* Active Bar */}
                     {isSelected && (
-                      <div className={`absolute left-0 top-2 bottom-2 w-1 rounded-r-full ${isWizard ? 'bg-emerald-400' : 'bg-fuchsia-400'}`} />
+                      <div className={`absolute left-0 top-2 bottom-2 w-1 rounded-r-full ${isWizard ? 'bg-emerald-300' : 'bg-fuchsia-300'}`} />
                     )}
                   </button>
                 </li>
@@ -131,11 +132,11 @@ const Sidebar: React.FC<SidebarProps> = ({ lineage, sectors, config, selectedSec
         </nav>
 
         {/* Footer Info / Settings */}
-        <div className="h-16 border-t border-white/5 flex items-center justify-center shrink-0 relative px-2">
+        <div className="h-16 border-t border-white/10 flex items-center justify-center shrink-0 relative px-2 bg-black/20">
            <button 
              onClick={onOpenSettings}
-             className={`w-full h-full flex items-center justify-center gap-2 hover:bg-white/5 transition-all group/settings
-               ${isWizard ? 'text-emerald-500 hover:text-red-400' : 'text-fuchsia-500 hover:text-blue-400'}
+             className={`w-full h-full flex items-center justify-center gap-2 hover:bg-white/10 transition-all group/settings
+               ${isWizard ? 'text-emerald-400 hover:text-red-300' : 'text-fuchsia-400 hover:text-blue-300'}
              `}
              title="Admin Access"
            >

@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Lineage, type UserProfile, SECTORS } from '../types';
 import { GlobalConfig } from '../App';
-import { X, Clock, ClipboardList, User, Palette, Save, Type, PaintBucket, LayoutTemplate, Plus, Link as LinkIcon, Eye } from 'lucide-react';
+import { X, Clock, ClipboardList, User, Palette, Save, Type, PaintBucket, LayoutTemplate, Plus, Link as LinkIcon, Eye, Sun, Moon } from 'lucide-react';
 import Pomodoro from './Pomodoro';
 import Kanban from './Kanban';
 import StudentID from './StudentID';
@@ -29,7 +29,8 @@ const ToolsModal: React.FC<ToolsModalProps> = ({ lineage, onClose, profile, setP
     const isDifferent = 
         editProfile.displayName !== profile.displayName ||
         editProfile.preferredFont !== profile.preferredFont ||
-        editProfile.themeColor !== profile.themeColor;
+        editProfile.themeColor !== profile.themeColor ||
+        editProfile.highContrast !== profile.highContrast;
     setHasChanges(isDifferent);
   }, [editProfile, profile]);
 
@@ -38,7 +39,8 @@ const ToolsModal: React.FC<ToolsModalProps> = ({ lineage, onClose, profile, setP
         ...prev,
         displayName: editProfile.displayName,
         preferredFont: editProfile.preferredFont,
-        themeColor: editProfile.themeColor
+        themeColor: editProfile.themeColor,
+        highContrast: editProfile.highContrast
     }));
     setHasChanges(false);
     const btn = document.getElementById('save-btn');
@@ -129,8 +131,6 @@ const ToolsModal: React.FC<ToolsModalProps> = ({ lineage, onClose, profile, setP
 
               <div className="flex-1 overflow-y-auto p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {[...defaultFonts, ...extraFonts].map(font => {
-                      // Lazy load styling for preview
-                      // Note: In a real prod app, you'd manage this better than on-render injection
                       const isSelected = editProfile.preferredFont === font.id;
                       return (
                           <button
@@ -230,6 +230,7 @@ const ToolsModal: React.FC<ToolsModalProps> = ({ lineage, onClose, profile, setP
                    {/* Right: Customization Form */}
                    <div className={`flex-1 overflow-y-auto pr-2 space-y-6 ${isWizard ? 'scrollbar-wizard' : 'scrollbar-muggle'}`}>
                        
+                       {/* Display Name */}
                        <div className="space-y-2">
                            <label className="flex items-center gap-2 text-sm font-bold text-white">
                                <User size={16} className={isWizard ? 'text-emerald-500' : 'text-fuchsia-500'}/> Display Name
@@ -245,6 +246,24 @@ const ToolsModal: React.FC<ToolsModalProps> = ({ lineage, onClose, profile, setP
                            />
                        </div>
 
+                       {/* Accessibility Toggle (New) */}
+                       <div className={`p-4 rounded-lg border flex items-center justify-between ${isWizard ? 'bg-emerald-950/20 border-emerald-800' : 'bg-fuchsia-950/20 border-fuchsia-800'}`}>
+                           <div>
+                               <label className="flex items-center gap-2 text-sm font-bold text-white mb-1">
+                                   {editProfile.highContrast ? <Sun size={16} className="text-yellow-400" /> : <Moon size={16} />}
+                                   Accessibility Mode
+                               </label>
+                               <p className="text-xs opacity-60">Increases text brightness and contrast.</p>
+                           </div>
+                           <button 
+                             onClick={() => setEditProfile(prev => ({...prev, highContrast: !prev.highContrast}))}
+                             className={`w-12 h-6 rounded-full p-1 transition-colors relative ${editProfile.highContrast ? (isWizard ? 'bg-emerald-500' : 'bg-fuchsia-500') : 'bg-zinc-700'}`}
+                           >
+                               <div className={`w-4 h-4 rounded-full bg-white transition-transform ${editProfile.highContrast ? 'translate-x-6' : 'translate-x-0'}`}></div>
+                           </button>
+                       </div>
+
+                       {/* Fonts */}
                        <div className="space-y-2">
                            <label className="flex items-center gap-2 text-sm font-bold text-white">
                                <Type size={16} className={isWizard ? 'text-emerald-500' : 'text-fuchsia-500'}/> Interface Font
@@ -262,6 +281,7 @@ const ToolsModal: React.FC<ToolsModalProps> = ({ lineage, onClose, profile, setP
                            </button>
                        </div>
 
+                       {/* Themes */}
                        <div className="space-y-2">
                            <label className="flex items-center gap-2 text-sm font-bold text-white">
                                <PaintBucket size={16} className={isWizard ? 'text-emerald-500' : 'text-fuchsia-500'}/> Soul Color
