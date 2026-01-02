@@ -13,9 +13,10 @@ const IdentityGate: React.FC<IdentityGateProps> = ({ onSelect, config }) => {
   const [selected, setSelected] = useState<Lineage | null>(null);
   const [name, setName] = useState('');
   const [hasName, setHasName] = useState(false);
+  const [showNameInput, setShowNameInput] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
 
-  // Check for existing name
+  // Check for existing name on mount
   useEffect(() => {
     const savedProfile = localStorage.getItem('core_connect_profile');
     if (savedProfile) {
@@ -37,39 +38,59 @@ const IdentityGate: React.FC<IdentityGateProps> = ({ onSelect, config }) => {
       e.preventDefault();
       if (name.trim()) {
           setHasName(true);
+          // Proceed to app now that we have name AND selection
+          if (selected) {
+              onSelect(selected, name);
+          }
       }
   };
 
   const handleSelection = (lineage: Lineage) => {
     setSelected(lineage);
     setIsAnimating(true);
-    // Allow animation to play before unmounting
+    
+    // Wait for gate animation to finish (1s)
     setTimeout(() => {
-        onSelect(lineage, name);
+        if (hasName) {
+            // User already has a name, proceed immediately
+            onSelect(lineage, name);
+        } else {
+            // User needs to identify themselves
+            setShowNameInput(true);
+        }
     }, 1000);
   };
 
-  // 1. NAME ENTRY SCREEN (If no name saved)
-  if (!hasName) {
+  // 1. NAME ENTRY SCREEN (Shown ONLY after selection if name is missing)
+  if (showNameInput) {
       return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black overflow-hidden">
-            {/* Background Ambience */}
+            {/* Background Ambience - Tailored to selection */}
             <div className="absolute inset-0 opacity-40">
-                <div className="absolute top-0 left-0 w-1/2 h-full bg-emerald-900/20 blur-[100px]"></div>
-                <div className="absolute top-0 right-0 w-1/2 h-full bg-fuchsia-900/20 blur-[100px]"></div>
+                {selected === Lineage.WIZARD ? (
+                    <div className="absolute top-0 left-0 w-full h-full bg-emerald-900/20 blur-[100px] animate-pulse-slow"></div>
+                ) : (
+                    <div className="absolute top-0 right-0 w-full h-full bg-fuchsia-900/20 blur-[100px] animate-pulse-slow"></div>
+                )}
             </div>
 
-            <div className="relative z-10 w-full max-w-md p-8 bg-black/80 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl animate-[fade-in-up_0.5s_ease-out]">
+            <div className={`relative z-10 w-full max-w-md p-8 bg-black/80 backdrop-blur-xl border rounded-2xl shadow-2xl animate-[fade-in-up_0.5s_ease-out]
+                ${selected === Lineage.WIZARD ? 'border-emerald-500/30' : 'border-fuchsia-500/30'}
+            `}>
                 <div className="flex justify-center mb-6">
-                    <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-emerald-500 to-fuchsia-500 p-[2px]">
+                    <div className={`w-16 h-16 rounded-full p-[2px] ${selected === Lineage.WIZARD ? 'bg-emerald-500' : 'bg-fuchsia-500'}`}>
                         <div className="w-full h-full rounded-full bg-black flex items-center justify-center">
                             <User size={32} className="text-white" />
                         </div>
                     </div>
                 </div>
                 
-                <h2 className="text-3xl font-bold text-center text-white mb-2 font-sans tracking-tight">Identify Yourself</h2>
-                <p className="text-center text-zinc-400 mb-8 text-sm">Enter your designation to access the Core Archives.</p>
+                <h2 className={`text-3xl font-bold text-center text-white mb-2 tracking-tight ${selected === Lineage.WIZARD ? 'font-wizardTitle' : 'font-muggle'}`}>
+                    {selected === Lineage.WIZARD ? 'State Thy Name' : 'Identity Required'}
+                </h2>
+                <p className="text-center text-zinc-400 mb-8 text-sm">
+                    {selected === Lineage.WIZARD ? 'To enter the archives, you must be known.' : 'Enter credentials to initialize session.'}
+                </p>
 
                 <form onSubmit={handleNameSubmit} className="space-y-6">
                     <div className="relative group">
@@ -79,7 +100,11 @@ const IdentityGate: React.FC<IdentityGateProps> = ({ onSelect, config }) => {
                             value={name}
                             onChange={(e) => setName(e.target.value)}
                             placeholder="Your Name..."
-                            className="w-full bg-black/50 border border-zinc-700 rounded-lg px-4 py-4 text-white placeholder:text-zinc-600 outline-none focus:border-white/50 transition-all text-center text-base tracking-wider"
+                            className={`w-full bg-black/50 border rounded-lg px-4 py-4 text-white placeholder:text-zinc-600 outline-none transition-all text-center text-base tracking-wider
+                                ${selected === Lineage.WIZARD 
+                                    ? 'border-emerald-900 focus:border-emerald-500 font-wizard' 
+                                    : 'border-fuchsia-900 focus:border-fuchsia-500 font-muggle'}
+                            `}
                             autoFocus
                         />
                     </div>
@@ -88,11 +113,11 @@ const IdentityGate: React.FC<IdentityGateProps> = ({ onSelect, config }) => {
                         disabled={!name.trim()}
                         className={`w-full py-4 rounded-lg font-bold tracking-widest flex items-center justify-center gap-2 transition-all
                             ${name.trim() 
-                                ? 'bg-white text-black hover:bg-zinc-200 hover:scale-[1.02]' 
+                                ? (selected === Lineage.WIZARD ? 'bg-emerald-600 hover:bg-emerald-500 text-black' : 'bg-fuchsia-600 hover:bg-fuchsia-500 text-black')
                                 : 'bg-zinc-800 text-zinc-500 cursor-not-allowed'}
                         `}
                     >
-                        <span>PROCEED</span>
+                        <span>{selected === Lineage.WIZARD ? 'ENTER' : 'PROCEED'}</span>
                         <ArrowRight size={18} />
                     </button>
                 </form>
@@ -101,7 +126,7 @@ const IdentityGate: React.FC<IdentityGateProps> = ({ onSelect, config }) => {
       );
   }
 
-  // 2. LINEAGE SELECTION SCREEN (Gate)
+  // 2. LINEAGE SELECTION SCREEN (Gate) - Initial View
   return (
     <div className="fixed inset-0 z-[100] flex flex-col md:flex-row bg-black overflow-hidden">
       {/* Wizard Side */}

@@ -1,7 +1,8 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Lineage, type CarouselItem } from '../types';
-import { Book, FileText, Video, Calendar, Search, Filter, X, Trash2, LayoutGrid, List, FolderOpen, ArrowLeft, Edit2, Plus, FolderPlus, Loader2, Image as ImageIcon } from 'lucide-react';
+import { Lineage, type CarouselItem, type LectureRule } from '../types';
+import { GlobalConfig } from '../App';
+import { Book, FileText, Video, Calendar, Search, Filter, X, Trash2, LayoutGrid, List, FolderOpen, ArrowLeft, Edit2, Plus, FolderPlus, Loader2, Image as ImageIcon, Send, Link, Repeat, ExternalLink, Hourglass, MonitorOff } from 'lucide-react';
 import CalendarWidget from './CalendarWidget';
 import DOMPurify from 'dompurify';
 
@@ -16,9 +17,14 @@ interface SectorViewProps {
   onBack?: () => void;
   onAddItem?: (sectorId: string) => void; 
   onQuickCreate?: (item: CarouselItem) => void; 
+  schedules?: LectureRule[];
+  quickInputOnly?: boolean; 
+  config?: GlobalConfig;
 }
 
-const SectorView: React.FC<SectorViewProps> = ({ items, lineage, sectorId, onViewItem, isAdmin, onDelete, onEdit, onBack, onAddItem, onQuickCreate }) => {
+const SectorView: React.FC<SectorViewProps> = ({ 
+    items, lineage, sectorId, onViewItem, isAdmin, onDelete, onEdit, onBack, onAddItem, onQuickCreate, schedules, quickInputOnly, config 
+}) => {
   const isWizard = lineage === Lineage.WIZARD;
   
   // --- STATE ---
@@ -27,6 +33,10 @@ const SectorView: React.FC<SectorViewProps> = ({ items, lineage, sectorId, onVie
   const [subjectFilter, setSubjectFilter] = useState('');
   const [viewMode, setViewMode] = useState<'folders' | 'masonry' | 'list'>('folders');
   const [calendarOpen, setCalendarOpen] = useState(false);
+
+  // Lazy Post State
+  const [quickPostText, setQuickPostText] = useState('');
+  const [isPosting, setIsPosting] = useState(false);
 
   // Subject Creation State
   const [isCreatingSubject, setIsCreatingSubject] = useState(false);
@@ -38,8 +48,54 @@ const SectorView: React.FC<SectorViewProps> = ({ items, lineage, sectorId, onVie
   // --- DERIVED DATA ---
   const subjects = useMemo(() => Array.from(new Set(items.map(i => i.subject || 'General'))).sort(), [items]);
 
+  // Combine Real Items with Scheduled (Virtual) Items
+  const displayItems = useMemo(() => {
+      let combined = [...items];
+
+      // If we are in "lectures" and have schedules
+      if (sectorId === 'lectures' && schedules && schedules.length > 0) {
+          const today = new Date();
+          const dayName = today.toLocaleDateString('en-US', { weekday: 'long' });
+          const todayStr = today.toISOString().split('T')[0].replace(/-/g, '.');
+
+          // Find rules for Today
+          const todaysRules = schedules.filter(rule => 
+              rule.isActive && rule.dayOfWeek === dayName && 
+              (!rule.endDate || new Date(rule.endDate) >= today)
+          );
+
+          // Create Virtual Items for display
+          const virtualItems: CarouselItem[] = todaysRules.map(rule => ({
+              id: `virtual-${rule.id}`,
+              title: `${rule.subject} - ${rule.startTime}`,
+              content: `Scheduled Lecture.`,
+              date: todayStr,
+              type: 'video', 
+              subject: rule.subject,
+              sector: 'lectures',
+              author: 'Scheduler',
+              fileUrl: rule.link,
+              isUnread: true,
+              likes: 0,
+              style: {
+                  titleColor: isWizard ? '#34d399' : '#e879f9', // Distinct color
+                  contentColor: '#ffffff'
+              }
+          }));
+
+          // Add virtual items to top if not already present
+          virtualItems.forEach(vItem => {
+              const realExists = items.some(i => i.date === vItem.date && i.subject === vItem.subject && i.title.includes(vItem.title));
+              if (!realExists) {
+                  combined.unshift(vItem);
+              }
+          });
+      }
+      return combined;
+  }, [items, sectorId, schedules, lineage]);
+
   const filteredItems = useMemo(() => {
-    return items.filter(item => {
+    return displayItems.filter(item => {
       const matchesSearch = item.title.toLowerCase().includes(search.toLowerCase()) || 
                             item.content.toLowerCase().includes(search.toLowerCase());
       const normalizedItemDate = item.date.replace(/-/g, '.');
@@ -49,7 +105,7 @@ const SectorView: React.FC<SectorViewProps> = ({ items, lineage, sectorId, onVie
       const matchesSubject = subjectFilter ? (item.subject || 'General') === subjectFilter : true;
       return matchesSearch && matchesDate && matchesSubject;
     });
-  }, [items, search, dateFilter, subjectFilter]);
+  }, [displayItems, search, dateFilter, subjectFilter]);
 
   // --- EFFECTS ---
   useEffect(() => {
@@ -83,6 +139,57 @@ const SectorView: React.FC<SectorViewProps> = ({ items, lineage, sectorId, onVie
     if (viewMode !== 'folders') setViewMode('folders');
   };
 
+  // --- LAZY QUICK POST ---
+  const handleQuickPost = async () => {
+      if (!quickPostText.trim() || !onQuickCreate) return;
+      setIsPosting(true);
+      try {
+          await onQuickCreate({
+              id: crypto.randomUUID(),
+              title: quickPostText.substring(0, 30) + (quickPostText.length > 30 ? '...' : ''), // Auto title
+              content: quickPostText,
+              date: new Date().toISOString().split('T')[0].replace(/-/g, '.'),
+              type: 'announcement',
+              sector: sectorId,
+              subject: subjectFilter || 'General', // Auto-tag if filtered
+              author: 'Admin',
+              isUnread: true,
+              likes: 0
+          });
+          setQuickPostText('');
+      } catch (e) {
+          alert('Failed to post');
+      } finally {
+          setIsPosting(false);
+      }
+  };
+
+  // --- RENDER QUICK INPUT ONLY ---
+  if (quickInputOnly) {
+      return (
+        <div className={`relative flex items-center p-2 rounded-lg border backdrop-blur-sm transition-all
+            ${isWizard ? 'bg-emerald-950/40 border-emerald-500/30 focus-within:border-emerald-400' : 'bg-fuchsia-950/40 border-fuchsia-500/30 focus-within:border-fuchsia-400'}
+        `}>
+            <input 
+                type="text"
+                value={quickPostText}
+                onChange={(e) => setQuickPostText(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleQuickPost()}
+                placeholder="Lazy Post: Type message & press Enter..."
+                className="flex-1 bg-transparent outline-none text-sm text-white placeholder:text-white/30 px-2"
+                disabled={isPosting}
+            />
+            <button 
+                onClick={handleQuickPost} 
+                disabled={!quickPostText.trim() || isPosting}
+                className={`p-2 rounded-full transition-colors ${isWizard ? 'text-emerald-400 hover:bg-emerald-900/50' : 'text-fuchsia-400 hover:bg-fuchsia-900/50'}`}
+            >
+                {isPosting ? <Loader2 size={16} className="animate-spin"/> : <Send size={16}/>}
+            </button>
+        </div>
+      );
+  }
+
   // --- SUBJECT MANAGEMENT HANDLERS ---
 
   const handleCreateSubject = async () => {
@@ -90,8 +197,6 @@ const SectorView: React.FC<SectorViewProps> = ({ items, lineage, sectorId, onVie
       setIsProcessing(true);
 
       const today = new Date().toISOString().split('T')[0].replace(/-/g, '.');
-      
-      // Create a "Genesis" item to establish the folder
       const genesisItem: CarouselItem = {
           id: crypto.randomUUID(), 
           title: `Welcome to ${newSubjectName}`,
@@ -122,23 +227,18 @@ const SectorView: React.FC<SectorViewProps> = ({ items, lineage, sectorId, onVie
   const handleDeleteSubject = async (e: React.MouseEvent, subject: string) => {
       e.stopPropagation();
       if (!onDelete) return;
-
       const count = items.filter(i => (i.subject || 'General') === subject).length;
       if (!confirm(`WARNING: This will delete the subject "${subject}" and ALL ${count} items inside it.\n\nThis action cannot be undone.\n\nAre you sure?`)) {
           return;
       }
-
-      // Find all items in this subject
       const itemsToDelete = items.filter(i => (i.subject || 'General') === subject);
-      
-      // Loop call onDelete
       for (const item of itemsToDelete) {
           onDelete(item.id);
       }
   };
 
   return (
-    <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 pb-20 animate-[fade-in-up_0.3s_ease-out]">
+    <div className={`w-full max-w-7xl mx-auto px-4 sm:px-6 pb-20 animate-[fade-in-up_0.3s_ease-out] ${isWizard ? 'scrollbar-wizard' : 'scrollbar-muggle'}`}>
       
       {/* Top Navigation Bar */}
       <div className="flex items-center gap-4 mb-4 justify-between">
@@ -166,20 +266,60 @@ const SectorView: React.FC<SectorViewProps> = ({ items, lineage, sectorId, onVie
               )}
           </div>
           
-          {onAddItem && (
-             <button 
-                onClick={() => onAddItem(sectorId)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-full font-bold shadow-lg transition-all hover:scale-105 active:scale-95
-                   ${isWizard 
-                     ? 'bg-emerald-600 text-black hover:bg-emerald-500' 
-                     : 'bg-fuchsia-600 text-black hover:bg-fuchsia-500'}
-                `}
-             >
-                <Plus size={18} />
-                <span className="hidden sm:inline">Add Content</span>
-             </button>
-          )}
+          <div className="flex items-center gap-3">
+              {/* Telegram Icon - Only if configured */}
+              {config?.telegramLink && (
+                  <a 
+                    href={config.telegramLink} 
+                    target="_blank" 
+                    rel="noreferrer"
+                    className={`p-2 rounded-full border transition-all hover:scale-110 active:scale-95 animate-pulse
+                        ${isWizard ? 'bg-emerald-900/50 border-emerald-500 text-emerald-400' : 'bg-fuchsia-900/50 border-fuchsia-500 text-fuchsia-400'}
+                    `}
+                    title="Official Communication Channel"
+                  >
+                      <Send size={20} />
+                  </a>
+              )}
+
+              {onAddItem && (
+                 <button 
+                    onClick={() => onAddItem(sectorId)}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-full font-bold shadow-lg transition-all hover:scale-105 active:scale-95
+                       ${isWizard 
+                         ? 'bg-emerald-600 text-black hover:bg-emerald-500' 
+                         : 'bg-fuchsia-600 text-black hover:bg-fuchsia-500'}
+                    `}
+                 >
+                    <Plus size={18} />
+                    <span className="hidden sm:inline">Advanced Add</span>
+                 </button>
+              )}
+          </div>
       </div>
+
+      {/* LAZY QUICK ADD INPUT - VISIBLE TO ADMINS */}
+      {isAdmin && onQuickCreate && (
+          <div className="mb-6 animate-[fade-in_0.5s]">
+             <div className={`relative flex items-center p-3 rounded-xl border backdrop-blur-md transition-all shadow-lg
+                ${isWizard ? 'bg-emerald-950/30 border-emerald-500/40' : 'bg-fuchsia-950/30 border-fuchsia-500/40'}
+             `}>
+                <div className={`mr-3 p-2 rounded-full ${isWizard ? 'bg-emerald-900/50 text-emerald-400' : 'bg-fuchsia-900/50 text-fuchsia-400'}`}>
+                    <Plus size={20} />
+                </div>
+                <input 
+                    type="text"
+                    value={quickPostText}
+                    onChange={(e) => setQuickPostText(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleQuickPost()}
+                    placeholder={`Lazy Mode: Quickly post to '${sectorId}'... (Press Enter)`}
+                    className="flex-1 bg-transparent outline-none text-base text-white placeholder:text-white/40"
+                    disabled={isPosting}
+                />
+                {isPosting && <Loader2 size={20} className="animate-spin text-white opacity-50 mr-2"/>}
+             </div>
+          </div>
+      )}
 
       {/* FILTER BAR - Mobile Responsive */}
       <div className={`mb-8 p-4 rounded-xl border backdrop-blur-md flex flex-col lg:flex-row gap-4 items-stretch lg:items-center justify-between sticky top-0 z-30 shadow-xl transition-all
@@ -200,10 +340,9 @@ const SectorView: React.FC<SectorViewProps> = ({ items, lineage, sectorId, onVie
                 `}
               />
             </div>
-            {/* FIX: Z-Index for Calendar Widget Popup */}
             <div className="relative w-full md:w-auto z-[40]">
                <CalendarWidget 
-                 lineage={lineage} items={items} selectedDate={dateFilter} onSelectDate={setDateFilter}
+                 lineage={lineage} items={displayItems} selectedDate={dateFilter} onSelectDate={setDateFilter}
                  isOpen={calendarOpen} setIsOpen={setCalendarOpen}
                />
             </div>
@@ -242,10 +381,8 @@ const SectorView: React.FC<SectorViewProps> = ({ items, lineage, sectorId, onVie
       {viewMode === 'folders' && !search && !dateFilter ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 animate-[fade-in_0.3s]">
           {subjects.map((subject, idx) => {
-             const subjectItems = items.filter(i => (i.subject || 'General') === subject);
+             const subjectItems = displayItems.filter(i => (i.subject || 'General') === subject);
              const count = subjectItems.length;
-             
-             // Find cover image: prioritize items with images, newest first
              const coverItem = subjectItems.find(i => i.image && i.image.length > 0);
              const coverImage = coverItem?.image;
 
@@ -291,7 +428,7 @@ const SectorView: React.FC<SectorViewProps> = ({ items, lineage, sectorId, onVie
             );
           })}
 
-          {/* ADD NEW FOLDER CARD */}
+          {/* ADD NEW FOLDER CARD (ADMIN ONLY) */}
           {isAdmin && onQuickCreate && (
               <div
                 className={`h-40 relative overflow-hidden rounded-2xl border-2 border-dashed flex flex-col items-center justify-center gap-2 transition-all duration-300
@@ -324,20 +461,6 @@ const SectorView: React.FC<SectorViewProps> = ({ items, lineage, sectorId, onVie
                                 ${isWizard ? 'border-emerald-500 text-emerald-100 placeholder:text-emerald-800' : 'border-fuchsia-500 text-fuchsia-100 placeholder:text-fuchsia-800'}
                             `}
                           />
-                          
-                          <div className="relative w-full mb-3 group">
-                             <ImageIcon size={14} className="absolute left-0 top-1.5 opacity-50"/>
-                             <input 
-                                type="text"
-                                value={newSubjectImage}
-                                onChange={(e) => setNewSubjectImage(e.target.value)}
-                                placeholder="Cover Image URL (Optional)"
-                                className={`w-full bg-transparent border-b outline-none text-[10px] pl-5
-                                    ${isWizard ? 'border-emerald-900 text-emerald-300 placeholder:text-emerald-900' : 'border-fuchsia-900 text-fuchsia-300 placeholder:text-fuchsia-900'}
-                                `}
-                             />
-                          </div>
-
                           <div className="flex gap-2">
                               <button 
                                 onClick={handleCreateSubject}
@@ -363,26 +486,52 @@ const SectorView: React.FC<SectorViewProps> = ({ items, lineage, sectorId, onVie
            <div className={`mb-4 text-xs opacity-50 px-2 ${isWizard ? 'font-wizard text-emerald-200' : 'font-muggle text-fuchsia-200'}`}>
               Found {filteredItems.length} {isWizard ? 'artifacts' : 'records'}
            </div>
+           
+           {/* EMPTY STATE FOR LECTURES */}
            {filteredItems.length === 0 ? (
-             <div className="text-center py-20 opacity-40">
-                <Search size={48} className="mx-auto mb-4" />
-                <p>{isWizard ? "The archives yield nothing." : "No matching records found."}</p>
-             </div>
+             sectorId === 'lectures' ? (
+                 <div className={`flex flex-col items-center justify-center py-20 animate-[fade-in_0.5s] relative overflow-hidden rounded-xl border border-dashed border-white/10 ${isWizard ? 'bg-emerald-950/10' : 'bg-fuchsia-950/10'}`}>
+                     <div className={`mb-6 p-6 rounded-full border-2 ${isWizard ? 'border-emerald-500/30 text-emerald-400 bg-black/40' : 'border-fuchsia-500/30 text-fuchsia-400 bg-black/40'} relative group`}>
+                         <div className={`absolute inset-0 rounded-full blur-xl opacity-30 ${isWizard ? 'bg-emerald-500' : 'bg-fuchsia-500'} animate-pulse`}></div>
+                         {isWizard ? <Hourglass size={48} className="animate-spin-slow" /> : <MonitorOff size={48} />}
+                     </div>
+                     <h3 className={`text-2xl font-bold mb-2 ${isWizard ? 'font-wizardTitle text-emerald-200' : 'font-muggle text-fuchsia-200'}`}>
+                         {isWizard ? "Time Stands Still..." : "Bandwidth Clear"}
+                     </h3>
+                     <p className={`text-sm opacity-60 max-w-sm text-center ${isWizard ? 'font-wizard' : 'font-muggle'}`}>
+                         {isWizard ? "The sands of time show no lectures for this day. Rest, apprentice." : "No scheduled data streams found for today. System idle."}
+                     </p>
+                 </div>
+             ) : (
+                 <div className="text-center py-20 opacity-40">
+                    <Search size={48} className="mx-auto mb-4" />
+                    <p>{isWizard ? "The archives yield nothing." : "No matching records found."}</p>
+                 </div>
+             )
            ) : (
              <div className={viewMode === 'list' ? 'flex flex-col gap-3' : 'columns-1 md:columns-2 lg:columns-3 gap-6 space-y-6'}>
                 {filteredItems.map((item) => {
                   const customStyle = item.style || {};
-                  // SECURITY: Sanitize Content
                   const cleanContent = DOMPurify.sanitize(item.content);
+                  const isVirtual = item.id.startsWith('virtual-');
+                  const hasLink = item.fileUrl && (item.fileUrl.startsWith('http') || item.fileUrl.startsWith('https'));
 
                   return (
                   <div key={item.id} onClick={() => onViewItem(item)}
                     className={`break-inside-avoid relative rounded-xl border backdrop-blur-md group transition-all duration-300 cursor-pointer overflow-hidden
                       ${viewMode === 'list' ? 'p-4 flex items-center gap-4 hover:translate-x-1' : 'p-6 flex flex-col gap-4 hover:-translate-y-1'}
                       ${isWizard ? 'bg-black/40 border-emerald-900/50 hover:bg-emerald-900/10' : 'bg-black/40 border-fuchsia-900/50 hover:bg-fuchsia-900/10'}
+                      ${isVirtual ? 'border-l-4' : ''} 
                     `}
+                    style={isVirtual ? {borderLeftColor: customStyle.titleColor} : {}}
                   >
-                    {isAdmin && (
+                    {isVirtual && (
+                        <div className="absolute top-0 right-0 bg-white/10 text-[10px] px-2 py-0.5 rounded-bl opacity-70 flex items-center gap-1 font-bold tracking-wider">
+                            <Repeat size={10}/> RECURRING
+                        </div>
+                    )}
+
+                    {isAdmin && !isVirtual && (
                         <div className={`absolute top-2 right-2 flex gap-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity ${viewMode === 'list' ? 'order-last relative top-0 right-0 opacity-100' : ''}`}>
                              {onEdit && (
                                  <button onClick={(e) => { e.stopPropagation(); onEdit(item); }} className="p-1.5 bg-yellow-600 rounded text-black hover:bg-yellow-500" title="Edit Item">
@@ -398,12 +547,11 @@ const SectorView: React.FC<SectorViewProps> = ({ items, lineage, sectorId, onVie
                     )}
 
                     <div className={`shrink-0 rounded-full flex items-center justify-center ${viewMode === 'list' ? 'w-10 h-10' : 'w-12 h-12 mb-2'} ${isWizard ? 'bg-emerald-900/30 text-emerald-400' : 'bg-fuchsia-900/30 text-fuchsia-400'}`}>
-                       {item.type === 'video' ? <Video size={viewMode==='list'?18:24} /> : <FileText size={viewMode==='list'?18:24} />}
+                       {item.type === 'video' ? <Video size={viewMode==='list'?18:24} /> : item.type === 'file' ? <FileText size={viewMode==='list'?18:24} /> : <Link size={viewMode==='list'?18:24} />}
                     </div>
                     <div className="flex-1 min-w-0">
                        <div className="flex items-center gap-2 mb-1">
                           {item.subject && <span className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded border opacity-60 ${isWizard ? 'border-emerald-800 text-emerald-300' : 'border-fuchsia-800 text-fuchsia-300'}`}>{item.subject}</span>}
-                          {/* Calendar Date Display */}
                           <div className={`flex items-center gap-1 text-[10px] opacity-50 ${isWizard ? 'font-wizard' : 'font-muggle'}`}>
                              <Calendar size={10} />
                              <span>{item.date}</span>
@@ -421,6 +569,23 @@ const SectorView: React.FC<SectorViewProps> = ({ items, lineage, sectorId, onVie
                               style={{color: customStyle.contentColor}}
                               dangerouslySetInnerHTML={{__html: cleanContent}}
                            ></div>
+                       )}
+                       
+                       {/* GO TO CLASS BUTTON */}
+                       {(isVirtual || hasLink) && viewMode !== 'list' && (
+                           <div className="mt-4 pt-4 border-t border-white/5">
+                               <a 
+                                 href={item.fileUrl} 
+                                 target="_blank" 
+                                 rel="noreferrer"
+                                 onClick={(e) => e.stopPropagation()}
+                                 className={`w-full flex items-center justify-center gap-2 py-2 rounded font-bold text-xs uppercase tracking-widest transition-all hover:scale-[1.02] active:scale-95 shadow-lg
+                                    ${isWizard ? 'bg-emerald-600 hover:bg-emerald-500 text-black' : 'bg-fuchsia-600 hover:bg-fuchsia-500 text-black'}
+                                 `}
+                               >
+                                   <ExternalLink size={14} /> {isVirtual ? "Enter Classroom" : "Open Link"}
+                               </a>
+                           </div>
                        )}
                     </div>
                   </div>

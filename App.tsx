@@ -4,7 +4,7 @@ import IdentityGate from './components/IdentityGate';
 import Sidebar from './components/Sidebar';
 import Carousel from './components/Carousel';
 import HUD from './components/HUD';
-import { Lineage, SECTORS, type CarouselItem, type UserProfile, type Sector, type AdminPermissions } from './types';
+import { Lineage, SECTORS, type CarouselItem, type UserProfile, type Sector, type AdminPermissions, type LectureRule } from './types';
 import { Menu, Briefcase, Lock, LayoutList, Loader2 } from 'lucide-react';
 import { supabase } from './lib/supabase';
 
@@ -49,7 +49,9 @@ export interface GlobalConfig {
   wizardImage: string;
   muggleImage: string;
   wizardLogoUrl?: string; 
-  muggleLogoUrl?: string; 
+  muggleLogoUrl?: string;
+  telegramLink?: string; // Added Telegram Link
+  schedules?: LectureRule[]; 
 }
 
 const DEFAULT_CONFIG: GlobalConfig = {
@@ -62,7 +64,9 @@ const DEFAULT_CONFIG: GlobalConfig = {
   wizardAlarmUrl: 'https://actions.google.com/sounds/v1/cartoon/harp_strum.ogg',
   muggleAlarmUrl: 'https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg',
   wizardImage: 'https://images.unsplash.com/photo-1598153346810-860daa0d6cad?q=80&w=2070&auto=format&fit=crop',
-  muggleImage: 'https://images.unsplash.com/photo-1480714378408-67cf0d13bc1b?q=80&w=2070&auto=format&fit=crop'
+  muggleImage: 'https://images.unsplash.com/photo-1480714378408-67cf0d13bc1b?q=80&w=2070&auto=format&fit=crop',
+  telegramLink: '',
+  schedules: []
 };
 
 const LoadingSpinner = ({ lineage, color }: { lineage: Lineage | null, color?: string }) => (
@@ -85,6 +89,9 @@ const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<string>('');
   const [permissions, setPermissions] = useState<AdminPermissions | null>(null);
   const [adminPanelOpen, setAdminPanelOpen] = useState(false);
+  
+  // New state to control which tab Admin opens on
+  const [adminInitialTab, setAdminInitialTab] = useState<'database' | 'creator' | 'scheduler'>('database');
   
   // Profile State
   const [profile, setProfile] = useState<UserProfile>(() => {
@@ -127,6 +134,48 @@ const App: React.FC = () => {
           });
       }
   }, [profile]);
+
+  // LAZY SHORTCUTS
+  useEffect(() => {
+    const handleGlobalKeys = (e: KeyboardEvent) => {
+        // Ignore if typing in an input (except for specific shortcuts that might override)
+        if ((e.target as HTMLElement).tagName === 'INPUT' || (e.target as HTMLElement).tagName === 'TEXTAREA') return;
+
+        // Shift + A: Open Admin
+        if (e.shiftKey && (e.key === 'A' || e.key === 'a')) {
+            e.preventDefault();
+            setAdminInitialTab('database');
+            setAdminPanelOpen(prev => !prev);
+        }
+        
+        // Shift + C: Create New (Open Admin to Creator)
+        if (e.shiftKey && (e.key === 'C' || e.key === 'c')) {
+            e.preventDefault();
+            setAdminInitialTab('creator');
+            setEditingItem(null); // Ensure fresh create
+            setAdminPanelOpen(true);
+        }
+
+        // Shift + / (?): Open Command Palette
+        if (e.shiftKey && e.key === '?') {
+            e.preventDefault();
+            setCmdOpen(prev => !prev);
+        }
+
+        // ESC: Close everything
+        if (e.key === 'Escape') {
+            setAdminPanelOpen(false);
+            setToolsOpen(false);
+            setCmdOpen(false);
+            setOracleOpen(false);
+            setCommandCenterOpen(false);
+            setViewingItem(null);
+        }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeys);
+    return () => window.removeEventListener('keydown', handleGlobalKeys);
+  }, []);
 
   // Apply Fonts
   useEffect(() => {
@@ -300,6 +349,7 @@ const App: React.FC = () => {
 
   const handleEditItemRequest = (item: CarouselItem) => {
     setEditingItem(item);
+    setAdminInitialTab('creator');
     setAdminPanelOpen(true);
   };
 
@@ -322,7 +372,7 @@ const App: React.FC = () => {
       <Sidebar 
         lineage={lineage} sectors={sectors} selectedSectorId={activeSectorId} 
         onSelectSector={setActiveSectorId} isOpen={sidebarOpen} setIsOpen={setSidebarOpen}
-        onOpenSettings={() => setAdminPanelOpen(true)} config={globalConfig}
+        onOpenSettings={() => { setAdminInitialTab('database'); setAdminPanelOpen(true); }} config={globalConfig}
       />
 
       <main className="flex-1 flex flex-col relative overflow-hidden z-10 transition-all lg:ml-20">
@@ -349,6 +399,20 @@ const App: React.FC = () => {
             {activeSectorId === 'announcements' && announcementViewMode === 'carousel' ? (
               <div className="w-full flex flex-col items-center gap-6 animate-[fade-in_0.5s] carousel-container no-swipe">
                  <Carousel items={currentViewItems} lineage={lineage} onExtract={handleViewItem} isAdmin={isAdmin && permissions?.canDelete} onDelete={handleDeleteItem} />
+                 
+                 {/* LAZY MODE: Quick Post Inline */}
+                 {isAdmin && (
+                    <div className="w-full max-w-md px-4">
+                       <SectorView 
+                          items={[]} // Pass empty, we just want the quick input logic
+                          lineage={lineage} sectorId={activeSectorId} onViewItem={() => {}}
+                          isAdmin={true} onQuickCreate={handleCreateItem}
+                          quickInputOnly={true} // Special flag to only render input
+                          config={globalConfig}
+                       />
+                    </div>
+                 )}
+
                  <button onClick={() => setAnnouncementViewMode('list')} className={`mt-4 px-6 py-2 rounded-full border backdrop-blur-sm flex items-center gap-2 transition-all ${isWizard ? 'bg-emerald-900/20 border-emerald-500/50 text-emerald-300' : 'bg-fuchsia-900/20 border-fuchsia-500/50 text-fuchsia-300'}`} style={profile.themeColor ? {borderColor: profile.themeColor, color: profile.themeColor, backgroundColor: `${profile.themeColor}20`} : {}}>
                      <LayoutList size={18} /> <span>{isWizard ? "Open Full Archives" : "View Database List"}</span>
                  </button>
@@ -359,8 +423,10 @@ const App: React.FC = () => {
                     items={currentViewItems} lineage={lineage} sectorId={activeSectorId} onViewItem={handleViewItem}
                     isAdmin={isAdmin} onDelete={handleDeleteItem} onEdit={handleEditItemRequest}
                     onBack={activeSectorId === 'announcements' ? () => setAnnouncementViewMode('carousel') : undefined}
-                    onAddItem={(sector) => { setEditingItem(null); setActiveSectorId(sector); setAdminPanelOpen(true); }}
+                    onAddItem={(sector) => { setEditingItem(null); setActiveSectorId(sector); setAdminInitialTab('creator'); setAdminPanelOpen(true); }}
                     onQuickCreate={handleCreateItem}
+                    schedules={globalConfig.schedules} // Pass schedules
+                    config={globalConfig}
                   />
               </Suspense>
             )}
@@ -376,7 +442,29 @@ const App: React.FC = () => {
             {toolsOpen && <ToolsModal lineage={lineage} onClose={() => setToolsOpen(false)} profile={profile} setProfile={setProfile} config={globalConfig} />}
             <CommandCenter lineage={lineage} isOpen={commandCenterOpen} onClose={() => setCommandCenterOpen(false)} onImportItems={(items) => items.forEach(i => handleCreateItem(i))} />
             <OracleInterface lineage={lineage} isOpen={oracleOpen} onClose={() => setOracleOpen(false)} items={allGameData} />
-            <AdminPanel lineage={lineage} isOpen={adminPanelOpen} onClose={() => { setAdminPanelOpen(false); setEditingItem(null); }} isAdmin={isAdmin} csrfToken={csrfToken} currentUser={currentUser} permissions={permissions} onLogin={handleLoginSuccess} onLogout={() => { setIsAdmin(false); setCsrfToken(''); }} allItems={dbItems} sectors={sectors} globalConfig={globalConfig} initialEditingItem={editingItem} defaultSector={activeSectorId} onAddItem={handleCreateItem} onUpdateItem={handleUpdateItem} onDeleteItem={handleDeleteItem} onUpdateSectors={saveSectors} onUpdateConfig={saveGlobalConfig} onClearData={() => { localStorage.clear(); window.location.reload(); }} />
+            <AdminPanel 
+                lineage={lineage} 
+                isOpen={adminPanelOpen} 
+                onClose={() => { setAdminPanelOpen(false); setEditingItem(null); }} 
+                initialTab={adminInitialTab}
+                isAdmin={isAdmin} 
+                csrfToken={csrfToken} 
+                currentUser={currentUser} 
+                permissions={permissions} 
+                onLogin={handleLoginSuccess} 
+                onLogout={() => { setIsAdmin(false); setCsrfToken(''); }} 
+                allItems={dbItems} 
+                sectors={sectors} 
+                globalConfig={globalConfig} 
+                initialEditingItem={editingItem} 
+                defaultSector={activeSectorId} 
+                onAddItem={handleCreateItem} 
+                onUpdateItem={handleUpdateItem} 
+                onDeleteItem={handleDeleteItem} 
+                onUpdateSectors={saveSectors} 
+                onUpdateConfig={saveGlobalConfig} 
+                onClearData={() => { localStorage.clear(); window.location.reload(); }} 
+            />
             {viewingItem && <ItemViewer item={viewingItem} lineage={lineage} onClose={() => setViewingItem(null)} />}
             <CommandPalette lineage={lineage} isOpen={cmdOpen} onClose={() => setCmdOpen(false)} onNavigate={setActiveSectorId} />
         </Suspense>

@@ -15,9 +15,21 @@ export interface Sector {
 
 export interface ItemStyle {
   titleColor?: string;
+  titleColorEnd?: string; // Added for gradients
   contentColor?: string;
   fontFamily?: 'wizard' | 'muggle' | 'sans';
   isGradient?: boolean;
+}
+
+export interface LectureRule {
+  id: string;
+  subject: string;
+  dayOfWeek: string; // "Monday", "Tuesday", etc.
+  startTime: string; // "10:00"
+  link: string; // The join link
+  endDate?: string; // ISO date string
+  recurrence: 'weekly' | 'monthly';
+  isActive: boolean;
 }
 
 export interface CarouselItem {
