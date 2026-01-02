@@ -113,11 +113,17 @@ const App: React.FC = () => {
   // Heartbeat & Persistence
   useEffect(() => {
       localStorage.setItem('core_connect_profile', JSON.stringify(profile));
-      if (profile.totalTimeSpent % 30 === 0) {
+      // Send heartbeat every 30 seconds
+      if (profile.totalTimeSpent > 0 && profile.totalTimeSpent % 30 === 0) {
           safeFetch(`${API_URL}/api/visitor/heartbeat`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ visitorId: profile.id, displayName: profile.displayName, timeSpent: profile.totalTimeSpent, visitCount: profile.visitCount })
+              body: JSON.stringify({ 
+                  visitorId: profile.id, 
+                  displayName: profile.displayName, 
+                  timeSpent: profile.totalTimeSpent, 
+                  visitCount: profile.visitCount 
+              })
           });
       }
   }, [profile]);
@@ -171,11 +177,15 @@ const App: React.FC = () => {
     }
   };
 
+  // Auth Check on Mount
   useEffect(() => {
     const checkAuth = async () => {
       const { ok, data } = await safeFetch(`${API_URL}/api/me`);
       if (ok && data?.authenticated) {
-          setIsAdmin(true); setCsrfToken(data.csrfToken); setPermissions(data.permissions); setCurrentUser(data.username);
+          setIsAdmin(true); 
+          setCsrfToken(data.csrfToken); 
+          setPermissions(data.permissions); 
+          setCurrentUser(data.username);
       }
     };
     checkAuth();
@@ -195,17 +205,27 @@ const App: React.FC = () => {
 
   // Swipe Logic
   const touchStartX = useRef<number | null>(null);
-  const handleTouchStart = (e: React.TouchEvent) => { touchStartX.current = e.touches[0].clientX; };
+  
+  const handleTouchStart = (e: React.TouchEvent) => { 
+      touchStartX.current = e.touches[0].clientX; 
+  };
+  
   const handleTouchEnd = (e: React.TouchEvent) => {
       if (!touchStartX.current) return;
       const target = e.target as HTMLElement;
+      // Prevent swipe if touching a slider, map, or carousel that needs its own swipe
       if (target.closest('.no-swipe') || target.closest('.overflow-x-auto')) return;
       
       const diffX = touchStartX.current - e.changedTouches[0].clientX;
-      if (Math.abs(diffX) > 60) {
+      if (Math.abs(diffX) > 60) { // Threshold
           const currentIdx = sectors.findIndex(s => s.id === activeSectorId);
-          if (diffX > 0) setActiveSectorId(sectors[(currentIdx + 1) % sectors.length].id);
-          else setActiveSectorId(sectors[(currentIdx - 1 + sectors.length) % sectors.length].id);
+          if (diffX > 0) {
+              // Swipe Left -> Next Sector
+              setActiveSectorId(sectors[(currentIdx + 1) % sectors.length].id);
+          } else {
+              // Swipe Right -> Prev Sector
+              setActiveSectorId(sectors[(currentIdx - 1 + sectors.length) % sectors.length].id);
+          }
       }
       touchStartX.current = null;
   };
