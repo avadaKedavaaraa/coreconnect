@@ -34,7 +34,7 @@ const Carousel: React.FC<CarouselProps> = ({ items, lineage, onExtract, isAdmin,
       const w = window.innerWidth;
       if (w < 640) setRadius(250); // Mobile
       else if (w < 1024) setRadius(350); // Tablet
-      else setRadius(700); // Laptop - Increased radius to prevent overlap
+      else setRadius(700); // Laptop
     };
     handleResize();
     window.addEventListener('resize', handleResize);
@@ -97,8 +97,20 @@ const Carousel: React.FC<CarouselProps> = ({ items, lineage, onExtract, isAdmin,
           const hasImage = !!item.image;
           
           const customStyle = item.style || {};
-          const titleColor = customStyle.titleColor || (lineage === Lineage.WIZARD ? '#ffffff' : '#ffffff');
           const titleFont = customStyle.fontFamily === 'wizard' ? '"EB Garamond", serif' : customStyle.fontFamily === 'muggle' ? '"JetBrains Mono", monospace' : 'inherit';
+          
+          // Fix Gradient Application
+          const titleStyle = customStyle.isGradient ? {
+              backgroundImage: `linear-gradient(to right, ${customStyle.titleColor}, ${customStyle.titleColorEnd || customStyle.titleColor})`,
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text',
+              color: 'transparent',
+              fontFamily: titleFont
+          } : {
+              color: customStyle.titleColor || (lineage === Lineage.WIZARD ? '#ffffff' : '#ffffff'),
+              fontFamily: titleFont
+          };
 
           const cleanContent = DOMPurify.sanitize(item.content);
 
@@ -141,13 +153,14 @@ const Carousel: React.FC<CarouselProps> = ({ items, lineage, onExtract, isAdmin,
                   {/* Body: Title + Intro */}
                   <div className="flex-1 overflow-hidden mt-2">
                       <h2 
-                        className={`text-3xl font-bold leading-tight mb-2 drop-shadow-md ${customStyle.isGradient ? 'bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400' : ''}`}
-                        style={{ color: titleColor, fontFamily: titleFont }}
+                        className={`text-3xl font-bold leading-tight mb-2 drop-shadow-md`}
+                        style={titleStyle}
                       >
                           {item.title}
                       </h2>
                       <div 
                         className="text-xs text-white/70 line-clamp-4 font-sans leading-relaxed"
+                        style={{ color: customStyle.contentColor }}
                         dangerouslySetInnerHTML={{__html: cleanContent}}
                       ></div>
                   </div>

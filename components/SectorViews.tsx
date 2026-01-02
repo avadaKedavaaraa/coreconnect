@@ -482,6 +482,19 @@ const SectorView: React.FC<SectorViewProps> = ({
                   const customStyle = item.style || {};
                   const isVirtual = item.id.startsWith('virtual-');
                   const hasLink = item.fileUrl && (item.fileUrl.startsWith('http') || item.fileUrl.startsWith('https'));
+                  
+                  // Fix Gradient Style Application
+                  const titleStyle = customStyle.isGradient ? {
+                      backgroundImage: `linear-gradient(to right, ${customStyle.titleColor}, ${customStyle.titleColorEnd || customStyle.titleColor})`,
+                      WebkitBackgroundClip: 'text',
+                      WebkitTextFillColor: 'transparent',
+                      backgroundClip: 'text',
+                      color: 'transparent',
+                      fontFamily: customStyle.fontFamily === 'wizard' ? '"EB Garamond", serif' : customStyle.fontFamily === 'muggle' ? '"JetBrains Mono", monospace' : 'inherit'
+                  } : {
+                      color: customStyle.titleColor || '#ffffff',
+                      fontFamily: customStyle.fontFamily === 'wizard' ? '"EB Garamond", serif' : customStyle.fontFamily === 'muggle' ? '"JetBrains Mono", monospace' : 'inherit'
+                  };
 
                   if (isLectureMode) {
                       return (
@@ -578,8 +591,8 @@ const SectorView: React.FC<SectorViewProps> = ({
                           </div>
                        </div>
                        <h4 
-                          className={`font-bold leading-tight truncate ${viewMode === 'list' ? 'text-lg' : 'text-lg mb-2'} ${customStyle.isGradient ? 'bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400' : ''} ${isWizard ? 'font-wizardTitle text-emerald-100' : 'font-muggle text-fuchsia-100'}`}
-                          style={{color: customStyle.titleColor}}
+                          className={`font-bold leading-tight truncate ${viewMode === 'list' ? 'text-lg' : 'text-lg mb-2'}`}
+                          style={titleStyle}
                        >
                            {item.title}
                        </h4>

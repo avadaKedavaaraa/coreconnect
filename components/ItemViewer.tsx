@@ -28,16 +28,23 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
 
   // --- STYLING LOGIC ---
   const customStyle = item.style || {};
-  
-  // Title keeps the "Fantasy/Sci-Fi" font choice
-  const titleStyle = { 
+  const titleFont = customStyle.fontFamily === 'wizard' ? '"EB Garamond", serif' : customStyle.fontFamily === 'muggle' ? '"JetBrains Mono", monospace' : undefined;
+
+  const titleStyle = customStyle.isGradient ? {
+      backgroundImage: `linear-gradient(to right, ${customStyle.titleColor}, ${customStyle.titleColorEnd || customStyle.titleColor})`,
+      WebkitBackgroundClip: 'text',
+      WebkitTextFillColor: 'transparent',
+      backgroundClip: 'text',
+      color: 'transparent',
+      fontFamily: titleFont
+  } : {
       color: customStyle.titleColor || (isWizard ? '#d1fae5' : '#f5d0fe'),
-      fontFamily: customStyle.fontFamily === 'wizard' ? '"EB Garamond", serif' : customStyle.fontFamily === 'muggle' ? '"JetBrains Mono", monospace' : undefined
+      fontFamily: titleFont
   };
 
-  // Content is FORCED to be readable Sans Serif
+  // Content is FORCED to be readable Sans Serif but allows color override
   const contentStyle = {
-      color: '#e4e4e7', // Zinc-200 for good readability against dark bg
+      color: customStyle.contentColor || '#e4e4e7',
       fontFamily: '"Inter", "Segoe UI", system-ui, sans-serif', // Force readability
       lineHeight: '1.6',
       fontSize: '1rem'
@@ -66,7 +73,7 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                     {isFile ? <FileText size={24} /> : <MessageCircle size={24} />}
                 </div>
                 <div className="min-w-0">
-                    <h3 className={`text-2xl font-bold leading-tight line-clamp-2 mb-1 ${customStyle.isGradient ? 'bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400' : ''}`} style={titleStyle}>
+                    <h3 className={`text-2xl font-bold leading-tight line-clamp-2 mb-1`} style={titleStyle}>
                         {item.title}
                     </h3>
                     <div className="flex items-center gap-2 text-xs opacity-60 uppercase tracking-widest font-mono">

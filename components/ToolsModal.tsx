@@ -262,7 +262,7 @@ const ToolsModal: React.FC<ToolsModalProps> = ({ lineage, onClose, profile, setP
                                        {editProfile.highContrast ? <Sun size={14} className="text-yellow-400" /> : <Moon size={14} />}
                                        High Contrast Mode
                                    </label>
-                                   <p className="text-xs opacity-60">Boosts legibility.</p>
+                                   <p className="text-xs opacity-60 text-white/70">Boosts legibility.</p>
                                </div>
                                <button 
                                  onClick={() => setEditProfile(prev => ({...prev, highContrast: !prev.highContrast}))}
@@ -273,7 +273,7 @@ const ToolsModal: React.FC<ToolsModalProps> = ({ lineage, onClose, profile, setP
                            </div>
 
                            <div>
-                               <div className="flex justify-between text-xs mb-1 opacity-80">
+                               <div className="flex justify-between text-xs mb-1 opacity-80 text-white">
                                    <span>Global Brightness</span>
                                    <span>{editProfile.brightness || 100}%</span>
                                </div>
@@ -286,7 +286,7 @@ const ToolsModal: React.FC<ToolsModalProps> = ({ lineage, onClose, profile, setP
                            </div>
 
                            <div>
-                               <div className="flex justify-between text-xs mb-1 opacity-80">
+                               <div className="flex justify-between text-xs mb-1 opacity-80 text-white">
                                    <span>Color Contrast</span>
                                    <span>{editProfile.contrast || 100}%</span>
                                </div>

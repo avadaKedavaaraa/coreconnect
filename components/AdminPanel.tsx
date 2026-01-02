@@ -546,13 +546,17 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   const filteredItems = useMemo(() => allItems.filter(i => (i.title.toLowerCase().includes(itemSearch.toLowerCase()) || i.content.toLowerCase().includes(itemSearch.toLowerCase())) && (typeFilter === 'all' || i.type === typeFilter)), [allItems, itemSearch, typeFilter]);
 
   // Styles for Preview
-  const previewTitleStyle = {
-      color: itemForm.titleColor,
+  const previewTitleStyle = itemForm.isGradient ? {
+      backgroundImage: `linear-gradient(to right, ${itemForm.titleColor}, ${itemForm.titleColorEnd || itemForm.titleColor})`,
+      WebkitBackgroundClip: 'text',
+      WebkitTextFillColor: 'transparent',
+      backgroundClip: 'text',
+      color: 'transparent',
       fontFamily: itemForm.fontFamily === 'wizard' ? '"EB Garamond", serif' : itemForm.fontFamily === 'muggle' ? '"JetBrains Mono", monospace' : 'inherit',
-      backgroundImage: itemForm.isGradient ? `linear-gradient(to right, ${itemForm.titleColor}, ${itemForm.titleColorEnd})` : 'none',
-      WebkitBackgroundClip: itemForm.isGradient ? 'text' : 'border-box',
-      WebkitTextFillColor: itemForm.isGradient ? 'transparent' : 'currentColor',
       display: 'inline-block'
+  } : {
+      color: itemForm.titleColor,
+      fontFamily: itemForm.fontFamily === 'wizard' ? '"EB Garamond", serif' : itemForm.fontFamily === 'muggle' ? '"JetBrains Mono", monospace' : 'inherit'
   };
 
   if (!isOpen) return null;
@@ -706,10 +710,21 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                         )}
 
                         <div className="grid gap-4">
-                            {filteredItems.map(item => (
+                            {filteredItems.map(item => {
+                                const listTitleStyle = item.style?.isGradient ? {
+                                    backgroundImage: `linear-gradient(to right, ${item.style.titleColor}, ${item.style.titleColorEnd || item.style.titleColor})`,
+                                    WebkitBackgroundClip: 'text',
+                                    WebkitTextFillColor: 'transparent',
+                                    backgroundClip: 'text',
+                                    color: 'transparent'
+                                } : {
+                                    color: item.style?.titleColor
+                                };
+
+                                return (
                                 <div key={item.id} className="p-4 rounded bg-white/5 border border-white/10 flex justify-between items-center group hover:bg-white/10 transition-colors">
                                     <div>
-                                        <div className="font-bold">{item.title}</div>
+                                        <div className="font-bold" style={listTitleStyle}>{item.title}</div>
                                         <div className="text-xs opacity-50 flex gap-2">
                                             <span>{item.date}</span> • <span>{item.type}</span> • <span>{item.sector}</span>
                                         </div>
@@ -719,7 +734,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                         <button onClick={() => { if(confirm('Delete?')) onDeleteItem?.(item.id) }} className="p-2 bg-red-600 rounded hover:bg-red-500"><Trash2 size={16}/></button>
                                     </div>
                                 </div>
-                            ))}
+                            )})}
                             {filteredItems.length === 0 && <div className="text-center opacity-50 py-10">No items found</div>}
                         </div>
                     </div>
