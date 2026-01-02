@@ -27,7 +27,7 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      connectSrc: ["'self'", process.env.VITE_SUPABASE_URL || "https://*.supabase.co", "http://localhost:*", "https://*.vercel.app"],
+      connectSrc: ["'self'", process.env.VITE_SUPABASE_URL || "https://*.supabase.co", "http://localhost:*", "https://*.vercel.app", "https://*.netlify.app"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       imgSrc: ["'self'", "data:", "https://images.unsplash.com", "https://cdn.pixabay.com", "https://*.supabase.co"],
@@ -50,7 +50,9 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'x-csrf-token', 'Authorization']
 }));
 
-const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 1000 });
+// Note: Rate limiting on Netlify Functions is tricky as IP is often shared/proxied.
+// We relax it slightly or rely on Netlify's built-in DDoS protection.
+const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 2000, validate: {xForwardedForHeader: false} });
 app.use(express.json({ limit: '10mb' })); 
 app.use(express.urlencoded({ extended: true, limit: '10mb' })); 
 app.use(cookieParser());
@@ -223,17 +225,13 @@ router.post('/admin/upload', requireAuth, async (req, res) => {
     res.json({ url: data.publicUrl });
 });
 
-// IMPORTANT: Mount on root AND /api to catch both Vercel rewrite and direct file hits
+// IMPORTANT: Netlify functions are served at /.netlify/functions/api
+// We mount the router there, AND at /api, AND at / to ensure all redirects work.
+app.use('/.netlify/functions/api', router);
 app.use('/api', router);
 app.use('/', router);
 
-// Global Error Handler to prevent HTML leakage on 500
-app.use((err, req, res, next) => {
-    console.error(err.stack);
-    res.status(500).json({ error: "Internal Server Error" });
-});
-
-// Export for Vercel
+// Export for Vercel/Netlify
 export default app;
 
 if (process.argv[1].endsWith('index.js')) {
