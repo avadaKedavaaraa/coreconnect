@@ -4,6 +4,7 @@ import IdentityGate from './components/IdentityGate';
 import Sidebar from './components/Sidebar';
 import Carousel from './components/Carousel';
 import HUD from './components/HUD';
+import LiveBackground from './components/LiveBackground';
 import { Lineage, SECTORS, type CarouselItem, type UserProfile, type Sector, type AdminPermissions, type LectureRule } from './types';
 import { Menu, Briefcase, Lock, LayoutList, Loader2 } from 'lucide-react';
 import { supabase } from './lib/supabase';
@@ -50,8 +51,9 @@ export interface GlobalConfig {
   muggleImage: string;
   wizardLogoUrl?: string; 
   muggleLogoUrl?: string;
-  telegramLink?: string; // Added Telegram Link
+  telegramLink?: string; 
   schedules?: LectureRule[]; 
+  cursorStyle?: 'classic' | 'minimal' | 'blade' | 'enchanted'; // New Cursor Config
 }
 
 const DEFAULT_CONFIG: GlobalConfig = {
@@ -66,7 +68,8 @@ const DEFAULT_CONFIG: GlobalConfig = {
   wizardImage: 'https://images.unsplash.com/photo-1598153346810-860daa0d6cad?q=80&w=2070&auto=format&fit=crop',
   muggleImage: 'https://images.unsplash.com/photo-1480714378408-67cf0d13bc1b?q=80&w=2070&auto=format&fit=crop',
   telegramLink: '',
-  schedules: []
+  schedules: [],
+  cursorStyle: 'classic'
 };
 
 const LoadingSpinner = ({ lineage, color }: { lineage: Lineage | null, color?: string }) => (
@@ -90,10 +93,8 @@ const App: React.FC = () => {
   const [permissions, setPermissions] = useState<AdminPermissions | null>(null);
   const [adminPanelOpen, setAdminPanelOpen] = useState(false);
   
-  // New state to control which tab Admin opens on
-  const [adminInitialTab, setAdminInitialTab] = useState<'database' | 'creator' | 'scheduler'>('database');
+  const [adminInitialTab, setAdminInitialTab] = useState<'database' | 'creator' | 'scheduler' | 'config' | 'users' | 'visitors' | 'backup' | 'ai-lab' | 'structure'>('database');
   
-  // Profile State
   const [profile, setProfile] = useState<UserProfile>(() => {
       try {
           const saved = localStorage.getItem('core_connect_profile');
@@ -120,7 +121,6 @@ const App: React.FC = () => {
   // Heartbeat & Persistence
   useEffect(() => {
       localStorage.setItem('core_connect_profile', JSON.stringify(profile));
-      // Send heartbeat every 30 seconds
       if (profile.totalTimeSpent > 0 && profile.totalTimeSpent % 30 === 0) {
           safeFetch(`${API_URL}/api/visitor/heartbeat`, {
               method: 'POST',
@@ -138,31 +138,23 @@ const App: React.FC = () => {
   // LAZY SHORTCUTS
   useEffect(() => {
     const handleGlobalKeys = (e: KeyboardEvent) => {
-        // Ignore if typing in an input (except for specific shortcuts that might override)
         if ((e.target as HTMLElement).tagName === 'INPUT' || (e.target as HTMLElement).tagName === 'TEXTAREA') return;
 
-        // Shift + A: Open Admin
         if (e.shiftKey && (e.key === 'A' || e.key === 'a')) {
             e.preventDefault();
             setAdminInitialTab('database');
             setAdminPanelOpen(prev => !prev);
         }
-        
-        // Shift + C: Create New (Open Admin to Creator)
         if (e.shiftKey && (e.key === 'C' || e.key === 'c')) {
             e.preventDefault();
             setAdminInitialTab('creator');
-            setEditingItem(null); // Ensure fresh create
+            setEditingItem(null); 
             setAdminPanelOpen(true);
         }
-
-        // Shift + / (?): Open Command Palette
         if (e.shiftKey && e.key === '?') {
             e.preventDefault();
             setCmdOpen(prev => !prev);
         }
-
-        // ESC: Close everything
         if (e.key === 'Escape') {
             setAdminPanelOpen(false);
             setToolsOpen(false);
@@ -191,13 +183,11 @@ const App: React.FC = () => {
 
   // Load Config
   useEffect(() => {
-    // 1. Load Local
     const savedSectors = localStorage.getItem('core_connect_sectors');
     if (savedSectors) setSectors(JSON.parse(savedSectors));
     const savedConfig = localStorage.getItem('core_connect_global_config_v2');
     if (savedConfig) setGlobalConfig({ ...DEFAULT_CONFIG, ...JSON.parse(savedConfig) });
 
-    // 2. Fetch Config
     const fetchConfig = async () => {
       const { ok, data } = await safeFetch(`${API_URL}/api/config`);
       if (ok && data) {
@@ -210,7 +200,6 @@ const App: React.FC = () => {
       }
     };
     
-    // 3. Fetch Sectors (NEW)
     const fetchSectors = async () => {
         const { ok, data } = await safeFetch(`${API_URL}/api/sectors`);
         if (ok && data && Array.isArray(data) && data.length > 0) {
@@ -226,7 +215,6 @@ const App: React.FC = () => {
   const saveSectors = async (newSectors: Sector[]) => {
     setSectors(newSectors);
     localStorage.setItem('core_connect_sectors', JSON.stringify(newSectors));
-    // Persist to Backend if Admin
     if (isAdmin && csrfToken) {
         await safeFetch(`${API_URL}/api/admin/sectors`, {
             method: 'POST', headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrfToken },
@@ -274,34 +262,17 @@ const App: React.FC = () => {
 
   // Swipe Logic
   const touchStartX = useRef<number | null>(null);
-  
-  const handleTouchStart = (e: React.TouchEvent) => { 
-      touchStartX.current = e.touches[0].clientX; 
-  };
-  
+  const handleTouchStart = (e: React.TouchEvent) => { touchStartX.current = e.touches[0].clientX; };
   const handleTouchEnd = (e: React.TouchEvent) => {
       if (!touchStartX.current) return;
       const target = e.target as HTMLElement;
-      
-      // FIX: Robust check to prevent swipe navigation when scrolling internal lists
-      if (target.closest('.no-swipe') || 
-          target.closest('.overflow-x-auto') || 
-          target.closest('.overflow-y-auto') ||
-          target.closest('input') ||
-          target.closest('textarea')) {
-          return;
-      }
+      if (target.closest('.no-swipe') || target.closest('.overflow-x-auto') || target.closest('.overflow-y-auto') || target.closest('input') || target.closest('textarea')) return;
       
       const diffX = touchStartX.current - e.changedTouches[0].clientX;
-      if (Math.abs(diffX) > 60) { // Threshold
+      if (Math.abs(diffX) > 60) { 
           const currentIdx = sectors.findIndex(s => s.id === activeSectorId);
-          if (diffX > 0) {
-              // Swipe Left -> Next Sector
-              setActiveSectorId(sectors[(currentIdx + 1) % sectors.length].id);
-          } else {
-              // Swipe Right -> Prev Sector
-              setActiveSectorId(sectors[(currentIdx - 1 + sectors.length) % sectors.length].id);
-          }
+          if (diffX > 0) setActiveSectorId(sectors[(currentIdx + 1) % sectors.length].id);
+          else setActiveSectorId(sectors[(currentIdx - 1 + sectors.length) % sectors.length].id);
       }
       touchStartX.current = null;
   };
@@ -311,11 +282,7 @@ const App: React.FC = () => {
 
   const handleLineageSelect = (l: Lineage, name?: string) => {
       setLineage(l);
-      setProfile(prev => ({ 
-          ...prev, 
-          displayName: name || prev.displayName, 
-          visitCount: prev.visitCount + 1 
-      }));
+      setProfile(prev => ({ ...prev, displayName: name || prev.displayName, visitCount: prev.visitCount + 1 }));
       if (profile.defaultSector) setActiveSectorId(profile.defaultSector);
   };
 
@@ -343,10 +310,7 @@ const App: React.FC = () => {
     if(ok) setDbItems(prev => prev.filter(i => i.id !== id));
   };
 
-  const handleViewItem = (item: CarouselItem) => {
-    setViewingItem(item);
-  };
-
+  const handleViewItem = (item: CarouselItem) => setViewingItem(item);
   const handleEditItemRequest = (item: CarouselItem) => {
     setEditingItem(item);
     setAdminInitialTab('creator');
@@ -363,12 +327,18 @@ const App: React.FC = () => {
 
   const isWizard = lineage === Lineage.WIZARD;
   const activeSector = sectors.find(s => s.id === activeSectorId) || sectors[0];
+  
+  // Determine Cursor Class
+  const cursorStyle = globalConfig.cursorStyle || 'classic';
+  const cursorClass = `cursor-${cursorStyle}-${isWizard ? 'wizard' : 'muggle'}`;
 
   return (
-    // FIX: Use 100dvh for better mobile browser support
-    <div className={`flex h-[100dvh] overflow-hidden transition-colors duration-1000 relative ${isWizard ? 'bg-[#050a05] cursor-wizard' : 'bg-[#09050f] cursor-muggle'}`} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+    <div className={`flex h-[100dvh] overflow-hidden transition-colors duration-1000 relative ${isWizard ? 'bg-[#050a05]' : 'bg-[#09050f]'} ${cursorClass}`} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
       <div className={`absolute inset-0 z-50 pointer-events-none ${isWizard ? 'parchment-grain' : 'crt-scanlines'}`}></div>
       
+      {/* New Live Background */}
+      <LiveBackground lineage={lineage} />
+
       <Sidebar 
         lineage={lineage} sectors={sectors} selectedSectorId={activeSectorId} 
         onSelectSector={setActiveSectorId} isOpen={sidebarOpen} setIsOpen={setSidebarOpen}
@@ -383,6 +353,8 @@ const App: React.FC = () => {
             onOpenOracle={() => setOracleOpen(true)}
             onOpenTools={() => setToolsOpen(true)}
             isOffline={isOffline} 
+            config={globalConfig}
+            onEditConfig={() => { setAdminInitialTab('config'); setAdminPanelOpen(true); }}
         />
 
         <div className="flex-1 overflow-y-auto relative z-10 flex flex-col pb-24 md:pb-0">
@@ -400,14 +372,13 @@ const App: React.FC = () => {
               <div className="w-full flex flex-col items-center gap-6 animate-[fade-in_0.5s] carousel-container no-swipe">
                  <Carousel items={currentViewItems} lineage={lineage} onExtract={handleViewItem} isAdmin={isAdmin && permissions?.canDelete} onDelete={handleDeleteItem} />
                  
-                 {/* LAZY MODE: Quick Post Inline */}
                  {isAdmin && (
                     <div className="w-full max-w-md px-4">
                        <SectorView 
-                          items={[]} // Pass empty, we just want the quick input logic
+                          items={[]} 
                           lineage={lineage} sectorId={activeSectorId} onViewItem={() => {}}
                           isAdmin={true} onQuickCreate={handleCreateItem}
-                          quickInputOnly={true} // Special flag to only render input
+                          quickInputOnly={true} 
                           config={globalConfig}
                        />
                     </div>
@@ -425,7 +396,7 @@ const App: React.FC = () => {
                     onBack={activeSectorId === 'announcements' ? () => setAnnouncementViewMode('carousel') : undefined}
                     onAddItem={(sector) => { setEditingItem(null); setActiveSectorId(sector); setAdminInitialTab('creator'); setAdminPanelOpen(true); }}
                     onQuickCreate={handleCreateItem}
-                    schedules={globalConfig.schedules} // Pass schedules
+                    schedules={globalConfig.schedules} 
                     config={globalConfig}
                   />
               </Suspense>
@@ -433,7 +404,6 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        {/* FIX: Z-Index adjusted to 40 so it doesn't overlap Modals (Z-50/80) */}
         <div className="absolute bottom-6 left-6 z-40">
             <button onClick={() => setToolsOpen(true)} className={`p-3 rounded-full border shadow-lg transition-all hover:scale-110 active:scale-95 ${isWizard ? 'bg-emerald-900/80 border-emerald-500/50 text-emerald-400' : 'bg-fuchsia-900/80 border-fuchsia-500/50 text-fuchsia-400'}`} style={profile.themeColor ? {borderColor: profile.themeColor, color: profile.themeColor, backgroundColor: `${profile.themeColor}30`} : {}}><Briefcase size={20} /></button>
         </div>

@@ -110,6 +110,7 @@ const ToolsModal: React.FC<ToolsModalProps> = ({ lineage, onClose, profile, setP
               </div>
               
               <div className="p-4 flex gap-2 border-b border-white/10 bg-black/20">
+                  {/* Removed autoFocus to prevent scroll jumping on mobile */}
                   <input placeholder="Enter Custom Google Font Name (e.g. 'Roboto Slab')" className="flex-1 bg-black/40 border border-white/10 rounded px-3 py-2 text-white outline-none" id="custom-font-input" />
                   <button 
                     onClick={() => {

@@ -48,6 +48,8 @@
                 'float': 'float 6s ease-in-out infinite',
                 'firefly': 'firefly 10s infinite alternate',
                 'matrix': 'matrix 2s linear infinite',
+                'spin-slow': 'spin 10s linear infinite',
+                'reverse-spin': 'spin 15s linear infinite reverse',
               },
               keyframes: {
                 float: {
@@ -81,22 +83,49 @@
         -webkit-tap-highlight-color: transparent;
       }
       
-      /* Custom Cursors */
-      .cursor-wizard {
+      /* --- CURSOR STYLES --- */
+      
+      /* 1. Classic (Default) */
+      .cursor-classic-wizard {
         cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="%2310b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72Z"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/></svg>') 0 24, auto;
       }
-      
-      .cursor-muggle {
+      .cursor-classic-muggle {
         cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="%23d946ef" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>') 12 12, crosshair;
       }
 
+      /* 2. Minimal (Dot) */
+      .cursor-minimal-wizard {
+        cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 12 12"><circle cx="6" cy="6" r="4" fill="%2310b981" stroke="white" stroke-width="1"/></svg>') 6 6, pointer;
+      }
+      .cursor-minimal-muggle {
+        cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 12 12"><rect x="2" y="2" width="8" height="8" fill="%23d946ef" stroke="white" stroke-width="1"/></svg>') 6 6, pointer;
+      }
+
+      /* 3. Blade (Sharp) */
+      .cursor-blade-wizard {
+        cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><path d="M2,2 L14,8 L8,14 Z" fill="%2310b981" stroke="white" stroke-width="1"/></svg>') 2 2, default;
+      }
+      .cursor-blade-muggle {
+        cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><path d="M0,0 L12,0 L6,10 L0,0" fill="%23d946ef" stroke="white" stroke-width="1"/></svg>') 6 5, default;
+      }
+
+      /* 4. Enchanted (Glow) */
+      .cursor-enchanted-wizard {
+        cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="8" fill="none" stroke="%2310b981" stroke-width="2" stroke-dasharray="2,2"/><circle cx="16" cy="16" r="2" fill="white"/></svg>') 16 16, pointer;
+      }
+      .cursor-enchanted-muggle {
+        cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><rect x="8" y="8" width="16" height="16" fill="none" stroke="%23d946ef" stroke-width="2"/><line x1="16" y1="4" x2="16" y2="28" stroke="%23d946ef"/><line x1="4" y1="16" x2="28" y2="16" stroke="%23d946ef"/></svg>') 16 16, crosshair;
+      }
+
+      /* --- UTILS --- */
       .perspective-container {
         perspective: 1200px;
       }
       .preserve-3d {
         transform-style: preserve-3d;
       }
-      /* Custom Scrollbar */
+      
+      /* Scrollbar */
       ::-webkit-scrollbar {
         width: 6px;
         height: 6px;
@@ -110,25 +139,6 @@
       }
       ::-webkit-scrollbar-thumb:hover {
         background: rgba(255, 255, 255, 0.4);
-      }
-
-      /* Particle & Texture Classes */
-      .firefly {
-        position: absolute;
-        width: 4px;
-        height: 4px;
-        background: #10b981;
-        border-radius: 50%;
-        box-shadow: 0 0 10px #10b981;
-        animation: firefly 15s infinite ease-in-out;
-      }
-      .matrix-rain {
-        position: absolute;
-        color: #d946ef;
-        font-family: 'JetBrains Mono', monospace;
-        font-size: 10px;
-        animation: matrix 3s infinite linear;
-        opacity: 0;
       }
 
       /* Textures */
@@ -150,11 +160,6 @@
         pointer-events: none;
         animation: scanline 10s linear infinite;
         opacity: 0.3;
-      }
-      
-      .crt-vignette {
-        background: radial-gradient(circle, rgba(0,0,0,0) 60%, rgba(0,0,0,0.6) 100%);
-        pointer-events: none;
       }
 
       @keyframes scanline {

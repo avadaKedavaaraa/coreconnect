@@ -43,8 +43,8 @@ app.use(hpp());
 app.use(cors({ origin: true, credentials: true, methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], allowedHeaders: ['Content-Type', 'x-csrf-token', 'Authorization'] }));
 
 const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 2000, validate: {xForwardedForHeader: false} });
-app.use(express.json({ limit: '10mb' })); 
-app.use(express.urlencoded({ extended: true, limit: '10mb' })); 
+app.use(express.json({ limit: '50mb' })); // Increased for JSON Import
+app.use(express.urlencoded({ extended: true, limit: '50mb' })); 
 app.use(cookieParser());
 app.use(limiter); 
 
@@ -180,6 +180,73 @@ router.get('/admin/visitors', requireAuth, async (req, res) => {
     if(!req.user.permissions.canViewLogs) return res.status(403).json({error: "Forbidden"});
     const { data } = await supabase.from('visitor_logs').select('*').order('last_active', { ascending: false }).limit(100);
     res.json(data || []);
+});
+
+// --- BACKUP & RESTORE ENDPOINTS ---
+router.get('/admin/export', requireAuth, async (req, res) => {
+    // Only God-Mode or High-Level Admins can export
+    if (!req.user.permissions.isGod) return res.status(403).json({ error: "Insufficient Permissions" });
+
+    try {
+        const [items, config, sectors, visitors] = await Promise.all([
+            supabase.from('items').select('*'),
+            supabase.from('global_config').select('*'),
+            supabase.from('sectors').select('*'),
+            supabase.from('visitor_logs').select('*')
+        ]);
+
+        const backup = {
+            timestamp: new Date().toISOString(),
+            version: '1.0',
+            exported_by: req.user.username,
+            data: {
+                items: items.data || [],
+                global_config: config.data || [],
+                sectors: sectors.data || [],
+                visitor_logs: visitors.data || []
+            }
+        };
+
+        res.setHeader('Content-Type', 'application/json');
+        res.setHeader('Content-Disposition', `attachment; filename=core_backup_${Date.now()}.json`);
+        res.json(backup);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+router.post('/admin/import', requireAuth, async (req, res) => {
+    if (!req.user.permissions.isGod) return res.status(403).json({ error: "Insufficient Permissions" });
+
+    try {
+        const { data } = req.body;
+        if (!data || !data.items) throw new Error("Invalid backup file format");
+
+        // 1. Restore Items
+        if (data.items.length > 0) {
+            const { error } = await supabase.from('items').upsert(data.items, { onConflict: 'id' });
+            if (error) throw error;
+        }
+
+        // 2. Restore Config
+        if (data.global_config.length > 0) {
+            await supabase.from('global_config').upsert(data.global_config, { onConflict: 'id' });
+        }
+
+        // 3. Restore Sectors
+        if (data.sectors.length > 0) {
+            await supabase.from('sectors').upsert(data.sectors, { onConflict: 'id' });
+        }
+
+        // 4. Restore Visitors (Optional, low priority)
+        if (data.visitor_logs && data.visitor_logs.length > 0) {
+            await supabase.from('visitor_logs').upsert(data.visitor_logs, { onConflict: 'visitor_id' });
+        }
+
+        res.json({ success: true, count: data.items.length });
+    } catch (e) {
+        res.status(500).json({ error: "Import Failed: " + e.message });
+    }
 });
 
 router.post('/ai/chat', async (req, res) => {
