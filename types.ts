@@ -62,6 +62,8 @@ export interface UserProfile {
   themeColor?: string; // User selected accent color
   preferredFont?: 'wizard' | 'muggle' | 'sans' | 'playfair' | 'orbitron' | 'montserrat' | 'courier' | 'cursive' | 'tech' | 'retro';
   highContrast?: boolean; // Accessibility setting
+  brightness?: number; // 50 to 150
+  contrast?: number; // 50 to 150
   defaultSector?: string;
   visitCount: number;
   totalTimeSpent: number; // Seconds

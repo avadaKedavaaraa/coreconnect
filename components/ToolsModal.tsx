@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Lineage, type UserProfile, SECTORS } from '../types';
 import { GlobalConfig } from '../App';
-import { X, Clock, ClipboardList, User, Palette, Save, Type, PaintBucket, LayoutTemplate, Plus, Link as LinkIcon, Eye, Sun, Moon } from 'lucide-react';
+import { X, Clock, ClipboardList, User, Palette, Save, Type, PaintBucket, LayoutTemplate, Plus, Link as LinkIcon, Eye, Sun, Moon, Accessibility, Activity } from 'lucide-react';
 import Pomodoro from './Pomodoro';
 import Kanban from './Kanban';
 import StudentID from './StudentID';
@@ -30,7 +30,9 @@ const ToolsModal: React.FC<ToolsModalProps> = ({ lineage, onClose, profile, setP
         editProfile.displayName !== profile.displayName ||
         editProfile.preferredFont !== profile.preferredFont ||
         editProfile.themeColor !== profile.themeColor ||
-        editProfile.highContrast !== profile.highContrast;
+        editProfile.highContrast !== profile.highContrast ||
+        editProfile.brightness !== profile.brightness ||
+        editProfile.contrast !== profile.contrast;
     setHasChanges(isDifferent);
   }, [editProfile, profile]);
 
@@ -40,7 +42,9 @@ const ToolsModal: React.FC<ToolsModalProps> = ({ lineage, onClose, profile, setP
         displayName: editProfile.displayName,
         preferredFont: editProfile.preferredFont,
         themeColor: editProfile.themeColor,
-        highContrast: editProfile.highContrast
+        highContrast: editProfile.highContrast,
+        brightness: editProfile.brightness,
+        contrast: editProfile.contrast
     }));
     setHasChanges(false);
     const btn = document.getElementById('save-btn');
@@ -246,21 +250,53 @@ const ToolsModal: React.FC<ToolsModalProps> = ({ lineage, onClose, profile, setP
                            />
                        </div>
 
-                       {/* Accessibility Toggle (New) */}
-                       <div className={`p-4 rounded-lg border flex items-center justify-between ${isWizard ? 'bg-emerald-950/20 border-emerald-800' : 'bg-fuchsia-950/20 border-fuchsia-800'}`}>
-                           <div>
-                               <label className="flex items-center gap-2 text-sm font-bold text-white mb-1">
-                                   {editProfile.highContrast ? <Sun size={16} className="text-yellow-400" /> : <Moon size={16} />}
-                                   Accessibility Mode
-                               </label>
-                               <p className="text-xs opacity-60">Increases text brightness and contrast.</p>
+                       {/* Accessibility Controls */}
+                       <div className={`p-4 rounded-lg border space-y-4 ${isWizard ? 'bg-emerald-950/20 border-emerald-800' : 'bg-fuchsia-950/20 border-fuchsia-800'}`}>
+                           <h4 className="flex items-center gap-2 text-sm font-bold text-white mb-2">
+                               <Accessibility size={16} /> Vision & Display
+                           </h4>
+                           
+                           <div className="flex justify-between items-center">
+                               <div>
+                                   <label className="text-sm font-bold text-white flex items-center gap-2">
+                                       {editProfile.highContrast ? <Sun size={14} className="text-yellow-400" /> : <Moon size={14} />}
+                                       High Contrast Mode
+                                   </label>
+                                   <p className="text-xs opacity-60">Boosts legibility.</p>
+                               </div>
+                               <button 
+                                 onClick={() => setEditProfile(prev => ({...prev, highContrast: !prev.highContrast}))}
+                                 className={`w-12 h-6 rounded-full p-1 transition-colors relative ${editProfile.highContrast ? (isWizard ? 'bg-emerald-500' : 'bg-fuchsia-500') : 'bg-zinc-700'}`}
+                               >
+                                   <div className={`w-4 h-4 rounded-full bg-white transition-transform ${editProfile.highContrast ? 'translate-x-6' : 'translate-x-0'}`}></div>
+                               </button>
                            </div>
-                           <button 
-                             onClick={() => setEditProfile(prev => ({...prev, highContrast: !prev.highContrast}))}
-                             className={`w-12 h-6 rounded-full p-1 transition-colors relative ${editProfile.highContrast ? (isWizard ? 'bg-emerald-500' : 'bg-fuchsia-500') : 'bg-zinc-700'}`}
-                           >
-                               <div className={`w-4 h-4 rounded-full bg-white transition-transform ${editProfile.highContrast ? 'translate-x-6' : 'translate-x-0'}`}></div>
-                           </button>
+
+                           <div>
+                               <div className="flex justify-between text-xs mb-1 opacity-80">
+                                   <span>Global Brightness</span>
+                                   <span>{editProfile.brightness || 100}%</span>
+                               </div>
+                               <input 
+                                 type="range" min="50" max="150" step="5"
+                                 value={editProfile.brightness || 100}
+                                 onChange={(e) => setEditProfile({...editProfile, brightness: Number(e.target.value)})}
+                                 className="w-full accent-white h-1 bg-white/20 rounded-lg appearance-none cursor-pointer"
+                               />
+                           </div>
+
+                           <div>
+                               <div className="flex justify-between text-xs mb-1 opacity-80">
+                                   <span>Color Contrast</span>
+                                   <span>{editProfile.contrast || 100}%</span>
+                               </div>
+                               <input 
+                                 type="range" min="50" max="150" step="5"
+                                 value={editProfile.contrast || 100}
+                                 onChange={(e) => setEditProfile({...editProfile, contrast: Number(e.target.value)})}
+                                 className="w-full accent-white h-1 bg-white/20 rounded-lg appearance-none cursor-pointer"
+                               />
+                           </div>
                        </div>
 
                        {/* Fonts */}

@@ -11,8 +11,14 @@ const LiveBackground: React.FC<LiveBackgroundProps> = ({ lineage }) => {
   const isWizard = lineage === Lineage.WIZARD;
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    // 1. Capture the ref value
+    const canvasEl = canvasRef.current;
+    
+    // 2. Explicit null check
+    if (!canvasEl) return;
+
+    // 3. Create a non-nullable reference for closures
+    const canvas = canvasEl;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 

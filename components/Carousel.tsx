@@ -118,7 +118,7 @@ const Carousel: React.FC<CarouselProps> = ({ items, lineage, onExtract, isAdmin,
         onTouchEnd={onTouchEnd}
     >
       <div 
-        className="relative w-[280px] sm:w-[320px] h-[400px] sm:h-[480px] preserve-3d transition-transform duration-700 ease-out"
+        className="relative w-[280px] sm:w-[320px] h-[350px] sm:h-[450px] preserve-3d transition-transform duration-700 ease-out"
         style={{ transform: `translateZ(-${radius}px) rotateY(${rotateY}deg)` }}
       >
         {localItems.map((item, index) => {
@@ -129,7 +129,7 @@ const Carousel: React.FC<CarouselProps> = ({ items, lineage, onExtract, isAdmin,
           const hasImage = !!item.image;
           
           const customStyle = item.style || {};
-          const titleColor = customStyle.titleColor || (lineage === Lineage.WIZARD ? '#ffffff' : '#ffffff');
+          const titleColor = customStyle.titleColor || (lineage === Lineage.WIZARD ? '#d1fae5' : '#f5d0fe');
           const titleFont = customStyle.fontFamily === 'wizard' ? '"EB Garamond", serif' : customStyle.fontFamily === 'muggle' ? '"JetBrains Mono", monospace' : 'inherit';
 
           // SECURITY: Sanitize content before render
@@ -138,12 +138,12 @@ const Carousel: React.FC<CarouselProps> = ({ items, lineage, onExtract, isAdmin,
           return (
             <div
               key={item.id}
-              className={`absolute top-0 left-0 w-full h-full rounded-2xl flex flex-col justify-between transition-all duration-500 cursor-pointer overflow-hidden
+              className={`absolute top-0 left-0 w-full h-full rounded-2xl flex flex-col justify-between p-6 transition-all duration-500 cursor-pointer overflow-hidden border backdrop-blur-md
                 ${lineage === Lineage.WIZARD 
-                  ? `bg-black border border-white/10 shadow-[0_0_40px_rgba(0,0,0,0.8)]` 
-                  : `bg-black border border-white/10 shadow-[0_0_40px_rgba(0,0,0,0.8)]`
+                  ? `bg-emerald-950/80 border-emerald-500/30 shadow-[0_0_20px_rgba(16,185,129,0.1)]` 
+                  : `bg-fuchsia-950/80 border-fuchsia-500/30 shadow-[0_0_20px_rgba(217,70,239,0.1)]`
                 }
-                ${isActive ? 'opacity-100 scale-105 shadow-2xl' : 'opacity-40 grayscale blur-[1px]'}
+                ${isActive ? 'opacity-100 scale-105 shadow-2xl z-10' : 'opacity-40 grayscale blur-[1px]'}
               `}
               style={{
                 transform: `rotateY(${angle}deg) translateZ(${radius}px)`,
@@ -153,62 +153,59 @@ const Carousel: React.FC<CarouselProps> = ({ items, lineage, onExtract, isAdmin,
               {/* --- BACKGROUND IMAGE LAYER --- */}
               {hasImage && (
                 <div className="absolute inset-0 z-0">
-                  <img src={item.image} alt={item.title} className="w-full h-full object-cover" />
-                  {/* Heavy overlay for readability */}
-                  <div className={`absolute inset-0 bg-gradient-to-t from-black via-black/40 to-black/60`}></div>
+                  <img src={item.image} alt={item.title} className="w-full h-full object-cover opacity-30" />
+                  <div className={`absolute inset-0 bg-gradient-to-t ${lineage === Lineage.WIZARD ? 'from-emerald-950' : 'from-fuchsia-950'} via-transparent to-transparent`}></div>
                 </div>
               )}
               
               {/* --- CARD CONTENT LAYER --- */}
-              <div className="relative z-10 w-full h-full flex flex-col p-6">
+              <div className="relative z-10 w-full h-full flex flex-col">
                   
                   {/* Header: Date + Badge */}
-                  <div className="flex justify-between items-start mb-4">
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-white/60 font-mono">
+                  <div className="flex justify-between items-start mb-2">
+                      <span className={`text-[10px] font-bold uppercase tracking-widest opacity-60 font-mono ${lineage === Lineage.WIZARD ? 'text-emerald-200' : 'text-fuchsia-200'}`}>
                           {item.date}
                       </span>
                       {item.isUnread && (
-                          <span className={`text-[10px] font-bold px-2 py-1 rounded bg-white/10 border border-white/20 backdrop-blur-md ${lineage === Lineage.WIZARD ? 'text-emerald-300' : 'text-fuchsia-300'}`}>
-                              NEW
-                          </span>
+                          <div className={`w-2 h-2 rounded-full animate-pulse ${lineage === Lineage.WIZARD ? 'bg-emerald-400' : 'bg-fuchsia-400'}`}></div>
                       )}
                   </div>
 
                   {/* Body: Title + Intro */}
-                  <div className="mt-4 flex-1">
+                  <div className="flex-1 overflow-hidden">
                       <h2 
-                        className={`text-3xl font-bold leading-tight mb-2 drop-shadow-md ${customStyle.isGradient ? 'bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400' : ''}`}
+                        className={`text-2xl font-bold leading-tight mb-2 ${customStyle.isGradient ? 'bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400' : ''}`}
                         style={{ color: titleColor, fontFamily: titleFont }}
                       >
                           {item.title}
                       </h2>
                       <div 
-                        className="text-sm text-white/70 line-clamp-3 font-sans leading-relaxed"
+                        className="text-xs text-white/60 line-clamp-4 font-sans leading-relaxed"
                         dangerouslySetInnerHTML={{__html: cleanContent}}
                       ></div>
                   </div>
 
                   {/* Footer: Likes + Action Button */}
-                  <div className="mt-auto flex items-end justify-between pt-4 border-t border-white/10">
+                  <div className="mt-4 pt-4 border-t border-white/10 flex items-center justify-between">
                       <button 
                          onClick={(e) => { e.stopPropagation(); toggleLike(index); }}
-                         className={`flex items-center gap-2 transition-transform active:scale-95 ${item.isLiked ? 'text-red-500' : 'text-white/50 hover:text-white'}`}
+                         className={`flex items-center gap-2 transition-transform active:scale-95 ${item.isLiked ? 'text-red-500' : 'text-white/40 hover:text-white'}`}
                       >
-                          <Heart size={20} fill={item.isLiked ? "currentColor" : "none"} />
-                          <span className="font-bold text-sm">{item.likes || 999}</span>
+                          <Heart size={16} fill={item.isLiked ? "currentColor" : "none"} />
+                          <span className="font-bold text-xs">{item.likes || 0}</span>
                       </button>
 
                       {isActive && (
                           <button
                             onClick={(e) => { e.stopPropagation(); onExtract(item); }}
-                            className={`flex items-center gap-2 px-5 py-2 rounded-lg font-bold text-xs uppercase tracking-widest transition-all hover:scale-105 active:scale-95 border backdrop-blur-md
+                            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-[10px] uppercase tracking-widest transition-all hover:scale-105 active:scale-95 border backdrop-blur-md
                                 ${lineage === Lineage.WIZARD 
                                     ? 'bg-emerald-900/40 border-emerald-500/50 text-white hover:bg-emerald-900/60' 
                                     : 'bg-fuchsia-900/40 border-fuchsia-500/50 text-white hover:bg-fuchsia-900/60'}
                             `}
                           >
-                              {lineage === Lineage.WIZARD ? <Sparkles size={14}/> : <Download size={14}/>}
-                              <span>READ</span>
+                              {lineage === Lineage.WIZARD ? <Sparkles size={12}/> : <Download size={12}/>}
+                              <span>View</span>
                           </button>
                       )}
                   </div>
@@ -218,7 +215,7 @@ const Carousel: React.FC<CarouselProps> = ({ items, lineage, onExtract, isAdmin,
               {isAdmin && onDelete && isActive && (
                 <button 
                   onClick={(e) => { e.stopPropagation(); if(confirm('Delete?')) onDelete(item.id); }}
-                  className="absolute top-2 left-2 z-30 p-2 bg-red-600/80 text-white rounded-full hover:bg-red-500"
+                  className="absolute top-2 right-2 z-30 p-2 bg-red-600/20 text-red-400 rounded hover:bg-red-600 hover:text-white transition-colors"
                 >
                   <Trash2 size={14} />
                 </button>

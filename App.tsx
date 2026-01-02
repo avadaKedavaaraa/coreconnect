@@ -100,7 +100,16 @@ const App: React.FC = () => {
           const saved = localStorage.getItem('core_connect_profile');
           if (saved) return JSON.parse(saved);
       } catch (e) {}
-      return { id: crypto.randomUUID(), displayName: '', house: 'Griffindor', totalTimeSpent: 0, visitCount: 1, lastActive: new Date().toISOString() };
+      return { 
+          id: crypto.randomUUID(), 
+          displayName: '', 
+          house: 'Griffindor', 
+          totalTimeSpent: 0, 
+          visitCount: 1, 
+          lastActive: new Date().toISOString(),
+          brightness: 100, // Default
+          contrast: 100 // Default
+      };
   });
 
   const [toolsOpen, setToolsOpen] = useState(false);
@@ -349,11 +358,18 @@ const App: React.FC = () => {
   const cursorStyle = globalConfig.cursorStyle || 'classic';
   const cursorClass = `cursor-${cursorStyle}-${isWizard ? 'wizard' : 'muggle'}`;
 
-  // Accessibility Class
+  // Accessibility & Visual Filters
+  // We apply brightness and contrast globally to the app container
+  const visualFilter = `brightness(${profile.brightness || 100}%) contrast(${profile.contrast || 100}%)`;
   const a11yClass = profile.highContrast ? 'contrast-125 brightness-110 saturate-150' : '';
 
   return (
-    <div className={`flex h-[100dvh] overflow-hidden transition-colors duration-1000 relative ${isWizard ? 'bg-[#050a05]' : 'bg-[#09050f]'} ${cursorClass} ${a11yClass}`} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+    <div 
+        className={`flex h-[100dvh] overflow-hidden transition-colors duration-1000 relative ${isWizard ? 'bg-[#050a05]' : 'bg-[#09050f]'} ${cursorClass} ${a11yClass}`} 
+        onTouchStart={handleTouchStart} 
+        onTouchEnd={handleTouchEnd}
+        style={{ filter: visualFilter }}
+    >
       <div className={`absolute inset-0 z-50 pointer-events-none ${isWizard ? 'parchment-grain' : 'crt-scanlines'}`}></div>
       
       {/* New Live Background */}
