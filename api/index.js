@@ -22,7 +22,6 @@ const PORT = process.env.PORT || 3000;
 app.set('trust proxy', 1);
 app.disable('x-powered-by');
 
-// Security Headers
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -41,14 +40,7 @@ app.use(helmet({
 }));
 
 app.use(hpp());
-
-// CORS
-app.use(cors({
-  origin: true, 
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'x-csrf-token', 'Authorization']
-}));
+app.use(cors({ origin: true, credentials: true, methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], allowedHeaders: ['Content-Type', 'x-csrf-token', 'Authorization'] }));
 
 const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 2000, validate: {xForwardedForHeader: false} });
 app.use(express.json({ limit: '10mb' })); 
@@ -56,7 +48,6 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
 app.use(limiter); 
 
-// --- SUPABASE & GEMINI SETUP ---
 const supabase = createClient(
   process.env.VITE_SUPABASE_URL || 'https://placeholder.supabase.co',
   process.env.SUPABASE_SERVICE_ROLE_KEY || 'placeholder', 
@@ -65,15 +56,12 @@ const supabase = createClient(
 
 let aiClient = null;
 if (process.env.API_KEY) {
-  try {
-    aiClient = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  } catch (e) { console.error("AI Init Failed:", e.message); }
+  try { aiClient = new GoogleGenAI({ apiKey: process.env.API_KEY }); } catch (e) { console.error("AI Init Failed:", e.message); }
 }
 
 const SECRET = process.env.SUPABASE_SERVICE_ROLE_KEY || 'default-secret';
 const scrypt = promisify(crypto.scrypt);
 
-// --- HELPERS ---
 function signSession(data) {
     const str = Buffer.from(JSON.stringify(data)).toString('base64');
     const sig = crypto.createHmac('sha256', SECRET).update(str).digest('base64').replace(/=/g, '');
@@ -92,52 +80,30 @@ function verifySession(token) {
 const requireAuth = (req, res, next) => {
     const token = req.cookies.session_id;
     const session = verifySession(token);
-    
     if (!session || Date.now() > session.expiresAt) return res.status(401).json({ error: "Unauthorized" });
-
     const clientCsrfToken = req.headers['x-csrf-token'];
     if (req.method !== 'GET' && (!clientCsrfToken || clientCsrfToken !== session.csrfToken)) {
         return res.status(403).json({ error: "Invalid CSRF Token" });
     }
-    
     req.user = session;
     next();
 };
 
 const uploadMiddleware = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
-
-// Helper to transform frontend item to DB item (CamelCase -> SnakeCase)
-// CRITICAL FIX: Removes fields that don't exist in DB to prevent 500 errors
 const toDbItem = (item) => {
   const dbItem = { ...item };
-  
-  // Map CamelCase to SnakeCase for DB
-  if (typeof dbItem.isUnread !== 'undefined') {
-    dbItem.is_unread = dbItem.isUnread;
-    delete dbItem.isUnread;
-  }
-  if (typeof dbItem.fileUrl !== 'undefined') {
-    dbItem.file_url = dbItem.fileUrl;
-    delete dbItem.fileUrl;
-  }
-
-  // STRIP CLIENT-ONLY FIELDS
-  delete dbItem.isLiked; // Not in DB schema
-  delete dbItem.is_liked; // Just in case
-  
+  if (typeof dbItem.isUnread !== 'undefined') { dbItem.is_unread = dbItem.isUnread; delete dbItem.isUnread; }
+  if (typeof dbItem.fileUrl !== 'undefined') { dbItem.file_url = dbItem.fileUrl; delete dbItem.fileUrl; }
+  delete dbItem.isLiked; delete dbItem.is_liked;
   return dbItem;
 };
 
-// --- ROUTER DEFINITIONS ---
 const router = express.Router();
-
 router.get('/health', (req, res) => res.json({ status: 'active', time: new Date().toISOString() }));
 
-// AUTH
 router.post('/login', async (req, res) => {
   try {
     const { username, password } = req.body;
-    // Auto-init admin if missing (Lazy Init)
     const { data: adminExists } = await supabase.from('admin_users').select('username').eq('username', 'admin').maybeSingle();
     if (!adminExists) {
         const salt = crypto.randomBytes(16).toString('hex');
@@ -147,26 +113,13 @@ router.post('/login', async (req, res) => {
             permissions: { canEdit: true, canDelete: true, canManageUsers: true, isGod: true }
         });
     }
-
     const { data: user } = await supabase.from('admin_users').select('*').eq('username', username).single();
     if (!user) return res.status(401).json({ error: "Invalid credentials" });
-
     const derivedKey = await scrypt(password, user.salt, 64);
-    if (!crypto.timingSafeEqual(Buffer.from(user.password_hash, 'hex'), derivedKey)) {
-        return res.status(401).json({ error: "Invalid credentials" });
-    }
-
+    if (!crypto.timingSafeEqual(Buffer.from(user.password_hash, 'hex'), derivedKey)) return res.status(401).json({ error: "Invalid credentials" });
     const csrfToken = crypto.randomBytes(32).toString('hex');
-    const sessionData = { 
-        username, permissions: user.permissions, csrfToken, expiresAt: Date.now() + 3600000 
-    };
-    
-    const token = signSession(sessionData);
-
-    res.cookie('session_id', token, { 
-        httpOnly: true, sameSite: 'none', secure: true, maxAge: 3600000, path: '/'
-    });
-    
+    const token = signSession({ username, permissions: user.permissions, csrfToken, expiresAt: Date.now() + 3600000 });
+    res.cookie('session_id', token, { httpOnly: true, sameSite: 'none', secure: true, maxAge: 3600000, path: '/' });
     res.json({ success: true, csrfToken, permissions: user.permissions });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
@@ -182,20 +135,39 @@ router.get('/config', async (req, res) => {
     res.json(data?.config || {});
 });
 
-// AI
+// --- VISITOR TRACKING ---
+router.post('/visitor/heartbeat', async (req, res) => {
+    const { visitorId, displayName, timeSpent, visitCount } = req.body;
+    if (!visitorId || typeof visitorId !== 'string') return res.status(400).json({ error: 'Invalid ID' });
+    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+    const ipHash = crypto.createHash('sha256').update(ip || 'unknown').digest('hex').substring(0, 10);
+    try {
+        await supabase.from('visitor_logs').upsert({
+            visitor_id: visitorId,
+            display_name: xss(displayName || 'Guest'),
+            total_time_spent: Number(timeSpent) || 0,
+            visit_count: Number(visitCount) || 1,
+            last_active: new Date().toISOString(),
+            ip_hash: ipHash
+        }, { onConflict: 'visitor_id' });
+        res.json({ status: 'logged' });
+    } catch (e) { res.status(200).json({ status: 'ignored' }); }
+});
+
+router.get('/admin/visitors', requireAuth, async (req, res) => {
+    if(!req.user.permissions.canViewLogs) return res.status(403).json({error: "Forbidden"});
+    const { data } = await supabase.from('visitor_logs').select('*').order('last_active', { ascending: false }).limit(100);
+    res.json(data || []);
+});
+
 router.post('/ai/chat', async (req, res) => {
     if (!aiClient) return res.status(503).json({ error: "Oracle Disconnected" });
     try {
         const { message, lineage, history, context } = req.body;
-        const baseInstruction = lineage === 'WIZARD' 
-            ? "You are a magical portrait. Speak wisely." 
-            : "You are the CORE.ARCH system.";
-        const systemInstruction = `${baseInstruction}\nCONTEXT:\n${context || ''}`;
-        
+        const systemInstruction = `${lineage === 'WIZARD' ? "You are a magical portrait." : "You are CORE.ARCH system."}\nCONTEXT:\n${context || ''}`;
         let contents = [];
         if (history) history.forEach(h => contents.push({ role: h.role, parts: [{ text: h.text }] }));
         contents.push({ role: 'user', parts: [{ text: message }] });
-
         const response = await aiClient.models.generateContent({ model: "gemini-3-flash-preview", contents, config: { systemInstruction }});
         res.json({ text: response.text });
     } catch(e) { res.status(500).json({ error: e.message }); }
@@ -213,135 +185,72 @@ router.post('/ai/parse', requireAuth, uploadMiddleware.single('file'), async (re
     } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-// ADMIN: ITEMS
 router.post('/admin/items', requireAuth, async (req, res) => {
     if(!req.user.permissions.canEdit) return res.status(403).json({error: "Forbidden"});
-    try {
-        // Sanitize object before DB insert
-        const dbItem = toDbItem(req.body);
-        
-        // Ensure ID is passed if provided, else allow DB to gen
-        // Upsert if ID exists to avoid conflicts, or standard insert
-        const { data, error } = await supabase.from('items').upsert(dbItem).select().single();
-        
-        if(error) throw error;
-        res.json({success: true, item: data});
-    } catch(e) { 
-        console.error("Create Item Error:", e.message);
-        res.status(400).json({error: e.message}); 
-    }
+    const { data } = await supabase.from('items').upsert(toDbItem(req.body)).select().single();
+    res.json({success: true, item: data});
 });
 
 router.put('/admin/items/:id', requireAuth, async (req, res) => {
     if(!req.user.permissions.canEdit) return res.status(403).json({error: "Forbidden"});
-    try {
-        const dbItem = toDbItem(req.body);
-        // Remove ID from body update to prevent PK errors
-        const { id, ...updateData } = dbItem; 
-        const { error } = await supabase.from('items').update(updateData).eq('id', req.params.id);
-        if(error) throw error;
-        res.json({success: true});
-    } catch(e) { res.status(400).json({error: e.message}); }
+    const { id, ...updateData } = toDbItem(req.body); 
+    await supabase.from('items').update(updateData).eq('id', req.params.id);
+    res.json({success: true});
 });
 
 router.delete('/admin/items/:id', requireAuth, async (req, res) => {
     if(!req.user.permissions.canDelete) return res.status(403).json({error: "Forbidden"});
-    const { error } = await supabase.from('items').delete().eq('id', req.params.id);
-    if(error) return res.status(400).json({error: error.message});
+    await supabase.from('items').delete().eq('id', req.params.id);
     res.json({success: true});
 });
 
-// ADMIN: CONFIG
 router.post('/admin/config', requireAuth, async (req, res) => {
     if(!req.user.permissions.canEdit) return res.status(403).json({error: "Forbidden"});
-    const { error } = await supabase.from('global_config').upsert({ id: 1, config: req.body });
-    if(error) return res.status(400).json({error: error.message});
+    await supabase.from('global_config').upsert({ id: 1, config: req.body });
     res.json({success: true});
 });
 
-// ADMIN: UPLOAD
 router.post('/admin/upload', requireAuth, uploadMiddleware.single('file'), async (req, res) => {
     if(!req.user.permissions.canEdit) return res.status(403).json({error: "Forbidden"});
     try {
         let fileBuffer, fileType, fileName;
-        
-        if (req.file) {
-            fileBuffer = req.file.buffer;
-            fileType = req.file.mimetype;
-            fileName = req.file.originalname;
-        } else if (req.body.fileData) {
-            fileBuffer = Buffer.from(req.body.fileData, 'base64');
-            fileType = req.body.fileType;
-            fileName = req.body.fileName;
-        } else {
-            return res.status(400).json({error: "No file data"});
-        }
-
+        if (req.file) { fileBuffer = req.file.buffer; fileType = req.file.mimetype; fileName = req.file.originalname; } 
+        else if (req.body.fileData) { fileBuffer = Buffer.from(req.body.fileData, 'base64'); fileType = req.body.fileType; fileName = req.body.fileName; } 
+        else return res.status(400).json({error: "No file data"});
         const uniqueName = `${crypto.randomUUID()}.${fileName.split('.').pop()}`;
-        const { error } = await supabase.storage.from('items').upload(uniqueName, fileBuffer, { 
-            contentType: fileType,
-            upsert: true 
-        });
+        const { error } = await supabase.storage.from('items').upload(uniqueName, fileBuffer, { contentType: fileType, upsert: true });
         if (error) throw error;
-        
         const { data } = supabase.storage.from('items').getPublicUrl(uniqueName);
         res.json({ url: data.publicUrl });
-    } catch (e) { 
-        console.error("Upload Error:", e.message);
-        res.status(500).json({ error: e.message }); 
-    }
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ADMIN: USERS
 router.get('/admin/users', requireAuth, async (req, res) => {
     if(!req.user.permissions.canManageUsers) return res.status(403).json({error: "Forbidden"});
-    const { data, error } = await supabase.from('admin_users').select('username, permissions, last_active');
-    if(error) return res.status(500).json({error: error.message});
+    const { data } = await supabase.from('admin_users').select('username, permissions, last_active');
     res.json(data);
 });
 
 router.post('/admin/users/add', requireAuth, async (req, res) => {
     if(!req.user.permissions.canManageUsers) return res.status(403).json({error: "Forbidden"});
-    try {
-        const { username, password, permissions } = req.body;
-        const salt = crypto.randomBytes(16).toString('hex');
-        const hash = (await scrypt(password, salt, 64)).toString('hex');
-        const { error } = await supabase.from('admin_users').insert({ username, password_hash: hash, salt, permissions });
-        if(error) throw error;
-        res.json({success: true});
-    } catch(e) { res.status(500).json({error: e.message}); }
+    const { username, password, permissions } = req.body;
+    const salt = crypto.randomBytes(16).toString('hex');
+    const hash = (await scrypt(password, salt, 64)).toString('hex');
+    await supabase.from('admin_users').insert({ username, password_hash: hash, salt, permissions });
+    res.json({success: true});
 });
 
 router.post('/admin/users/delete', requireAuth, async (req, res) => {
     if(!req.user.permissions.canManageUsers) return res.status(403).json({error: "Forbidden"});
     const { targetUser } = req.body;
     if(targetUser === 'admin') return res.status(400).json({error: "Cannot delete root admin"});
-    const { error } = await supabase.from('admin_users').delete().eq('username', targetUser);
-    if(error) return res.status(500).json({error: error.message});
+    await supabase.from('admin_users').delete().eq('username', targetUser);
     res.json({success: true});
 });
 
-// ADMIN: LOGS
-router.get('/admin/logs', requireAuth, async (req, res) => {
-    if(!req.user.permissions.canViewLogs) return res.status(403).json({error: "Forbidden"});
-    const query = supabase.from('audit_logs').select('*').order('timestamp', { ascending: false }).limit(100);
-    if (req.query.targetUser) query.eq('username', req.query.targetUser);
-    const { data, error } = await query;
-    if(error) return res.status(500).json({error: error.message});
-    res.json(data);
-});
-
-
-// MOUNT ROUTER
-// Mount to /api for local dev and standard usage
 app.use('/api', router);
-// Mount to root for direct calls if path logic matches
 app.use('/', router);
-// Mount to Netlify functions path for production there
 app.use('/.netlify/functions/api', router);
 
 export default app;
-
-if (process.argv[1].endsWith('index.js')) {
-    app.listen(PORT, () => console.log(`Server running on ${PORT}`));
-}
+if (process.argv[1] && process.argv[1].endsWith('index.js')) { app.listen(PORT, () => console.log(`Server running on ${PORT}`)); }

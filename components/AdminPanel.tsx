@@ -716,11 +716,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                 
                 {/* --- TAB: CREATOR (THE FORGE) --- */}
                 {activeTab === 'creator' && (
-                    // ... (Existing Creator Code - No changes needed to logic, just wrapper)
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full">
                         {/* FORM COLUMN */}
                         <div className={`lg:col-span-7 flex flex-col p-6 rounded-xl border relative overflow-y-auto z-0 ${isWizard ? 'border-red-800/30 bg-[#0f0a0a]' : 'border-blue-800/30 bg-[#0a0a12]'}`}>
-                           {/* ... (Existing Creator UI) ... */}
                            <div className="font-bold mb-6 flex items-center justify-between text-xl border-b border-white/10 pb-4 text-white">
                                <div className="flex items-center gap-2">
                                    {isEditingItem ? <Edit3 size={20} className="text-yellow-500" /> : <Plus size={20} className="text-green-500" />} 
@@ -937,7 +935,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
                 {/* --- TAB: AI LAB --- */}
                 {activeTab === 'ai-lab' && (
-                    // ... (Existing AI Lab - No changes needed)
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full max-w-7xl mx-auto">
                         {/* Input Column */}
                         <div className={`flex flex-col p-6 rounded-xl border relative overflow-hidden h-full ${isWizard ? 'border-emerald-800/30 bg-[#0f0a0a]' : 'border-fuchsia-800/30 bg-[#0a0a12]'}`}>
@@ -1031,7 +1028,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                 )}
 
                 {activeTab === 'database' && (
-                    // ... (Existing Database - No changes)
                     <div className="h-full flex flex-col">
                         <div className="mb-6 flex gap-4 items-center justify-between p-4 bg-white/5 rounded-xl border border-white/10">
                             {/* ... same database view ... */}
@@ -1120,10 +1116,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                     </div>
                 )}
 
-                {/* ... (Existing Tabs: Structure, Config, Users, Tools) - No logic changes, just ensuring they render */}
                 {activeTab === 'structure' && (
                     <div className="h-full flex flex-col overflow-y-auto max-w-5xl mx-auto p-2">
-                        {/* ... Existing Structure Code ... */}
                         <div className="mb-6 flex justify-between items-center bg-white/5 p-4 rounded-xl border border-white/10">
                             <div>
                                 <h3 className="text-xl font-bold text-white mb-1">Sector Architecture</h3>
@@ -1174,12 +1168,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
                 {activeTab === 'config' && (
                     <div className="h-full overflow-y-auto p-4 max-w-3xl mx-auto space-y-8 pb-20">
-                        {/* ... Existing Config Code ... */}
                         <div className="flex items-center justify-between">
                             <h3 className="text-2xl font-bold text-white">Global Configuration</h3>
                             <button onClick={handleSaveConfig} className="px-6 py-2 bg-white text-black font-bold rounded shadow hover:bg-gray-200">Save Config</button>
                         </div>
-                        {/* ... Config Forms (Skipping repeat for brevity, standard fields) ... */}
                         <div className="p-6 border border-white/10 rounded-lg bg-black/40">
                             <h3 className="font-bold text-emerald-400 mb-6 flex items-center gap-2"><Sparkles size={18}/> Wizard Theme Settings</h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1206,7 +1198,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                 )}
 
                 {activeTab === 'users' && (
-                    // ... (Existing Users Tab) ...
                     <div className="h-full flex flex-col max-w-4xl mx-auto">
                         <div className="flex gap-6 mb-8">
                             <div className="flex-1 p-6 border border-white/10 rounded-lg bg-white/5">
@@ -1223,7 +1214,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                     <button onClick={handleCreateUser} className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 rounded text-white text-sm font-bold mt-2">Create User</button>
                                 </div>
                             </div>
-                            {/* ... */}
                         </div>
                         <div className="flex-1 overflow-y-auto border border-white/10 rounded-lg">
                             <table className="w-full text-left text-sm text-white">
@@ -1256,7 +1246,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                 )}
 
                 {activeTab === 'tools' && (
-                    // ... (Existing Tools - Find & Replace)
                     <div className="h-full flex flex-col max-w-2xl mx-auto">
                         <div className="mb-6 p-4 border border-white/10 rounded-lg bg-white/5">
                             <h3 className="font-bold text-white mb-4 flex items-center gap-2"><Replace size={18}/> Global Find & Replace</h3>

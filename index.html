@@ -8,7 +8,7 @@
     <title>CoreConnect</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=EB+Garamond:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600&family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Orbitron:wght@400;700&family=Montserrat:wght@400;600&family=Courier+Prime&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=EB+Garamond:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600&family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Orbitron:wght@400;700&family=Montserrat:wght@400;600&family=Courier+Prime&family=Dancing+Script:wght@600&family=Righteous&family=Audiowide&display=swap" rel="stylesheet">
     
     <!-- Configure Tailwind BEFORE loading the script to prevent race conditions -->
     <script>
@@ -39,6 +39,9 @@
                 orbitron: ['"Orbitron"', 'sans-serif'],
                 montserrat: ['"Montserrat"', 'sans-serif'],
                 courier: ['"Courier Prime"', 'monospace'],
+                cursive: ['"Dancing Script"', 'cursive'],
+                tech: ['"Audiowide"', 'sans-serif'],
+                retro: ['"Righteous"', 'cursive'],
               },
               animation: {
                 'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
@@ -75,6 +78,7 @@
         overflow: hidden; /* App handles scrolling */
         background-color: #000; /* Fallback for slow load */
         touch-action: pan-y; /* Allow vertical scroll, handle horizontal in JS */
+        -webkit-tap-highlight-color: transparent;
       }
       
       /* Custom Cursors */
@@ -98,7 +102,7 @@
         height: 6px;
       }
       ::-webkit-scrollbar-track {
-        background: rgba(0, 0, 0, 0.3); 
+        background: rgba(0, 0, 0, 0.1); 
       }
       ::-webkit-scrollbar-thumb {
         background: rgba(255, 255, 255, 0.2); 
