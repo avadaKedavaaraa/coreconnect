@@ -1,0 +1,27 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+  functions = "netlify/functions"
+
+[dev]
+  command = "npm run dev"
+  framework = "#custom"
+  targetPort = 3000
+  port = 5173
+  publish = "dist"
+
+# 1. API Redirects
+# Directs calls from /api/... to the serverless function "api.js"
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/api"
+  status = 200
+  force = true
+
+# 2. SPA Fallback
+# Ensures that refreshing the page on a React route (if you use routing) 
+# serves index.html instead of a 404
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

@@ -42,7 +42,7 @@ app.use(helmet({
 
 app.use(hpp());
 
-// CORS: Allow requests from anywhere in this configuration to prevent 405 on Options
+// CORS
 app.use(cors({
   origin: true, 
   credentials: true,
@@ -50,8 +50,6 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'x-csrf-token', 'Authorization']
 }));
 
-// Note: Rate limiting on Netlify Functions is tricky as IP is often shared/proxied.
-// We relax it slightly or rely on Netlify's built-in DDoS protection.
 const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 2000, validate: {xForwardedForHeader: false} });
 app.use(express.json({ limit: '10mb' })); 
 app.use(express.urlencoded({ extended: true, limit: '10mb' })); 
@@ -73,10 +71,9 @@ if (process.env.API_KEY) {
 }
 
 const SECRET = process.env.SUPABASE_SERVICE_ROLE_KEY || 'default-secret';
-
-// --- AUTH UTILS ---
 const scrypt = promisify(crypto.scrypt);
 
+// --- HELPERS ---
 function signSession(data) {
     const str = Buffer.from(JSON.stringify(data)).toString('base64');
     const sig = crypto.createHmac('sha256', SECRET).update(str).digest('base64').replace(/=/g, '');
@@ -107,14 +104,36 @@ const requireAuth = (req, res, next) => {
     next();
 };
 
-const uploadMiddleware = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
+const uploadMiddleware = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+
+// Helper to transform frontend item to DB item (CamelCase -> SnakeCase)
+// CRITICAL FIX: Removes fields that don't exist in DB to prevent 500 errors
+const toDbItem = (item) => {
+  const dbItem = { ...item };
+  
+  // Map CamelCase to SnakeCase for DB
+  if (typeof dbItem.isUnread !== 'undefined') {
+    dbItem.is_unread = dbItem.isUnread;
+    delete dbItem.isUnread;
+  }
+  if (typeof dbItem.fileUrl !== 'undefined') {
+    dbItem.file_url = dbItem.fileUrl;
+    delete dbItem.fileUrl;
+  }
+
+  // STRIP CLIENT-ONLY FIELDS
+  delete dbItem.isLiked; // Not in DB schema
+  delete dbItem.is_liked; // Just in case
+  
+  return dbItem;
+};
 
 // --- ROUTER DEFINITIONS ---
-
 const router = express.Router();
 
 router.get('/health', (req, res) => res.json({ status: 'active', time: new Date().toISOString() }));
 
+// AUTH
 router.post('/login', async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -194,44 +213,133 @@ router.post('/ai/parse', requireAuth, uploadMiddleware.single('file'), async (re
     } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-// Admin
+// ADMIN: ITEMS
 router.post('/admin/items', requireAuth, async (req, res) => {
-    const { data, error } = await supabase.from('items').insert(req.body).select().single();
-    if(error) return res.status(400).json({error: error.message});
-    res.json({success: true, item: data});
+    if(!req.user.permissions.canEdit) return res.status(403).json({error: "Forbidden"});
+    try {
+        // Sanitize object before DB insert
+        const dbItem = toDbItem(req.body);
+        
+        // Ensure ID is passed if provided, else allow DB to gen
+        // Upsert if ID exists to avoid conflicts, or standard insert
+        const { data, error } = await supabase.from('items').upsert(dbItem).select().single();
+        
+        if(error) throw error;
+        res.json({success: true, item: data});
+    } catch(e) { 
+        console.error("Create Item Error:", e.message);
+        res.status(400).json({error: e.message}); 
+    }
 });
+
 router.put('/admin/items/:id', requireAuth, async (req, res) => {
-    const { error } = await supabase.from('items').update(req.body).eq('id', req.params.id);
-    if(error) return res.status(400).json({error: error.message});
-    res.json({success: true});
+    if(!req.user.permissions.canEdit) return res.status(403).json({error: "Forbidden"});
+    try {
+        const dbItem = toDbItem(req.body);
+        // Remove ID from body update to prevent PK errors
+        const { id, ...updateData } = dbItem; 
+        const { error } = await supabase.from('items').update(updateData).eq('id', req.params.id);
+        if(error) throw error;
+        res.json({success: true});
+    } catch(e) { res.status(400).json({error: e.message}); }
 });
+
 router.delete('/admin/items/:id', requireAuth, async (req, res) => {
+    if(!req.user.permissions.canDelete) return res.status(403).json({error: "Forbidden"});
     const { error } = await supabase.from('items').delete().eq('id', req.params.id);
     if(error) return res.status(400).json({error: error.message});
     res.json({success: true});
 });
+
+// ADMIN: CONFIG
 router.post('/admin/config', requireAuth, async (req, res) => {
+    if(!req.user.permissions.canEdit) return res.status(403).json({error: "Forbidden"});
     const { error } = await supabase.from('global_config').upsert({ id: 1, config: req.body });
     if(error) return res.status(400).json({error: error.message});
     res.json({success: true});
 });
-router.post('/admin/upload', requireAuth, async (req, res) => {
-    const { fileName, fileType, fileData } = req.body;
-    const buffer = Buffer.from(fileData, 'base64');
-    const uniqueName = `${crypto.randomUUID()}.${fileName.split('.').pop()}`;
-    const { error } = await supabase.storage.from('items').upload(uniqueName, buffer, { contentType: fileType });
-    if (error) return res.status(500).json({ error: error.message });
-    const { data } = supabase.storage.from('items').getPublicUrl(uniqueName);
-    res.json({ url: data.publicUrl });
+
+// ADMIN: UPLOAD
+router.post('/admin/upload', requireAuth, uploadMiddleware.single('file'), async (req, res) => {
+    if(!req.user.permissions.canEdit) return res.status(403).json({error: "Forbidden"});
+    try {
+        let fileBuffer, fileType, fileName;
+        
+        if (req.file) {
+            fileBuffer = req.file.buffer;
+            fileType = req.file.mimetype;
+            fileName = req.file.originalname;
+        } else if (req.body.fileData) {
+            fileBuffer = Buffer.from(req.body.fileData, 'base64');
+            fileType = req.body.fileType;
+            fileName = req.body.fileName;
+        } else {
+            return res.status(400).json({error: "No file data"});
+        }
+
+        const uniqueName = `${crypto.randomUUID()}.${fileName.split('.').pop()}`;
+        const { error } = await supabase.storage.from('items').upload(uniqueName, fileBuffer, { 
+            contentType: fileType,
+            upsert: true 
+        });
+        if (error) throw error;
+        
+        const { data } = supabase.storage.from('items').getPublicUrl(uniqueName);
+        res.json({ url: data.publicUrl });
+    } catch (e) { 
+        console.error("Upload Error:", e.message);
+        res.status(500).json({ error: e.message }); 
+    }
 });
 
-// IMPORTANT: Netlify functions are served at /.netlify/functions/api
-// We mount the router there, AND at /api, AND at / to ensure all redirects work.
-app.use('/.netlify/functions/api', router);
-app.use('/api', router);
-app.use('/', router);
+// ADMIN: USERS
+router.get('/admin/users', requireAuth, async (req, res) => {
+    if(!req.user.permissions.canManageUsers) return res.status(403).json({error: "Forbidden"});
+    const { data, error } = await supabase.from('admin_users').select('username, permissions, last_active');
+    if(error) return res.status(500).json({error: error.message});
+    res.json(data);
+});
 
-// Export for Vercel/Netlify
+router.post('/admin/users/add', requireAuth, async (req, res) => {
+    if(!req.user.permissions.canManageUsers) return res.status(403).json({error: "Forbidden"});
+    try {
+        const { username, password, permissions } = req.body;
+        const salt = crypto.randomBytes(16).toString('hex');
+        const hash = (await scrypt(password, salt, 64)).toString('hex');
+        const { error } = await supabase.from('admin_users').insert({ username, password_hash: hash, salt, permissions });
+        if(error) throw error;
+        res.json({success: true});
+    } catch(e) { res.status(500).json({error: e.message}); }
+});
+
+router.post('/admin/users/delete', requireAuth, async (req, res) => {
+    if(!req.user.permissions.canManageUsers) return res.status(403).json({error: "Forbidden"});
+    const { targetUser } = req.body;
+    if(targetUser === 'admin') return res.status(400).json({error: "Cannot delete root admin"});
+    const { error } = await supabase.from('admin_users').delete().eq('username', targetUser);
+    if(error) return res.status(500).json({error: error.message});
+    res.json({success: true});
+});
+
+// ADMIN: LOGS
+router.get('/admin/logs', requireAuth, async (req, res) => {
+    if(!req.user.permissions.canViewLogs) return res.status(403).json({error: "Forbidden"});
+    const query = supabase.from('audit_logs').select('*').order('timestamp', { ascending: false }).limit(100);
+    if (req.query.targetUser) query.eq('username', req.query.targetUser);
+    const { data, error } = await query;
+    if(error) return res.status(500).json({error: error.message});
+    res.json(data);
+});
+
+
+// MOUNT ROUTER
+// Mount to /api for local dev and standard usage
+app.use('/api', router);
+// Mount to root for direct calls if path logic matches
+app.use('/', router);
+// Mount to Netlify functions path for production there
+app.use('/.netlify/functions/api', router);
+
 export default app;
 
 if (process.argv[1].endsWith('index.js')) {
