@@ -66,7 +66,7 @@ const DEFAULT_CONFIG: GlobalConfig = {
 };
 
 const LoadingSpinner = ({ lineage, color }: { lineage: Lineage | null, color?: string }) => (
-    <div className={`fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm`} style={{color: color || (lineage === Lineage.WIZARD ? '#10b981' : '#d946ef')}}>
+    <div className={`fixed inset-0 z-[110] flex items-center justify-center bg-black/50 backdrop-blur-sm`} style={{color: color || (lineage === Lineage.WIZARD ? '#10b981' : '#d946ef')}}>
         <Loader2 size={40} className="animate-spin" />
     </div>
 );
@@ -233,8 +233,15 @@ const App: React.FC = () => {
   const handleTouchEnd = (e: React.TouchEvent) => {
       if (!touchStartX.current) return;
       const target = e.target as HTMLElement;
-      // Prevent swipe if touching a slider, map, or carousel that needs its own swipe
-      if (target.closest('.no-swipe') || target.closest('.overflow-x-auto')) return;
+      
+      // FIX: Robust check to prevent swipe navigation when scrolling internal lists
+      if (target.closest('.no-swipe') || 
+          target.closest('.overflow-x-auto') || 
+          target.closest('.overflow-y-auto') ||
+          target.closest('input') ||
+          target.closest('textarea')) {
+          return;
+      }
       
       const diffX = touchStartX.current - e.changedTouches[0].clientX;
       if (Math.abs(diffX) > 60) { // Threshold
@@ -308,7 +315,8 @@ const App: React.FC = () => {
   const activeSector = sectors.find(s => s.id === activeSectorId) || sectors[0];
 
   return (
-    <div className={`flex h-screen overflow-hidden transition-colors duration-1000 relative ${isWizard ? 'bg-[#050a05] cursor-wizard' : 'bg-[#09050f] cursor-muggle'}`} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+    // FIX: Use 100dvh for better mobile browser support
+    <div className={`flex h-[100dvh] overflow-hidden transition-colors duration-1000 relative ${isWizard ? 'bg-[#050a05] cursor-wizard' : 'bg-[#09050f] cursor-muggle'}`} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
       <div className={`absolute inset-0 z-50 pointer-events-none ${isWizard ? 'parchment-grain' : 'crt-scanlines'}`}></div>
       
       <Sidebar 
@@ -359,8 +367,8 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        {/* RESTORED FLOATING BAG ICON WITH HIGHER Z-INDEX */}
-        <div className="absolute bottom-6 left-6 z-[60]">
+        {/* FIX: Z-Index adjusted to 40 so it doesn't overlap Modals (Z-50/80) */}
+        <div className="absolute bottom-6 left-6 z-40">
             <button onClick={() => setToolsOpen(true)} className={`p-3 rounded-full border shadow-lg transition-all hover:scale-110 active:scale-95 ${isWizard ? 'bg-emerald-900/80 border-emerald-500/50 text-emerald-400' : 'bg-fuchsia-900/80 border-fuchsia-500/50 text-fuchsia-400'}`} style={profile.themeColor ? {borderColor: profile.themeColor, color: profile.themeColor, backgroundColor: `${profile.themeColor}30`} : {}}><Briefcase size={20} /></button>
         </div>
 

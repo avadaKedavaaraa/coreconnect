@@ -52,7 +52,7 @@ const IdentityGate: React.FC<IdentityGateProps> = ({ onSelect, config }) => {
   // 1. NAME ENTRY SCREEN (If no name saved)
   if (!hasName) {
       return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black overflow-hidden">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black overflow-hidden">
             {/* Background Ambience */}
             <div className="absolute inset-0 opacity-40">
                 <div className="absolute top-0 left-0 w-1/2 h-full bg-emerald-900/20 blur-[100px]"></div>
@@ -73,12 +73,13 @@ const IdentityGate: React.FC<IdentityGateProps> = ({ onSelect, config }) => {
 
                 <form onSubmit={handleNameSubmit} className="space-y-6">
                     <div className="relative group">
+                        {/* FIX: text-base to prevent iOS Zoom */}
                         <input 
                             type="text" 
                             value={name}
                             onChange={(e) => setName(e.target.value)}
                             placeholder="Your Name..."
-                            className="w-full bg-black/50 border border-zinc-700 rounded-lg px-4 py-4 text-white placeholder:text-zinc-600 outline-none focus:border-white/50 transition-all text-center text-lg tracking-wider"
+                            className="w-full bg-black/50 border border-zinc-700 rounded-lg px-4 py-4 text-white placeholder:text-zinc-600 outline-none focus:border-white/50 transition-all text-center text-base tracking-wider"
                             autoFocus
                         />
                     </div>
@@ -102,7 +103,7 @@ const IdentityGate: React.FC<IdentityGateProps> = ({ onSelect, config }) => {
 
   // 2. LINEAGE SELECTION SCREEN (Gate)
   return (
-    <div className="fixed inset-0 z-50 flex flex-col md:flex-row bg-black overflow-hidden">
+    <div className="fixed inset-0 z-[100] flex flex-col md:flex-row bg-black overflow-hidden">
       {/* Wizard Side */}
       <div 
         onClick={() => !selected && handleSelection(Lineage.WIZARD)}

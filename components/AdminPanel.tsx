@@ -542,8 +542,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 p-2 sm:p-4 animate-[fade-in_0.2s_ease-out]">
-      <div className={`w-full max-w-6xl rounded-xl border shadow-2xl overflow-hidden flex flex-col relative h-[calc(100dvh-20px)] sm:h-full sm:max-h-[95vh] text-zinc-200 transition-colors duration-500
+    // FIX: Z-Index 80 to prevent overlaps with floating bag or other elements
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/95 p-2 sm:p-4 animate-[fade-in_0.2s_ease-out]">
+      <div className={`w-full max-w-6xl rounded-xl border shadow-2xl overflow-hidden flex flex-col relative h-[100dvh] sm:h-full sm:max-h-[95vh] text-zinc-200 transition-colors duration-500
         ${isWizard ? 'bg-[#0a0505] border-red-900/50 shadow-red-900/30' : 'bg-[#050510] border-blue-900/50 shadow-blue-900/30'}
       `}>
         <button onClick={onClose} className="absolute top-4 right-4 text-white/50 hover:text-white z-30 p-2 hover:bg-white/10 rounded-full transition-colors">
@@ -612,13 +613,14 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                        <div className={`absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none transition-colors ${isWizard ? 'text-red-700 group-focus-within:text-red-400' : 'text-blue-700 group-focus-within:text-blue-400'}`}>
                            {isWizard ? <Wand2 size={18}/> : <Terminal size={18}/>}
                        </div>
+                       {/* FIX: text-base prevents iOS zoom */}
                        <input 
                          type="text" value={loginUser} onChange={(e) => setLoginUser(e.target.value)} 
                          placeholder={isWizard ? "Incantation (Username)" : "Identity"}
-                         className={`w-full pl-10 pr-4 py-4 rounded-lg border bg-black/60 text-white placeholder:text-white/20 outline-none transition-all duration-300
+                         className={`w-full pl-10 pr-4 py-4 rounded-lg border bg-black/60 text-white placeholder:text-white/20 outline-none transition-all duration-300 text-base
                             ${isWizard 
                                 ? 'border-red-900/50 focus:border-red-500 focus:shadow-[0_0_20px_rgba(239,68,68,0.2)] font-wizard tracking-wider' 
-                                : 'border-blue-900/50 focus:border-blue-500 focus:shadow-[0_0_20px_rgba(59,130,246,0.2)] font-muggle text-sm'}
+                                : 'border-blue-900/50 focus:border-blue-500 focus:shadow-[0_0_20px_rgba(59,130,246,0.2)] font-muggle'}
                          `}
                        />
                    </div>
@@ -629,10 +631,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                        <input 
                          type="password" value={loginPass} onChange={(e) => setLoginPass(e.target.value)} 
                          placeholder={isWizard ? "Sigil (Password)" : "Passcode"}
-                         className={`w-full pl-10 pr-4 py-4 rounded-lg border bg-black/60 text-white placeholder:text-white/20 outline-none transition-all duration-300
+                         className={`w-full pl-10 pr-4 py-4 rounded-lg border bg-black/60 text-white placeholder:text-white/20 outline-none transition-all duration-300 text-base
                             ${isWizard 
                                 ? 'border-red-900/50 focus:border-red-500 focus:shadow-[0_0_20px_rgba(239,68,68,0.2)] font-wizard tracking-wider' 
-                                : 'border-blue-900/50 focus:border-blue-500 focus:shadow-[0_0_20px_rgba(59,130,246,0.2)] font-muggle text-sm'}
+                                : 'border-blue-900/50 focus:border-blue-500 focus:shadow-[0_0_20px_rgba(59,130,246,0.2)] font-muggle'}
                          `}
                        />
                    </div>
@@ -691,6 +693,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
             </div>
 
             {/* TAB CONTENT */}
+            {/* FIX: Ensure pb-20 so footer/keyboard doesn't hide content */}
             <div className="flex-1 overflow-y-auto p-2 sm:p-6 pb-20 relative">
                 
                 {/* --- TAB: CREATOR (THE FORGE) --- */}

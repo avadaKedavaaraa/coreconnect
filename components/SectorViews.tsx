@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Lineage, type CarouselItem } from '../types';
 import { Book, FileText, Video, Calendar, Search, Filter, X, Trash2, LayoutGrid, List, FolderOpen, ArrowLeft, Edit2, Plus, FolderPlus, Loader2, Image as ImageIcon } from 'lucide-react';
@@ -14,7 +15,7 @@ interface SectorViewProps {
   onEdit?: (item: CarouselItem) => void;
   onBack?: () => void;
   onAddItem?: (sectorId: string) => void; 
-  onQuickCreate?: (item: CarouselItem) => void; // New prop for direct creation
+  onQuickCreate?: (item: CarouselItem) => void; 
 }
 
 const SectorView: React.FC<SectorViewProps> = ({ items, lineage, sectorId, onViewItem, isAdmin, onDelete, onEdit, onBack, onAddItem, onQuickCreate }) => {
@@ -91,7 +92,6 @@ const SectorView: React.FC<SectorViewProps> = ({ items, lineage, sectorId, onVie
       const today = new Date().toISOString().split('T')[0].replace(/-/g, '.');
       
       // Create a "Genesis" item to establish the folder
-      // Includes the optional cover image which will be used for the folder background
       const genesisItem: CarouselItem = {
           id: crypto.randomUUID(), 
           title: `Welcome to ${newSubjectName}`,
@@ -181,26 +181,27 @@ const SectorView: React.FC<SectorViewProps> = ({ items, lineage, sectorId, onVie
           )}
       </div>
 
-      {/* FILTER BAR */}
-      <div className={`mb-8 p-4 rounded-xl border backdrop-blur-md flex flex-col md:flex-row gap-4 items-center justify-between sticky top-0 z-20 shadow-xl transition-all
+      {/* FILTER BAR - Mobile Responsive */}
+      <div className={`mb-8 p-4 rounded-xl border backdrop-blur-md flex flex-col lg:flex-row gap-4 items-stretch lg:items-center justify-between sticky top-0 z-30 shadow-xl transition-all
         ${isWizard ? 'bg-emerald-900/20 border-emerald-500/30' : 'bg-fuchsia-900/20 border-fuchsia-500/30'}
       `}>
-         <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto flex-1">
-            <div className="relative flex-[2] min-w-[250px]">
+         <div className="flex flex-col md:flex-row gap-4 w-full lg:w-auto flex-1">
+            <div className="relative flex-[2] min-w-[200px]">
               <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${isWizard ? 'text-emerald-500' : 'text-fuchsia-500'}`} />
               <input 
                 type="text" 
                 placeholder={isWizard ? "Search the archives..." : "Filter database..."}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className={`w-full pl-10 pr-4 py-2 rounded border bg-black/40 outline-none transition-all
+                className={`w-full pl-10 pr-4 py-2 rounded border bg-black/40 outline-none transition-all text-base
                   ${isWizard 
                     ? 'border-emerald-700 text-emerald-100 placeholder:text-emerald-700/50 focus:border-emerald-400 font-wizard' 
-                    : 'border-fuchsia-700 text-fuchsia-100 placeholder:text-fuchsia-700/50 focus:border-fuchsia-400 font-muggle text-sm'}
+                    : 'border-fuchsia-700 text-fuchsia-100 placeholder:text-fuchsia-700/50 focus:border-fuchsia-400 font-muggle'}
                 `}
               />
             </div>
-            <div className="relative w-full md:w-auto z-50">
+            {/* FIX: Z-Index for Calendar Widget Popup */}
+            <div className="relative w-full md:w-auto z-[40]">
                <CalendarWidget 
                  lineage={lineage} items={items} selectedDate={dateFilter} onSelectDate={setDateFilter}
                  isOpen={calendarOpen} setIsOpen={setCalendarOpen}
@@ -213,24 +214,24 @@ const SectorView: React.FC<SectorViewProps> = ({ items, lineage, sectorId, onVie
                     setSubjectFilter(e.target.value);
                     if(e.target.value && viewMode === 'folders') setViewMode('masonry');
                  }}
-                 className={`w-full px-4 py-2 rounded border bg-transparent outline-none appearance-none cursor-pointer
+                 className={`w-full px-4 py-2 rounded border bg-transparent outline-none appearance-none cursor-pointer text-base
                    ${isWizard 
                      ? 'border-emerald-700 text-emerald-100 bg-[#050a05] font-wizard' 
-                     : 'border-fuchsia-700 text-fuchsia-100 bg-[#09050f] font-muggle text-sm'}
+                     : 'border-fuchsia-700 text-fuchsia-100 bg-[#09050f] font-muggle'}
                  `}
                >
-                 <option value="">{isWizard ? "All Subjects" : "All Directories"}</option>
-                 {subjects.map(sub => <option key={sub} value={sub}>{sub}</option>)}
+                 <option value="" className="bg-black text-white">{isWizard ? "All Subjects" : "All Directories"}</option>
+                 {subjects.map(sub => <option key={sub} value={sub} className="bg-black text-white">{sub}</option>)}
                </select>
                <Filter className={`absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none opacity-50`} />
             </div>
             {(search || dateFilter || subjectFilter) && (
-              <button onClick={clearFilters} className={`p-2 rounded hover:bg-white/10 ${isWizard ? 'text-emerald-400' : 'text-fuchsia-400'} shrink-0`}>
+              <button onClick={clearFilters} className={`p-2 rounded hover:bg-white/10 ${isWizard ? 'text-emerald-400' : 'text-fuchsia-400'} shrink-0 self-end md:self-auto`}>
                 <X size={20} />
               </button>
             )}
          </div>
-         <div className={`flex items-center gap-1 p-1 rounded border shrink-0 ${isWizard ? 'border-emerald-800 bg-black/40' : 'border-fuchsia-800 bg-black/40'}`}>
+         <div className={`flex items-center gap-1 p-1 rounded border shrink-0 justify-center ${isWizard ? 'border-emerald-800 bg-black/40' : 'border-fuchsia-800 bg-black/40'}`}>
             <button onClick={() => { setSubjectFilter(''); setViewMode('folders'); }} className={`p-2 rounded transition-all ${viewMode === 'folders' ? (isWizard ? 'bg-emerald-800 text-emerald-100' : 'bg-fuchsia-800 text-fuchsia-100') : 'text-white/40 hover:text-white'}`}><FolderOpen size={16} /></button>
             <div className="w-px h-4 bg-white/10 mx-1"></div>
             <button onClick={() => setViewMode('masonry')} className={`p-2 rounded transition-all ${viewMode === 'masonry' ? (isWizard ? 'bg-emerald-800 text-emerald-100' : 'bg-fuchsia-800 text-fuchsia-100') : 'text-white/40 hover:text-white'}`}><LayoutGrid size={16} /></button>

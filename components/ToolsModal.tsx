@@ -21,20 +21,31 @@ const ToolsModal: React.FC<ToolsModalProps> = ({ lineage, onClose, profile, setP
   const isWizard = lineage === Lineage.WIZARD;
 
   // Local State for Profile Editing
+  // FIX: Initialize state ONCE. Do not sync with 'profile' prop in useEffect to avoid resetting while typing (due to time tracking updates).
   const [editProfile, setEditProfile] = useState<UserProfile>(profile);
   const [hasChanges, setHasChanges] = useState(false);
 
+  // Check for changes by comparing editable fields only, ignoring time/visits
   useEffect(() => {
-    setEditProfile(profile);
-  }, [profile]);
-
-  useEffect(() => {
-    setHasChanges(JSON.stringify(editProfile) !== JSON.stringify(profile));
-  }, [editProfile, profile]);
+    const isDifferent = 
+        editProfile.displayName !== profile.displayName ||
+        editProfile.defaultSector !== profile.defaultSector ||
+        editProfile.preferredFont !== profile.preferredFont ||
+        editProfile.themeColor !== profile.themeColor;
+    setHasChanges(isDifferent);
+  }, [editProfile, profile.displayName, profile.defaultSector, profile.preferredFont, profile.themeColor]);
 
   const handleSaveProfile = () => {
-    setProfile(editProfile);
+    // Merge editable fields with current profile stats
+    setProfile(prev => ({
+        ...prev,
+        displayName: editProfile.displayName,
+        defaultSector: editProfile.defaultSector,
+        preferredFont: editProfile.preferredFont,
+        themeColor: editProfile.themeColor
+    }));
     setHasChanges(false);
+    
     // Visual feedback
     const btn = document.getElementById('save-btn');
     if(btn) {
@@ -69,9 +80,32 @@ const ToolsModal: React.FC<ToolsModalProps> = ({ lineage, onClose, profile, setP
       { id: '#ffffff', name: 'Spectral White' },
   ];
 
+  // Component for Statistics to reuse in layout
+  const StatisticsWidget = () => (
+    <div className={`mt-6 p-4 rounded-lg border w-full ${isWizard ? 'bg-emerald-950/20 border-emerald-900/50' : 'bg-fuchsia-950/20 border-fuchsia-900/50'}`}>
+        {/* FIX: Explicit text colors to ensure visibility */}
+        <h5 className="font-bold mb-4 text-sm text-white border-b border-white/10 pb-2">Your Statistics</h5>
+        <div className="grid grid-cols-2 gap-4 text-xs text-zinc-200">
+            <div>
+                <span className="opacity-50 block mb-1">Total Visits</span>
+                <span className="text-lg font-mono font-bold text-white">{profile.visitCount}</span>
+            </div>
+            <div>
+                <span className="opacity-50 block mb-1">Time Spent</span>
+                <span className="text-lg font-mono font-bold text-white">{(profile.totalTimeSpent / 60).toFixed(1)} m</span>
+            </div>
+            <div className="col-span-2">
+                <span className="opacity-50 block mb-1">Last Active</span>
+                <span className="font-mono opacity-80 text-white">{new Date(profile.lastActive).toLocaleString()}</span>
+            </div>
+        </div>
+    </div>
+  );
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-[fade-in-up_0.2s_ease-out]">
-      <div className={`w-full max-w-4xl h-[90vh] md:h-auto md:max-h-[85vh] rounded-xl border shadow-2xl flex flex-col overflow-hidden relative
+    // FIX: Z-Index 80 to ensure it is above the Floating Bag (Z-40) and standard overlays
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-[fade-in-up_0.2s_ease-out]">
+      <div className={`w-full max-w-4xl h-[90dvh] md:h-auto md:max-h-[85vh] rounded-xl border shadow-2xl flex flex-col overflow-hidden relative
          ${isWizard ? 'bg-[#0a0f0a] border-emerald-600' : 'bg-[#0f0a15] border-fuchsia-600'}
       `}
       style={editProfile.themeColor ? { borderColor: editProfile.themeColor } : {}}
@@ -129,33 +163,22 @@ const ToolsModal: React.FC<ToolsModalProps> = ({ lineage, onClose, profile, setP
            {activeTab === 'tasks' && <Kanban lineage={lineage} />}
            {activeTab === 'profile' && (
                <div className="h-full flex flex-col md:flex-row gap-6">
-                   {/* Left: ID Card Preview */}
-                   <div className="flex-1 flex flex-col items-center">
+                   {/* Left: ID Card Preview + Desktop Stats */}
+                   <div className="flex-1 flex flex-col items-center shrink-0">
                        <h4 className={`mb-4 text-xs font-bold uppercase tracking-widest opacity-70 ${isWizard ? 'text-emerald-400' : 'text-fuchsia-400'}`}>Digital Identification</h4>
                        <div className="scale-90 md:scale-100 origin-top">
-                           <StudentID lineage={lineage} profile={profile} />
+                           {/* Use live profile data for ID card preview, or editProfile if you want real-time preview of edits. 
+                               Using editProfile gives immediate feedback. */}
+                           <StudentID lineage={lineage} profile={editProfile} />
                        </div>
                        
-                       <div className={`mt-6 p-4 rounded-lg border w-full max-w-sm ${isWizard ? 'bg-emerald-950/20 border-emerald-900/50' : 'bg-fuchsia-950/20 border-fuchsia-900/50'}`}>
-                           <h5 className="font-bold mb-2 text-sm text-white">Your Statistics</h5>
-                           <div className="grid grid-cols-2 gap-4 text-xs">
-                               <div>
-                                   <span className="opacity-50 block">Total Visits</span>
-                                   <span className="text-lg font-mono">{profile.visitCount}</span>
-                               </div>
-                               <div>
-                                   <span className="opacity-50 block">Time Spent</span>
-                                   <span className="text-lg font-mono">{(profile.totalTimeSpent / 60).toFixed(1)} m</span>
-                               </div>
-                               <div className="col-span-2">
-                                   <span className="opacity-50 block">Last Active</span>
-                                   <span className="font-mono opacity-80">{new Date(profile.lastActive).toLocaleString()}</span>
-                               </div>
-                           </div>
+                       {/* FIX: Layout - Stats shown here ONLY on Desktop */}
+                       <div className="hidden md:block w-full max-w-sm">
+                           <StatisticsWidget />
                        </div>
                    </div>
 
-                   {/* Right: Customization Form */}
+                   {/* Right: Customization Form + Mobile Stats */}
                    <div className={`flex-1 overflow-y-auto pr-2 space-y-6 ${isWizard ? 'scrollbar-wizard' : 'scrollbar-muggle'}`}>
                        
                        {/* Name Input */}
@@ -168,7 +191,8 @@ const ToolsModal: React.FC<ToolsModalProps> = ({ lineage, onClose, profile, setP
                              value={editProfile.displayName}
                              onChange={(e) => setEditProfile({...editProfile, displayName: e.target.value})}
                              placeholder="Enter your name..."
-                             className={`w-full p-3 rounded-lg border bg-black/40 outline-none transition-all
+                             // FIX: text-base to prevent iPhone Zoom
+                             className={`w-full p-3 rounded-lg border bg-black/40 outline-none transition-all text-base
                                 ${isWizard ? 'border-emerald-800 focus:border-emerald-500 text-emerald-100' : 'border-fuchsia-800 focus:border-fuchsia-500 text-fuchsia-100'}
                              `}
                            />
@@ -182,11 +206,12 @@ const ToolsModal: React.FC<ToolsModalProps> = ({ lineage, onClose, profile, setP
                            <select 
                              value={editProfile.defaultSector || 'announcements'}
                              onChange={(e) => setEditProfile({...editProfile, defaultSector: e.target.value})}
-                             className={`w-full p-3 rounded-lg border bg-black/40 outline-none
+                             className={`w-full p-3 rounded-lg border bg-black/40 outline-none text-base
                                 ${isWizard ? 'border-emerald-800 focus:border-emerald-500 text-emerald-100' : 'border-fuchsia-800 focus:border-fuchsia-500 text-fuchsia-100'}
                              `}
                            >
                                {SECTORS.map(s => (
+                                   // FIX: Explicit background for options to prevent white-on-white in dark mode on mobile
                                    <option key={s.id} value={s.id} className="bg-black text-white">
                                        {isWizard ? s.wizardName : s.muggleName}
                                    </option>
@@ -241,12 +266,12 @@ const ToolsModal: React.FC<ToolsModalProps> = ({ lineage, onClose, profile, setP
                            <p className="text-[10px] opacity-50">This color will subtly override the default lineage theme.</p>
                        </div>
 
-                       <div className="pt-4 sticky bottom-0 bg-gradient-to-t from-black via-black to-transparent pb-2">
+                       <div className="pt-4 sticky bottom-0 bg-gradient-to-t from-black via-black to-transparent pb-2 z-10">
                            <button 
                              id="save-btn"
                              onClick={handleSaveProfile}
                              disabled={!hasChanges}
-                             className={`w-full py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all
+                             className={`w-full py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all shadow-lg
                                 ${hasChanges 
                                     ? (isWizard ? 'bg-emerald-600 text-black hover:bg-emerald-500' : 'bg-fuchsia-600 text-black hover:bg-fuchsia-500') 
                                     : 'bg-zinc-800 text-zinc-500 cursor-not-allowed'}
@@ -254,6 +279,11 @@ const ToolsModal: React.FC<ToolsModalProps> = ({ lineage, onClose, profile, setP
                            >
                                <Save size={18} /> {hasChanges ? 'SAVE SETTINGS' : 'NO CHANGES'}
                            </button>
+                       </div>
+
+                       {/* FIX: Layout - Stats shown here ONLY on Mobile/Tablet */}
+                       <div className="block md:hidden pb-6">
+                           <StatisticsWidget />
                        </div>
 
                    </div>
