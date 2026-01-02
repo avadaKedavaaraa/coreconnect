@@ -134,7 +134,7 @@ const DEFAULT_CONFIG: GlobalConfig = {
   muggleAlarmUrl: 'https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg',
   wizardImage: 'https://images.unsplash.com/photo-1598153346810-860daa0d6cad?q=80&w=2070&auto=format&fit=crop',
   muggleImage: 'https://images.unsplash.com/photo-1480714378408-67cf0d13bc1b?q=80&w=2070&auto=format&fit=crop',
-  showDemoData: true
+  showDemoData: false
 };
 
 const LoadingSpinner = ({ lineage }: { lineage: Lineage | null }) => (
@@ -153,7 +153,18 @@ const App: React.FC = () => {
   
   // GOD MODE STATES
   const [sectors, setSectors] = useState<Sector[]>(SECTORS);
-  const [globalConfig, setGlobalConfig] = useState<GlobalConfig>(DEFAULT_CONFIG);
+
+  // Initialize Config from LocalStorage to prevent flicker/reset
+  // Uses v2 key to ensure a fresh start with showDemoData=false for existing users
+  const [globalConfig, setGlobalConfig] = useState<GlobalConfig>(() => {
+    try {
+      const saved = localStorage.getItem('core_connect_global_config_v2');
+      return saved ? { ...DEFAULT_CONFIG, ...JSON.parse(saved) } : DEFAULT_CONFIG;
+    } catch {
+      return DEFAULT_CONFIG;
+    }
+  });
+
   const [isOffline, setIsOffline] = useState(false);
 
   const [announcementViewMode, setAnnouncementViewMode] = useState<'carousel' | 'list'>('carousel');
@@ -198,7 +209,12 @@ const App: React.FC = () => {
     const fetchConfig = async () => {
       const { ok, data, status } = await safeFetch(`${API_URL}/api/config`);
       if (ok && data) {
-          setGlobalConfig(prev => ({...prev, ...data}));
+          setGlobalConfig(prev => {
+             const newData = {...prev, ...data};
+             // Sync with LocalStorage immediately
+             localStorage.setItem('core_connect_global_config_v2', JSON.stringify(newData));
+             return newData;
+          });
           setIsOffline(false);
       } else if (status === 0) {
           setIsOffline(true);
@@ -214,6 +230,9 @@ const App: React.FC = () => {
 
   const saveGlobalConfig = async (newConfig: GlobalConfig) => {
     setGlobalConfig(newConfig);
+    // Persist locally first for instant feedback/offline support
+    localStorage.setItem('core_connect_global_config_v2', JSON.stringify(newConfig));
+    
     if (isAdmin && csrfToken && permissions?.canEdit) {
       await safeFetch(`${API_URL}/api/admin/config`, {
           method: 'POST',
@@ -382,9 +401,11 @@ const App: React.FC = () => {
   const handleFactoryReset = () => {
     if(confirm("Are you sure? This will delete all custom settings locally. Database items require manual deletion.")) {
       localStorage.removeItem('core_connect_sectors');
-      localStorage.removeItem('core_connect_global_config');
+      localStorage.removeItem('core_connect_global_config_v2');
       setSectors(SECTORS);
       setGlobalConfig(DEFAULT_CONFIG);
+      // Reload to ensure fresh state
+      window.location.reload();
     }
   };
 

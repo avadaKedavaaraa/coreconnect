@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Lineage, type Task } from '../types';
 import { Plus, Trash2, CheckCircle } from 'lucide-react';
@@ -22,12 +23,8 @@ const Kanban: React.FC<KanbanProps> = ({ lineage }) => {
         setTasks(JSON.parse(saved));
       } catch (e) { console.error("Failed to parse tasks"); }
     } else {
-      // Default tasks if empty
-      setTasks([
-        { id: '1', title: isWizard ? 'Practice Levitation' : 'Debug React Components', status: 'todo' },
-        { id: '2', title: isWizard ? 'Buy Potion Vials' : 'Update Dependencies', status: 'doing' },
-        { id: '3', title: isWizard ? 'Read Hogwarts: A History' : 'Commit Changes', status: 'done' },
-      ]);
+      // Default tasks: Empty for clean slate
+      setTasks([]);
     }
     setLoaded(true);
   }, [isWizard]);
@@ -111,6 +108,9 @@ const Kanban: React.FC<KanbanProps> = ({ lineage }) => {
                  </div>
                </div>
              ))}
+             {tasks.filter(t => t.status === col.id).length === 0 && (
+                <div className="opacity-20 text-center text-xs py-4 italic">Empty</div>
+             )}
           </div>
         ))}
       </div>
