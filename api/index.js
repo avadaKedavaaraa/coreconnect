@@ -18,6 +18,7 @@ dotenv.config();
 const scryptAsync = promisify(crypto.scrypt);
 const app = express();
 const PORT = process.env.PORT || 3000;
+const IS_PROD = process.env.NODE_ENV === 'production';
 
 app.set('trust proxy', 1);
 app.disable('x-powered-by');
@@ -33,17 +34,22 @@ app.use(helmet({
       frameAncestors: ["'self'"],
     },
   },
-  hsts: { maxAge: 31536000, includeSubDomains: true, preload: true },
+  hsts: IS_PROD ? { maxAge: 31536000, includeSubDomains: true, preload: true } : false,
   noSniff: true,
   xssFilter: true,
   frameguard: { action: 'deny' },
 }));
 
 app.use(hpp());
-app.use(cors({ origin: true, credentials: true, methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], allowedHeaders: ['Content-Type', 'x-csrf-token', 'Authorization'] }));
+app.use(cors({ 
+    origin: true, 
+    credentials: true, 
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], 
+    allowedHeaders: ['Content-Type', 'x-csrf-token', 'Authorization'] 
+}));
 
 const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 2000, validate: {xForwardedForHeader: false} });
-app.use(express.json({ limit: '50mb' })); // Increased for JSON Import
+app.use(express.json({ limit: '50mb' })); 
 app.use(express.urlencoded({ extended: true, limit: '50mb' })); 
 app.use(cookieParser());
 app.use(limiter); 
@@ -59,7 +65,9 @@ if (process.env.API_KEY) {
   try { aiClient = new GoogleGenAI({ apiKey: process.env.API_KEY }); } catch (e) { console.error("AI Init Failed:", e.message); }
 }
 
-const SECRET = process.env.SUPABASE_SERVICE_ROLE_KEY || 'default-secret';
+// SECURITY: Use Env Secret or Generate Random (Safe Fallback)
+// If env var is missing, sessions invalidate on restart (Good security practice)
+const SECRET = process.env.SUPABASE_SERVICE_ROLE_KEY || crypto.randomBytes(64).toString('hex');
 const scrypt = promisify(crypto.scrypt);
 
 function signSession(data) {
@@ -104,22 +112,38 @@ router.get('/health', (req, res) => res.json({ status: 'active', time: new Date(
 router.post('/login', async (req, res) => {
   try {
     const { username, password } = req.body;
-    const { data: adminExists } = await supabase.from('admin_users').select('username').eq('username', 'admin').maybeSingle();
-    if (!adminExists) {
-        const salt = crypto.randomBytes(16).toString('hex');
-        const hash = (await scrypt(process.env.ADMIN_PASSWORD || 'admin123', salt, 64)).toString('hex');
-        await supabase.from('admin_users').insert({
-            username: 'admin', salt, password_hash: hash,
-            permissions: { canEdit: true, canDelete: true, canManageUsers: true, canViewLogs: true, isGod: true }
-        });
+    
+    // SECURITY: Only initialize admin if explicitly set in environment
+    if (process.env.ADMIN_PASSWORD) {
+        const { data: adminExists } = await supabase.from('admin_users').select('username').eq('username', 'admin').maybeSingle();
+        if (!adminExists) {
+            console.log("Initializing Root Admin from Environment Variable...");
+            const salt = crypto.randomBytes(16).toString('hex');
+            const hash = (await scrypt(process.env.ADMIN_PASSWORD, salt, 64)).toString('hex');
+            await supabase.from('admin_users').insert({
+                username: 'admin', salt, password_hash: hash,
+                permissions: { canEdit: true, canDelete: true, canManageUsers: true, canViewLogs: true, isGod: true }
+            });
+        }
     }
+
     const { data: user } = await supabase.from('admin_users').select('*').eq('username', username).single();
     if (!user) return res.status(401).json({ error: "Invalid credentials" });
+    
     const derivedKey = await scrypt(password, user.salt, 64);
     if (!crypto.timingSafeEqual(Buffer.from(user.password_hash, 'hex'), derivedKey)) return res.status(401).json({ error: "Invalid credentials" });
+    
     const csrfToken = crypto.randomBytes(32).toString('hex');
     const token = signSession({ username, permissions: user.permissions, csrfToken, expiresAt: Date.now() + 3600000 });
-    res.cookie('session_id', token, { httpOnly: true, sameSite: 'none', secure: true, maxAge: 3600000, path: '/' });
+    
+    // SECURITY: Cookie settings tailored for env
+    res.cookie('session_id', token, { 
+        httpOnly: true, 
+        sameSite: IS_PROD ? 'none' : 'lax', 
+        secure: IS_PROD, // Secure in Prod, allowed loose in Dev
+        maxAge: 3600000, 
+        path: '/' 
+    });
     res.json({ success: true, csrfToken, permissions: user.permissions });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });

@@ -29,7 +29,7 @@ async function safeFetch(url: string, options: RequestInit = {}) {
         const defaultOptions: RequestInit = { 
             ...options, 
             credentials: 'include',
-            headers: { ...options.headers, 'Cache-Control': 'no-cache' }
+            headers: { ...options.headers, 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
         };
         const res = await fetch(url, defaultOptions);
         const text = await res.text();
@@ -79,8 +79,9 @@ const DEFAULT_CONFIG: GlobalConfig = {
 };
 
 const LoadingSpinner = ({ lineage, color }: { lineage: Lineage | null, color?: string }) => (
-    <div className={`fixed inset-0 z-[110] flex items-center justify-center bg-black/50 backdrop-blur-sm`} style={{color: color || (lineage === Lineage.WIZARD ? '#10b981' : '#d946ef')}}>
-        <Loader2 size={40} className="animate-spin" />
+    <div className={`fixed inset-0 z-[110] flex flex-col items-center justify-center bg-black transition-colors duration-1000`} style={{color: color || (lineage === Lineage.WIZARD ? '#10b981' : '#d946ef')}}>
+        <Loader2 size={40} className="animate-spin mb-4" />
+        <p className="text-xs uppercase tracking-[0.2em] opacity-50 animate-pulse">Initializing Core...</p>
     </div>
 );
 
@@ -91,6 +92,7 @@ const App: React.FC = () => {
   const [dbItems, setDbItems] = useState<CarouselItem[]>([]);
   const [sectors, setSectors] = useState<Sector[]>(SECTORS);
   const [globalConfig, setGlobalConfig] = useState<GlobalConfig>(DEFAULT_CONFIG);
+  const [configLoaded, setConfigLoaded] = useState(false); // NEW: Waits for config before showing Gate
   const [isOffline, setIsOffline] = useState(false);
   const [announcementViewMode, setAnnouncementViewMode] = useState<'carousel' | 'list'>('carousel');
   const [isAdmin, setIsAdmin] = useState(false);
@@ -134,24 +136,27 @@ const App: React.FC = () => {
       return () => clearInterval(interval);
   }, []);
 
-  // Heartbeat & Persistence
+  // Heartbeat & Persistence (Regular Interval)
   useEffect(() => {
       localStorage.setItem('core_connect_profile', JSON.stringify(profile));
+      // Trigger every 30s
       if (profile.totalTimeSpent > 0 && profile.totalTimeSpent % 30 === 0) {
-          safeFetch(`${API_URL}/api/visitor/heartbeat`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ 
-                  visitorId: profile.id, 
-                  displayName: profile.displayName, 
-                  timeSpent: profile.totalTimeSpent, 
-                  visitCount: profile.visitCount 
-              })
-          }).then(({ ok, status }) => {
-              if (!ok) console.warn("Visitor heartbeat failed", status);
-          });
+          triggerHeartbeat();
       }
   }, [profile]);
+
+  const triggerHeartbeat = async () => {
+      await safeFetch(`${API_URL}/api/visitor/heartbeat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+              visitorId: profile.id, 
+              displayName: profile.displayName, 
+              timeSpent: profile.totalTimeSpent, 
+              visitCount: profile.visitCount 
+          })
+      });
+  };
 
   // LAZY SHORTCUTS
   useEffect(() => {
@@ -201,8 +206,12 @@ const App: React.FC = () => {
 
   // Load Config
   useEffect(() => {
+    // 1. Try Local Storage for instant load (if exists)
     const savedSectors = localStorage.getItem('core_connect_sectors');
     if (savedSectors) setSectors(JSON.parse(savedSectors));
+    
+    // Don't trust local storage for global config images if we want fresh updates for new users
+    // But we use it as a fallback
     const savedConfig = localStorage.getItem('core_connect_global_config_v2');
     if (savedConfig) setGlobalConfig({ ...DEFAULT_CONFIG, ...JSON.parse(savedConfig) });
 
@@ -211,13 +220,14 @@ const App: React.FC = () => {
       const { ok, data } = await safeFetch(`${API_URL}/api/config?t=${Date.now()}`);
       if (ok && data) {
           setGlobalConfig(prev => {
-             // Prioritize server data, fallback to previous if key missing
+             // Prioritize server data
              const newData = {...prev, ...data};
              localStorage.setItem('core_connect_global_config_v2', JSON.stringify(newData));
              return newData;
           });
           setIsOffline(false);
       }
+      setConfigLoaded(true); // Allow Gate to render now
     };
     
     const fetchSectors = async () => {
@@ -317,7 +327,13 @@ const App: React.FC = () => {
 
   const handleLineageSelect = (l: Lineage, name?: string) => {
       setLineage(l);
-      setProfile(prev => ({ ...prev, displayName: name || prev.displayName, visitCount: prev.visitCount + 1 }));
+      setProfile(prev => ({ 
+          ...prev, 
+          displayName: name || prev.displayName, 
+          visitCount: prev.visitCount + 1 
+      }));
+      // IMMEDIATE HEARTBEAT ON ENTRY
+      setTimeout(triggerHeartbeat, 100); 
       if (profile.defaultSector) setActiveSectorId(profile.defaultSector);
   };
 
@@ -361,6 +377,9 @@ const App: React.FC = () => {
     setCsrfToken(token);
     setPermissions(perms);
   };
+
+  // Block rendering Gate until config is loaded from server
+  if (!configLoaded) return <LoadingSpinner lineage={null} color="#ffffff" />;
 
   if (!lineage) return <IdentityGate onSelect={handleLineageSelect} config={globalConfig} />;
 
