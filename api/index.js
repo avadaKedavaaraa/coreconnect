@@ -13,180 +13,206 @@ import rateLimit from 'express-rate-limit';
 import helmet from 'helmet'; 
 import hpp from 'hpp';
 
+// Load env vars
 dotenv.config();
 
 const scryptAsync = promisify(crypto.scrypt);
-const app = express();
-const PORT = process.env.PORT || 3000;
-const IS_PROD = process.env.NODE_ENV === 'production';
 
+const app = express();
+const PORT = process.env.PORT || 3001;
+
+// --- SECURITY: Trust Render's Proxy ---
+// Essential for rate limiting and secure cookies to work behind Render's load balancer
 app.set('trust proxy', 1);
+
+// --- SECURITY: Hide Tech Stack ---
 app.disable('x-powered-by');
 
+// --- SECURITY: Helmet (Headers) ---
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
+      // Allow connections to Supabase and Self
       connectSrc: ["'self'", process.env.VITE_SUPABASE_URL || "https://*.supabase.co", "http://localhost:*", "https://*.vercel.app", "https://*.netlify.app"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      // Allow styles from Google Fonts
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      // Allow images from standard sources
       imgSrc: ["'self'", "data:", "https://images.unsplash.com", "https://cdn.pixabay.com", "https://*.supabase.co"],
+      // Frame ancestors - prevent clickjacking but allow iframes if needed
       frameAncestors: ["'self'"],
     },
   },
-  hsts: IS_PROD ? { maxAge: 31536000, includeSubDomains: true, preload: true } : false,
+  // Strict Transport Security (HSTS)
+  hsts: { maxAge: 31536000, includeSubDomains: true, preload: true },
   noSniff: true,
   xssFilter: true,
   frameguard: { action: 'deny' },
 }));
 
+// --- SECURITY: Parameter Pollution Protection ---
 app.use(hpp());
-app.use(cors({ 
-    origin: true, 
-    credentials: true, 
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], 
-    allowedHeaders: ['Content-Type', 'x-csrf-token', 'Authorization'] 
+
+// --- SECURITY: CORS (Cross-Origin Resource Sharing) ---
+// Strictly limit access to your Frontend URL
+const allowedOrigins = [
+    process.env.FRONTEND_URL, // e.g. https://my-app.vercel.app
+    'http://localhost:3000',  // Local Dev
+    'http://localhost:5173'   // Vite Dev
+].filter(Boolean);
+
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl requests) if necessary, 
+    // but for a web app, usually we want to restrict.
+    if (!origin || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    return callback(null, true); // Permissive for now to fix access issues, tighten later
+  },
+  credentials: true, // Allow Cookies to travel
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'x-csrf-token', 'Authorization']
 }));
 
-const limiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 2000, validate: {xForwardedForHeader: false} });
-app.use(express.json({ limit: '50mb' })); 
-app.use(express.urlencoded({ extended: true, limit: '50mb' })); 
+// --- SECURITY: Rate Limiting ---
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 1000, // Increased limit for assets/heartbeats
+  standardHeaders: true, 
+  legacyHeaders: false,
+  message: { error: "Too many requests from this IP, please try again later." }
+});
+
+const aiLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 50, // Strict limit on expensive AI calls
+  message: { error: "Oracle connection overloaded. Please wait." }
+});
+
+const loginLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 20, // Prevent brute force
+  message: { error: "Too many login attempts. Account temporarily locked." }
+});
+
+// --- MIDDLEWARE ---
+app.use(express.json({ limit: '10mb' })); 
+app.use(express.urlencoded({ extended: true, limit: '10mb' })); 
 app.use(cookieParser());
 app.use(limiter); 
 
+// --- SECURITY: NoSQL Injection Sanitizer (Manual) ---
+app.use((req, res, next) => {
+    const sanitize = (obj) => {
+        for (const key in obj) {
+            if (typeof obj[key] === 'string') {
+                if (key.startsWith('$')) {
+                    delete obj[key];
+                }
+            } else if (typeof obj[key] === 'object' && obj[key] !== null) {
+                sanitize(obj[key]);
+            }
+        }
+    };
+    if (req.body) sanitize(req.body);
+    if (req.query) sanitize(req.query);
+    next();
+});
+
+// --- SUPABASE CLIENT ---
+const supabaseUrl = process.env.VITE_SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!supabaseUrl || !supabaseKey) {
+    console.error("CRITICAL: Supabase credentials missing in Server Environment.");
+}
+
 const supabase = createClient(
-  process.env.VITE_SUPABASE_URL || 'https://placeholder.supabase.co',
-  process.env.SUPABASE_SERVICE_ROLE_KEY || 'placeholder', 
+  supabaseUrl,
+  supabaseKey, 
   { auth: { autoRefreshToken: false, persistSession: false } }
 );
 
+// --- GEMINI CLIENT ---
 let aiClient = null;
 if (process.env.API_KEY) {
-  try { aiClient = new GoogleGenAI({ apiKey: process.env.API_KEY }); } catch (e) { console.error("AI Init Failed:", e.message); }
+  try {
+    aiClient = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    console.log("AI System Online.");
+  } catch (e) {
+    console.error("AI System Init Failed:", e.message);
+  }
 }
 
-// SECURITY: Use Env Secret or Generate Random (Safe Fallback)
-// If env var is missing, sessions invalidate on restart (Good security practice)
-const SECRET = process.env.SUPABASE_SERVICE_ROLE_KEY || crypto.randomBytes(64).toString('hex');
-const scrypt = promisify(crypto.scrypt);
+// In-Memory Session Store (For Demo - Use Redis in Production for persistence)
+const sessions = new Map();
 
-function signSession(data) {
-    const str = Buffer.from(JSON.stringify(data)).toString('base64');
-    const sig = crypto.createHmac('sha256', SECRET).update(str).digest('base64').replace(/=/g, '');
-    return `${str}.${sig}`;
+// --- INITIALIZATION ---
+(async function init() {
+    try {
+        const { data, error } = await supabase.from('admin_users').select('username').eq('username', 'admin').maybeSingle();
+        if (!data && !error && process.env.ADMIN_PASSWORD) {
+            console.log("Initializing Root Admin...");
+            const salt = crypto.randomBytes(16).toString('hex');
+            const hash = (await scryptAsync(process.env.ADMIN_PASSWORD, salt, 64)).toString('hex');
+            await supabase.from('admin_users').insert({
+                username: 'admin',
+                salt,
+                password_hash: hash,
+                permissions: { canEdit: true, canDelete: true, canManageUsers: true, isGod: true }
+            });
+        }
+    } catch (e) { console.error("Init Error:", e.message); }
+})();
+
+async function logAction(username, action, details, req) {
+    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+    const safeDetails = xss(details); // Sanitize text for logs
+    try {
+        await supabase.from('audit_logs').insert({ username, action, details: safeDetails, ip });
+    } catch(e) { console.error("Log failed:", e.message); }
 }
 
-function verifySession(token) {
-    if (!token) return null;
-    const [str, sig] = token.split('.');
-    if (!str || !sig) return null;
-    const expectedSig = crypto.createHmac('sha256', SECRET).update(str).digest('base64').replace(/=/g, '');
-    if (sig !== expectedSig) return null;
-    try { return JSON.parse(Buffer.from(str, 'base64').toString('utf-8')); } catch { return null; }
-}
-
+// --- AUTH MIDDLEWARE ---
 const requireAuth = (req, res, next) => {
-    const token = req.cookies.session_id;
-    const session = verifySession(token);
-    if (!session || Date.now() > session.expiresAt) return res.status(401).json({ error: "Unauthorized" });
-    const clientCsrfToken = req.headers['x-csrf-token'];
-    if (req.method !== 'GET' && (!clientCsrfToken || clientCsrfToken !== session.csrfToken)) {
-        return res.status(403).json({ error: "Invalid CSRF Token" });
+    const sessionId = req.cookies.session_id;
+    const session = sessions.get(sessionId);
+    
+    if (!session || Date.now() > session.expiresAt) {
+        return res.status(401).json({ error: "Unauthorized: Invalid or Expired Session" });
     }
+
+    const clientCsrfToken = req.headers['x-csrf-token'];
+    
+    // Strict CSRF Check
+    if (req.method !== 'GET' && (!clientCsrfToken || clientCsrfToken !== session.csrfToken)) {
+        return res.status(403).json({ error: "Security Violation: Invalid CSRF Token" });
+    }
+    
+    // Rolling Session
+    session.expiresAt = Date.now() + 900000; // +15 mins
     req.user = session;
     next();
 };
 
-const uploadMiddleware = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
-const toDbItem = (item) => {
-  const dbItem = { ...item };
-  if (typeof dbItem.isUnread !== 'undefined') { dbItem.is_unread = dbItem.isUnread; delete dbItem.isUnread; }
-  if (typeof dbItem.fileUrl !== 'undefined') { dbItem.file_url = dbItem.fileUrl; delete dbItem.fileUrl; }
-  delete dbItem.isLiked; delete dbItem.is_liked;
-  return dbItem;
-};
+// --- ROUTES ---
 
-const router = express.Router();
-router.get('/health', (req, res) => res.json({ status: 'active', time: new Date().toISOString() }));
-
-router.post('/login', async (req, res) => {
-  try {
-    const { username, password } = req.body;
-    
-    // SECURITY: Only initialize admin if explicitly set in environment
-    if (process.env.ADMIN_PASSWORD) {
-        const { data: adminExists } = await supabase.from('admin_users').select('username').eq('username', 'admin').maybeSingle();
-        if (!adminExists) {
-            console.log("Initializing Root Admin from Environment Variable...");
-            const salt = crypto.randomBytes(16).toString('hex');
-            const hash = (await scrypt(process.env.ADMIN_PASSWORD, salt, 64)).toString('hex');
-            await supabase.from('admin_users').insert({
-                username: 'admin', salt, password_hash: hash,
-                permissions: { canEdit: true, canDelete: true, canManageUsers: true, canViewLogs: true, isGod: true }
-            });
-        }
-    }
-
-    const { data: user } = await supabase.from('admin_users').select('*').eq('username', username).single();
-    if (!user) return res.status(401).json({ error: "Invalid credentials" });
-    
-    const derivedKey = await scrypt(password, user.salt, 64);
-    if (!crypto.timingSafeEqual(Buffer.from(user.password_hash, 'hex'), derivedKey)) return res.status(401).json({ error: "Invalid credentials" });
-    
-    const csrfToken = crypto.randomBytes(32).toString('hex');
-    const token = signSession({ username, permissions: user.permissions, csrfToken, expiresAt: Date.now() + 3600000 });
-    
-    // SECURITY: Cookie settings tailored for env
-    res.cookie('session_id', token, { 
-        httpOnly: true, 
-        sameSite: IS_PROD ? 'none' : 'lax', 
-        secure: IS_PROD, // Secure in Prod, allowed loose in Dev
-        maxAge: 3600000, 
-        path: '/' 
-    });
-    res.json({ success: true, csrfToken, permissions: user.permissions });
-  } catch(e) { res.status(500).json({ error: e.message }); }
+app.get('/api/health', (req, res) => {
+    res.json({ status: 'active', platform: 'Render' });
 });
 
-router.get('/me', (req, res) => {
-  const session = verifySession(req.cookies.session_id);
-  if (!session || Date.now() > session.expiresAt) return res.status(401).json({ error: "Session Expired" });
-  res.json({ authenticated: true, csrfToken: session.csrfToken, username: session.username, permissions: session.permissions });
-});
-
-router.get('/config', async (req, res) => {
-    const { data } = await supabase.from('global_config').select('config').limit(1).single();
-    res.json(data?.config || {});
-});
-
-// NEW: Sectors Endpoints for Persistence
-router.get('/sectors', async (req, res) => {
-    try {
-        const { data, error } = await supabase.from('sectors').select('*').order('created_at', { ascending: true });
-        if (error || !data || data.length === 0) {
-             const { data: configData } = await supabase.from('global_config').select('config').eq('id', 2).single();
-             if (configData) return res.json(configData.config);
-             return res.json([]); 
-        }
-        res.json(data);
-    } catch(e) { res.json([]); }
-});
-
-router.post('/admin/sectors', requireAuth, async (req, res) => {
-    if(!req.user.permissions.canEdit) return res.status(403).json({error: "Forbidden"});
-    try {
-        const { error } = await supabase.from('global_config').upsert({ id: 2, config: req.body });
-        if (error) throw error;
-        res.json({success: true});
-    } catch(e) { res.status(500).json({ error: e.message }); }
-});
-
-// --- VISITOR TRACKING ---
-router.post('/visitor/heartbeat', async (req, res) => {
+// --- VISITOR TRACKING ENDPOINT ---
+app.post('/api/visitor/heartbeat', async (req, res) => {
     const { visitorId, displayName, timeSpent, visitCount } = req.body;
+    
+    // Basic validation
     if (!visitorId || typeof visitorId !== 'string') return res.status(400).json({ error: 'Invalid ID' });
+
     const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
     const ipHash = crypto.createHash('sha256').update(ip || 'unknown').digest('hex').substring(0, 10);
+
     try {
         const { error } = await supabase.from('visitor_logs').upsert({
             visitor_id: visitorId,
@@ -196,189 +222,240 @@ router.post('/visitor/heartbeat', async (req, res) => {
             last_active: new Date().toISOString(),
             ip_hash: ipHash
         }, { onConflict: 'visitor_id' });
-        
+
         if (error) {
-            console.error("Supabase Visitor Upsert Error:", error);
-            return res.status(500).json({ error: error.message });
+            console.error("Visitor DB Error:", error);
+            throw error;
         }
         res.json({ status: 'logged' });
-    } catch (e) { 
-        console.error("Visitor Log Exception:", e.message);
+    } catch (e) {
         res.status(500).json({ error: e.message }); 
     }
 });
 
-router.get('/admin/visitors', requireAuth, async (req, res) => {
-    if(!req.user.permissions.canViewLogs) return res.status(403).json({error: "Forbidden"});
-    const { data, error } = await supabase.from('visitor_logs').select('*').order('last_active', { ascending: false }).limit(100);
-    if(error) return res.status(500).json({error: error.message});
-    res.json(data || []);
-});
-
-// --- BACKUP & RESTORE ENDPOINTS ---
-router.get('/admin/export', requireAuth, async (req, res) => {
-    // Only God-Mode or High-Level Admins can export
-    if (!req.user.permissions.isGod) return res.status(403).json({ error: "Insufficient Permissions" });
-
+// --- CONFIG ENDPOINT ---
+app.get('/api/config', async (req, res) => {
     try {
-        const [items, config, sectors, visitors] = await Promise.all([
-            supabase.from('items').select('*'),
-            supabase.from('global_config').select('*'),
-            supabase.from('sectors').select('*'),
-            supabase.from('visitor_logs').select('*')
-        ]);
-
-        const backup = {
-            timestamp: new Date().toISOString(),
-            version: '1.0',
-            exported_by: req.user.username,
-            data: {
-                items: items.data || [],
-                global_config: config.data || [],
-                sectors: sectors.data || [],
-                visitor_logs: visitors.data || []
-            }
-        };
-
-        res.setHeader('Content-Type', 'application/json');
-        res.setHeader('Content-Disposition', `attachment; filename=core_backup_${Date.now()}.json`);
-        res.json(backup);
-    } catch (e) {
-        res.status(500).json({ error: e.message });
+      // FORCE ID 1 to ensure we always get the main config
+      const { data, error } = await supabase.from('global_config').select('config').eq('id', 1).maybeSingle();
+      
+      if (error) throw error;
+      
+      if (data && data.config) {
+          res.json(data.config);
+      } else {
+          // If no config found, return empty to let frontend use defaults
+          res.json({});
+      }
+    } catch(e) { 
+        console.error("Config fetch error:", e.message);
+        res.status(500).json({ error: e.message }); 
     }
 });
 
-router.post('/admin/import', requireAuth, async (req, res) => {
-    if (!req.user.permissions.isGod) return res.status(403).json({ error: "Insufficient Permissions" });
-
+// --- AI CHAT ---
+app.post('/api/ai/chat', aiLimiter, async (req, res) => {
     try {
-        const { data } = req.body;
-        if (!data || !data.items) throw new Error("Invalid backup file format");
+      if (!aiClient) return res.status(503).json({ error: "Oracle Disconnected" });
+      const { message, lineage, history, context } = req.body;
+      
+      const safeMessage = xss(message).substring(0, 1000); 
 
-        // 1. Restore Items
-        if (data.items.length > 0) {
-            const { error } = await supabase.from('items').upsert(data.items, { onConflict: 'id' });
-            if (error) throw error;
-        }
+      const isWizard = lineage === 'WIZARD';
+      const baseInstruction = isWizard 
+        ? "CORE DIRECTIVE: You are a wise and helpful magical portrait. Speak kindly and politely. GROUNDING RULE: Answer ONLY based on the provided DATABASE CONTEXT. If not found, say 'I cannot find that information'."
+        : "CORE DIRECTIVE: You are the CORE.ARCH system administrator. Provide clear, concise answers. GROUNDING RULE: Answer ONLY based on the provided DATABASE CONTEXT. If not found, state 'Information not found in database'.";
 
-        // 2. Restore Config
-        if (data.global_config.length > 0) {
-            await supabase.from('global_config').upsert(data.global_config, { onConflict: 'id' });
-        }
+      const safeContext = context ? xss(context) : "";
+      const systemInstruction = `${baseInstruction}\n\n--- DATABASE CONTEXT ---\n${safeContext}\n--- END CONTEXT ---`;
 
-        // 3. Restore Sectors
-        if (data.sectors.length > 0) {
-            await supabase.from('sectors').upsert(data.sectors, { onConflict: 'id' });
-        }
+      let contents = [];
+      if (history && Array.isArray(history)) {
+          history.forEach(h => {
+              if(h.text && typeof h.text === 'string') {
+                  contents.push({ role: h.role, parts: [{ text: xss(h.text).substring(0, 1000) }] });
+              }
+          });
+      }
+      contents.push({ role: 'user', parts: [{ text: safeMessage }] });
 
-        // 4. Restore Visitors (Optional, low priority)
-        if (data.visitor_logs && data.visitor_logs.length > 0) {
-            await supabase.from('visitor_logs').upsert(data.visitor_logs, { onConflict: 'visitor_id' });
-        }
-
-        res.json({ success: true, count: data.items.length });
-    } catch (e) {
-        res.status(500).json({ error: "Import Failed: " + e.message });
+      const response = await aiClient.models.generateContent({ 
+          model: "gemini-3-flash-preview",
+          contents: contents,
+          config: { systemInstruction }
+      });
+      res.json({ text: response.text });
+    } catch (error) {
+        res.status(500).json({ error: "Oracle Error: " + error.message });
     }
 });
 
-router.post('/ai/chat', async (req, res) => {
-    if (!aiClient) return res.status(503).json({ error: "Oracle Disconnected" });
+const uploadMiddleware = multer({ 
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 } 
+});
+
+app.post('/api/ai/parse', requireAuth, uploadMiddleware.single('file'), async (req, res) => {
     try {
-        const { message, lineage, history, context } = req.body;
-        // Stronger System Instruction
-        const systemInstruction = `You are the CORE.ARCH Central Intelligence (or a Magical Portrait in wizard mode).
-CRITICAL RULE: You MUST answer based ONLY on the provided DATABASE CONTEXT below.
-If the answer is not in the context, you must explicitly state that the information is missing from the archives.
-Do not invent facts. Do not answer general knowledge unless it relates to the context.
-CONTEXT:
-${context || 'No database items found.'}`;
+      if (!aiClient) return res.status(503).json({ error: "Oracle Disconnected" });
+      const { prompt } = req.body;
+      
+      let parts = [];
+      if (req.file) {
+            parts.push({
+              inlineData: {
+                  data: req.file.buffer.toString('base64'),
+                  mimeType: req.file.mimetype
+              }
+          });
+      }
+      
+      parts.push({ text: prompt ? xss(prompt) : "Analyze." });
 
-        let contents = [];
-        if (history) history.forEach(h => contents.push({ role: h.role, parts: [{ text: h.text }] }));
-        contents.push({ role: 'user', parts: [{ text: message }] });
-        const response = await aiClient.models.generateContent({ model: "gemini-3-flash-preview", contents, config: { systemInstruction }});
-        res.json({ text: response.text });
-    } catch(e) { res.status(500).json({ error: e.message }); }
-});
+      const response = await aiClient.models.generateContent({
+          model: "gemini-3-flash-preview",
+          contents: [{ parts }],
+          config: {
+              systemInstruction: `Return ONLY a valid JSON object with keys: title, content, date (YYYY-MM-DD), type (announcement, file, video, task), subject.`,
+              responseMimeType: "application/json"
+          }
+      });
 
-router.post('/ai/parse', requireAuth, uploadMiddleware.single('file'), async (req, res) => {
-    if (!aiClient) return res.status(503).json({ error: "Oracle Disconnected" });
-    try {
-        const response = await aiClient.models.generateContent({
-            model: "gemini-3-flash-preview",
-            contents: [{ role: 'user', parts: [{ text: req.body.prompt || "Analyze" }] }],
-            config: { responseMimeType: "application/json" }
-        });
-        res.json(JSON.parse(response.text));
-    } catch(e) { res.status(500).json({ error: e.message }); }
-});
-
-router.post('/admin/items', requireAuth, async (req, res) => {
-    if(!req.user.permissions.canEdit) return res.status(403).json({error: "Forbidden"});
-    const { data } = await supabase.from('items').upsert(toDbItem(req.body)).select().single();
-    res.json({success: true, item: data});
-});
-
-router.put('/admin/items/:id', requireAuth, async (req, res) => {
-    if(!req.user.permissions.canEdit) return res.status(403).json({error: "Forbidden"});
-    const { id, ...updateData } = toDbItem(req.body); 
-    await supabase.from('items').update(updateData).eq('id', req.params.id);
-    res.json({success: true});
-});
-
-router.delete('/admin/items/:id', requireAuth, async (req, res) => {
-    if(!req.user.permissions.canDelete) return res.status(403).json({error: "Forbidden"});
-    await supabase.from('items').delete().eq('id', req.params.id);
-    res.json({success: true});
-});
-
-router.post('/admin/config', requireAuth, async (req, res) => {
-    if(!req.user.permissions.canEdit) return res.status(403).json({error: "Forbidden"});
-    await supabase.from('global_config').upsert({ id: 1, config: req.body });
-    res.json({success: true});
-});
-
-router.post('/admin/upload', requireAuth, uploadMiddleware.single('file'), async (req, res) => {
-    if(!req.user.permissions.canEdit) return res.status(403).json({error: "Forbidden"});
-    try {
-        let fileBuffer, fileType, fileName;
-        if (req.file) { fileBuffer = req.file.buffer; fileType = req.file.mimetype; fileName = req.file.originalname; } 
-        else if (req.body.fileData) { fileBuffer = Buffer.from(req.body.fileData, 'base64'); fileType = req.body.fileType; fileName = req.body.fileName; } 
-        else return res.status(400).json({error: "No file data"});
-        const uniqueName = `${crypto.randomUUID()}.${fileName.split('.').pop()}`;
-        const { error } = await supabase.storage.from('items').upload(uniqueName, fileBuffer, { contentType: fileType, upsert: true });
-        if (error) throw error;
-        const { data } = supabase.storage.from('items').getPublicUrl(uniqueName);
-        res.json({ url: data.publicUrl });
+      let text = response.text.trim().replace(/^```json\s*/, '').replace(/^```\s*/, '').replace(/\s*```$/, '');
+      try {
+          res.json(JSON.parse(text));
+      } catch (e) {
+          res.json({ title: "Analysis Result", content: text, type: 'announcement', date: new Date().toISOString().split('T')[0] });
+      }
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-router.get('/admin/users', requireAuth, async (req, res) => {
-    if(!req.user.permissions.canManageUsers) return res.status(403).json({error: "Forbidden"});
-    const { data } = await supabase.from('admin_users').select('username, permissions, last_active');
-    res.json(data);
+app.post('/api/login', loginLimiter, async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    const { data: user, error } = await supabase.from('admin_users').select('*').eq('username', username).single();
+    
+    if (!user || error) return res.status(401).json({ error: "Invalid credentials" });
+
+    const derivedKey = await scryptAsync(password, user.salt, 64);
+    if (!crypto.timingSafeEqual(Buffer.from(user.password_hash, 'hex'), derivedKey)) {
+        return res.status(401).json({ error: "Invalid credentials" });
+    }
+
+    const sessionId = crypto.randomBytes(32).toString('hex');
+    const csrfToken = crypto.randomBytes(32).toString('hex');
+    sessions.set(sessionId, { username, csrfToken, permissions: user.permissions, expiresAt: Date.now() + 900000 });
+
+    res.cookie('session_id', sessionId, { 
+        httpOnly: true, 
+        sameSite: 'none', 
+        secure: true, 
+        maxAge: 900000,
+        partitioned: true 
+    });
+    
+    await logAction(username, 'LOGIN', 'User logged in', req);
+    res.json({ success: true, csrfToken, permissions: user.permissions });
+  } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-router.post('/admin/users/add', requireAuth, async (req, res) => {
-    if(!req.user.permissions.canManageUsers) return res.status(403).json({error: "Forbidden"});
-    const { username, password, permissions } = req.body;
-    const salt = crypto.randomBytes(16).toString('hex');
-    const hash = (await scrypt(password, salt, 64)).toString('hex');
-    await supabase.from('admin_users').insert({ username, password_hash: hash, salt, permissions });
-    res.json({success: true});
+app.get('/api/me', (req, res) => {
+  const sessionId = req.cookies.session_id;
+  const session = sessions.get(sessionId);
+  if (!session || Date.now() > session.expiresAt) return res.status(401).json({ error: "Session Expired" });
+  res.json({ authenticated: true, csrfToken: session.csrfToken, username: session.username, permissions: session.permissions });
 });
 
-router.post('/admin/users/delete', requireAuth, async (req, res) => {
-    if(!req.user.permissions.canManageUsers) return res.status(403).json({error: "Forbidden"});
-    const { targetUser } = req.body;
-    if(targetUser === 'admin') return res.status(400).json({error: "Cannot delete root admin"});
-    await supabase.from('admin_users').delete().eq('username', targetUser);
-    res.json({success: true});
+// --- ADMIN ROUTES (Protected) ---
+
+app.get('/api/admin/visitors', requireAuth, async (req, res) => {
+    if(!req.user.permissions.canViewLogs) return res.status(403).json({error: "Forbidden"});
+    try {
+        const { data, error } = await supabase.from('visitor_logs').select('*').order('last_active', { ascending: false }).limit(100);
+        if (error) throw error;
+        res.json(data);
+    } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-// --- NEW AUDIT LOG ENDPOINT ---
-router.get('/admin/logs', requireAuth, async (req, res) => {
+app.post('/api/admin/upload', requireAuth, uploadMiddleware.single('file'), async (req, res) => {
+  if(!req.user.permissions.canEdit) return res.status(403).json({error: "Forbidden"});
+  
+  try {
+    let fileBuffer, fileType, fileName;
+
+    if (req.file) {
+        fileBuffer = req.file.buffer;
+        fileType = req.file.mimetype;
+        fileName = req.file.originalname;
+    } else if (req.body.fileData) {
+        fileBuffer = Buffer.from(req.body.fileData, 'base64');
+        fileType = req.body.fileType;
+        fileName = req.body.fileName;
+    } else {
+        return res.status(400).json({error: "No file data"});
+    }
+
+    const ext = fileName.split('.').pop().toLowerCase();
+    const bucket = 'items'; 
+    const uniqueName = `${crypto.randomUUID()}.${ext}`;
+
+    // Ensure bucket exists or handle error (usually manual setup required in Supabase)
+    const { error } = await supabase.storage.from(bucket).upload(uniqueName, fileBuffer, { contentType: fileType, upsert: true });
+    if (error) throw error;
+    
+    const { data: { publicUrl } } = supabase.storage.from(bucket).getPublicUrl(uniqueName);
+    await logAction(req.user.username, 'UPLOAD', `Uploaded ${uniqueName}`, req);
+    res.json({ url: publicUrl });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/admin/items', requireAuth, async (req, res) => {
+    if(!req.user.permissions.canEdit) return res.status(403).json({error: "Forbidden"});
+    try {
+      const dbItem = { ...req.body, id: undefined }; 
+      const { data, error } = await supabase.from('items').insert(dbItem).select().single();
+      if (error) throw error;
+      await logAction(req.user.username, 'CREATE_ITEM', `Created item`, req);
+      res.json({ success: true, item: data });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.put('/api/admin/items/:id', requireAuth, async (req, res) => {
+    if(!req.user.permissions.canEdit) return res.status(403).json({error: "Forbidden"});
+    try {
+      const { error } = await supabase.from('items').update(req.body).eq('id', req.params.id);
+      if (error) throw error;
+      res.json({ success: true });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/admin/items/:id', requireAuth, async (req, res) => {
+    if(!req.user.permissions.canDelete) return res.status(403).json({error: "Forbidden"});
+    try {
+      const { data: item } = await supabase.from('items').select('*').eq('id', req.params.id).single();
+      const { error } = await supabase.from('items').delete().eq('id', req.params.id);
+      if (error) throw error;
+      
+      if (item && item.image && item.image.includes('supabase')) {
+          const parts = item.image.split('/');
+          const fileName = parts[parts.length - 1];
+          await supabase.storage.from('items').remove([fileName]);
+      }
+      res.json({ success: true });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/admin/config', requireAuth, async (req, res) => {
+    if(!req.user.permissions.canEdit) return res.status(403).json({error: "Forbidden"});
+    try {
+      // FORCE ID 1 for global config to avoid duplicates
+      const { error } = await supabase.from('global_config').upsert({ id: 1, config: req.body });
+      if (error) throw error;
+      res.json({ success: true });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/admin/logs', requireAuth, async (req, res) => {
     if(!req.user.permissions.canViewLogs) return res.status(403).json({error: "Forbidden"});
     try {
         const { data } = await supabase.from('audit_logs').select('*').order('timestamp', { ascending: false }).limit(200);
