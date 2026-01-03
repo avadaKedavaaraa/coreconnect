@@ -24,7 +24,30 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
 
   const safeUrl = isValidUrl(item.fileUrl) ? item.fileUrl! : "";
   const isVideo = item.type === 'video' || (safeUrl && safeUrl.match(/\.(mp4|webm|ogg|mov)$/i));
-  const isPdf = item.type === 'file' && (safeUrl && safeUrl.match(/\.pdf$/i));
+  
+  // Google Drive Logic
+  const isGoogleDrive = safeUrl.includes('drive.google.com');
+  const getDriveEmbed = (url: string) => {
+      let id = '';
+      const parts = url.split('/');
+      const dIndex = parts.indexOf('d');
+      
+      if (dIndex !== -1 && parts[dIndex + 1]) {
+          id = parts[dIndex + 1].split(/[?&]/)[0]; 
+      } else {
+          try {
+             const urlObj = new URL(url);
+             id = urlObj.searchParams.get('id') || '';
+          } catch(e) {}
+      }
+      return id ? `https://drive.google.com/file/d/${id}/preview` : url;
+  };
+
+  const isPdfOrDoc = (item.type === 'file' && (
+      (safeUrl && safeUrl.match(/\.pdf$/i)) || isGoogleDrive
+  ));
+
+  const embedUrl = isGoogleDrive ? getDriveEmbed(safeUrl) : safeUrl;
 
   // --- STYLING LOGIC ---
   const customStyle = item.style || {};
@@ -102,11 +125,16 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
             
             {/* If Media (File/Video) */}
             {isFile && safeUrl ? (
-                <div className="w-full h-full min-h-[300px] bg-black/50 flex flex-col items-center justify-center p-4">
+                <div className="w-full h-full min-h-[400px] bg-black/50 flex flex-col items-center justify-center p-4">
                     {isVideo ? (
                         <video src={safeUrl} controls className="max-w-full max-h-full rounded-lg shadow-2xl" />
-                    ) : isPdf ? (
-                        <iframe src={safeUrl} className="w-full h-full border-0 rounded-lg bg-white" title="PDF" />
+                    ) : isPdfOrDoc ? (
+                        <iframe 
+                            src={embedUrl} 
+                            className="w-full h-full border-0 rounded-lg bg-white shadow-2xl" 
+                            title="Document Viewer"
+                            allow="autoplay" 
+                        />
                     ) : (
                         <div className="text-center">
                             <a href={safeUrl} target="_blank" rel="noreferrer" className={`px-8 py-4 rounded-full font-bold flex items-center gap-2 transition-transform hover:scale-105 ${isWizard ? 'bg-emerald-600 text-black' : 'bg-fuchsia-600 text-black'}`}>

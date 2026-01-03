@@ -10,6 +10,7 @@ import { GoogleGenAI } from '@google/genai';
 import xss from 'xss';
 import { promisify } from 'util';
 import hpp from 'hpp';
+import helmet from 'helmet';
 import { fileURLToPath } from 'url';
 
 // Load env vars
@@ -22,6 +23,13 @@ const PORT = process.env.PORT || 3000;
 
 app.set('trust proxy', 1);
 app.disable('x-powered-by');
+
+// Security Headers (configured to allow external assets)
+app.use(helmet({
+  contentSecurityPolicy: false, // Disable CSP to allow Unsplash/Telegram images/scripts
+  crossOriginEmbedderPolicy: false,
+  crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
 
 app.use(hpp());
 
@@ -58,10 +66,9 @@ app.use((req, res, next) => {
 const supabaseUrl = process.env.VITE_SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
 
-// Mock client for build/deploy safety if keys are missing
 const mockSupabase = {
     from: () => ({
-        select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({data: null}), single: () => Promise.resolve({data: null}) }), limit: () => ({ maybeSingle: () => Promise.resolve({data: null}) }) }),
+        select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({data: null}), single: () => Promise.resolve({data: null}) }), limit: () => ({ maybeSingle: () => Promise.resolve({data: null}) }), order: () => ({ limit: () => ({ maybeSingle: () => Promise.resolve({data: null}) }) }) }),
         insert: () => Promise.resolve({ error: { message: "Database not configured" } }),
         upsert: () => Promise.resolve({ error: { message: "Database not configured" } }),
         update: () => ({ eq: () => Promise.resolve({ error: { message: "Database not configured" } }) }),
@@ -176,10 +183,10 @@ router.post('/visitor/heartbeat', async (req, res) => {
     }
 });
 
-// GET CONFIG: Get the *first* available row, do not assume ID 1
+// GET CONFIG: Get the lowest ID row
 router.get('/config', async (req, res) => {
     try {
-      const { data, error } = await supabase.from('global_config').select('config').limit(1).maybeSingle();
+      const { data, error } = await supabase.from('global_config').select('config').order('id', { ascending: true }).limit(1).maybeSingle();
       if (error) throw error;
       res.json(data?.config || {});
     } catch(e) { 
@@ -187,25 +194,18 @@ router.get('/config', async (req, res) => {
     }
 });
 
-// GET SECTORS: Get the *first* available row
+// GET SECTORS: Get the second lowest ID row, or fallback
 router.get('/sectors', async (req, res) => {
     try {
-      const { data, error } = await supabase.from('global_config').select('config').eq('id', 2).maybeSingle(); // Fallback for legacy
+      // Fetch the first 2 rows. Assume row 2 is sectors if it exists.
+      const { data, error } = await supabase.from('global_config').select('config').order('id', { ascending: true }).limit(2);
       
-      // If legacy ID 2 not found, try dynamic first row of sectors table (if separated) or config logic
-      // Assuming 'global_config' table stores both sectors and config, user schema might vary.
-      // Reverting to robust logic:
+      if (error) throw error;
       
-      // NOTE: In previous versions, sectors were stored in global_config with ID 2. 
-      // If that fails, we return empty list.
-      if (data) {
-          res.json(data.config || []);
+      if (data && data.length > 1) {
+          res.json(data[1].config || []);
       } else {
-          // Try fetching first row that ISNT the main config? 
-          // For simplicity, we stick to ID 2 for sectors if it exists, or just return empty.
-          // IF the DB auto-increments, we might need a better strategy, but usually ID 1=config, ID 2=sectors.
-          // Let's try to fetch by a type column if it existed, but we don't have one.
-          // Fallback: Return empty and let frontend use defaults.
+          // Fallback if only 1 row exists or table is empty
           res.json([]);
       }
     } catch(e) { 
@@ -363,54 +363,45 @@ router.delete('/admin/items/:id', requireAuth, async (req, res) => {
     } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-// Admin Config: Do not force ID 1. Update existing or insert new.
+// Admin Config: FIX for "cannot insert non-DEFAULT value into column id"
 router.post('/admin/config', requireAuth, async (req, res) => {
     if(!req.user.permissions.canEdit) return res.status(403).json({error: "Forbidden"});
     try {
-      // 1. Try to find ANY existing config row (since it's a singleton)
-      const { data: existing } = await supabase.from('global_config').select('id').limit(1).maybeSingle();
+      // 1. Fetch rows ordered by ID
+      const { data: rows } = await supabase.from('global_config').select('id').order('id', { ascending: true }).limit(1);
       
-      let error;
-      if (existing) {
-          // 2. Update found row
-          const result = await supabase.from('global_config').update({ config: req.body }).eq('id', existing.id);
-          error = result.error;
+      if (rows && rows.length > 0) {
+          // 2. Update the FIRST row found (assumed to be Config)
+          const { error } = await supabase.from('global_config').update({ config: req.body }).eq('id', rows[0].id);
+          if (error) throw error;
       } else {
-          // 3. Insert new row (Let DB handle ID)
-          const result = await supabase.from('global_config').insert({ config: req.body });
-          error = result.error;
+          // 3. Insert new row (Database generates ID automatically)
+          const { error } = await supabase.from('global_config').insert({ config: req.body });
+          if (error) throw error;
       }
 
-      if (error) throw error;
       res.json({ success: true });
     } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-// Admin Sectors: Do not force ID 2.
+// Admin Sectors: FIX for "cannot insert non-DEFAULT value into column id"
 router.post('/admin/sectors', requireAuth, async (req, res) => {
     if(!req.user.permissions.canEdit) return res.status(403).json({error: "Forbidden"});
     try {
-      // We need a way to distinguish sectors from main config if they share a table.
-      // Assuming user uses ID 2 for sectors based on old code.
-      // If auto-increment is on, we might have lost control of ID 2.
-      // STRATEGY: Try to update ID 2. If fail, insert.
+      // 1. Fetch rows ordered by ID
+      const { data: rows } = await supabase.from('global_config').select('id').order('id', { ascending: true }).limit(2);
       
-      const { data: existing } = await supabase.from('global_config').select('id').eq('id', 2).maybeSingle();
-      
-      let error;
-      if (existing) {
-          const result = await supabase.from('global_config').update({ config: req.body }).eq('id', 2);
-          error = result.error;
+      if (rows && rows.length > 1) {
+          // 2. Update the SECOND row found (assumed to be Sectors)
+          const { error } = await supabase.from('global_config').update({ config: req.body }).eq('id', rows[1].id);
+          if (error) throw error;
       } else {
-          // Try to force ID 2 on insert if possible, if not, this might fail or create ID 3+
-          // If generated always, we can't insert ID 2.
-          // Fallback: If we can't control ID, we can't reliably store sectors separately without a Type column.
-          // But we will try standard insert.
-          const result = await supabase.from('global_config').insert({ config: req.body }); // Might lose "ID 2" link
-          error = result.error;
+          // 3. Insert new row (Database generates ID automatically)
+          // Note: If only 1 row exists, this becomes the 2nd row (Sectors)
+          const { error } = await supabase.from('global_config').insert({ config: req.body });
+          if (error) throw error;
       }
 
-      if (error) throw error;
       res.json({ success: true });
     } catch(e) { res.status(500).json({ error: e.message }); }
 });
@@ -479,11 +470,11 @@ router.post('/admin/import', requireAuth, async (req, res) => {
         const { data } = req.body;
         if (data.items?.length) await supabase.from('items').upsert(data.items);
         if (data.global_config?.length) {
-             // For import, we might need to be careful with ID forcing again.
-             // If config has ID, strip it or use it depending on DB schema.
-             // Safest is to just iterate and insert contents without ID if possible, or upsert if IDs are UUIDs.
-             // For global_config, usually we just want the latest one.
-             await supabase.from('global_config').upsert(data.global_config);
+             // Basic import logic - does not force IDs to prevent errors
+             for (const cfg of data.global_config) {
+                 const { id, ...rest } = cfg; // Strip ID
+                 await supabase.from('global_config').insert(rest);
+             }
         }
         
         await logAction(req.user.username, 'IMPORT', 'Restored backup', req);
