@@ -41,20 +41,21 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'x-csrf-token', 'Authorization']
 }));
 
-// Increase payload limit for file uploads
+// Increase payload limit for file uploads (50mb)
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(cookieParser());
 
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, 
-  max: 3000, 
+  max: 5000, // Generous limit for admin usage
   standardHeaders: true,
   legacyHeaders: false,
 });
 // Apply rate limiting to API routes
 app.use('/api', limiter);
 
+// Sanitization Middleware
 app.use((req, res, next) => {
     const sanitize = (obj) => {
         for (const key in obj) {
@@ -176,90 +177,54 @@ const mapItemPayload = (body) => {
 
 const router = express.Router();
 
-// --- ROUTES ---
+// --- PUBLIC ROUTES ---
 
 router.get('/health', (req, res) => res.json({ status: 'active', db: isMock ? 'mock' : 'connected' }));
 
-// 1. ITEMS CRUD
-router.post('/admin/items', requireAuth, async (req, res) => {
-    if (!req.user.permissions.canEdit) return res.status(403).json({ error: "Forbidden" });
-    if (isMock) return res.status(500).json({ error: "Database not configured" });
-
-    try {
-        const payload = mapItemPayload(req.body);
-        // Supabase will generate ID if not provided, but we usually provide UUID from frontend
-        const { data, error } = await supabase.from('items').upsert(payload).select().single();
-        if (error) throw error;
-        await logAction(req.user.username, 'CREATE', `Created item ${data.title}`, req);
-        res.json({ success: true, item: data });
-    } catch (e) {
-        console.error("Create Error:", e);
-        res.status(500).json({ error: e.message });
-    }
-});
-
-router.put('/admin/items/:id', requireAuth, async (req, res) => {
-    if (!req.user.permissions.canEdit) return res.status(403).json({ error: "Forbidden" });
-    if (isMock) return res.status(500).json({ error: "Database not configured" });
-
-    try {
-        const payload = mapItemPayload(req.body);
-        delete payload.id; // Don't change PK
-        const { error } = await supabase.from('items').update(payload).eq('id', req.params.id);
-        if (error) throw error;
-        await logAction(req.user.username, 'UPDATE', `Updated item ${req.params.id}`, req);
-        res.json({ success: true });
-    } catch (e) {
-        res.status(500).json({ error: e.message });
-    }
-});
-
-router.delete('/admin/items/:id', requireAuth, async (req, res) => {
-    if (!req.user.permissions.canDelete) return res.status(403).json({ error: "Forbidden" });
-    if (isMock) return res.status(500).json({ error: "Database not configured" });
-
-    try {
-        const { error } = await supabase.from('items').delete().eq('id', req.params.id);
-        if (error) throw error;
-        await logAction(req.user.username, 'DELETE', `Deleted item ${req.params.id}`, req);
-        res.json({ success: true });
-    } catch (e) {
-        res.status(500).json({ error: e.message });
-    }
-});
-
-// 2. CONFIG & SECTORS
 router.get('/config', async (req, res) => {
     if (isMock) return res.json({});
-    const { data } = await supabase.from('global_config').select('config').eq('id', 1).maybeSingle();
-    res.json(data?.config || {});
+    try {
+        const { data, error } = await supabase.from('global_config').select('config').eq('id', 1).maybeSingle();
+        if (error) throw error;
+        res.json(data?.config || {});
+    } catch(e) {
+        console.error("Config Fetch Error:", e);
+        res.status(500).json({ error: e.message });
+    }
 });
 
 router.get('/sectors', async (req, res) => {
     if (isMock) return res.json([]);
-    const { data } = await supabase.from('global_config').select('config').eq('id', 2).maybeSingle();
-    res.json(data?.config || []);
+    try {
+        const { data, error } = await supabase.from('global_config').select('config').eq('id', 2).maybeSingle();
+        if(error) throw error;
+        res.json(data?.config || []);
+    } catch(e) {
+        console.error("Sector Fetch Error:", e);
+        res.status(500).json({ error: e.message });
+    }
 });
 
-router.post('/admin/config', requireAuth, async (req, res) => {
-    if (isMock) return res.status(500).json({ error: "DB Missing" });
+router.post('/visitor/heartbeat', async (req, res) => {
+    if (isMock) return res.json({ status: 'ignored' });
     try {
-        const { error } = await supabase.from('global_config').upsert({ id: 1, config: req.body });
-        if(error) throw error;
-        res.json({ success: true });
+        const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+        const ipHash = crypto.createHash('sha256').update(ip || 'unknown').digest('hex').substring(0, 10);
+        
+        const { error } = await supabase.from('visitor_logs').upsert({
+            visitor_id: req.body.visitorId,
+            display_name: xss(req.body.displayName || 'Guest'),
+            total_time_spent: req.body.timeSpent,
+            visit_count: req.body.visitCount,
+            last_active: new Date().toISOString(),
+            ip_hash: ipHash
+        }, { onConflict: 'visitor_id' });
+        
+        if (error) throw error;
+        res.json({ status: 'logged' });
     } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-router.post('/admin/sectors', requireAuth, async (req, res) => {
-    if (isMock) return res.status(500).json({ error: "DB Missing" });
-    try {
-        const { error } = await supabase.from('global_config').upsert({ id: 2, config: req.body });
-        if(error) throw error;
-        res.json({ success: true });
-    } catch(e) { res.status(500).json({ error: e.message }); }
-});
-
-// 3. LOGIN & AUTH
 router.post('/login', async (req, res) => {
     const { username, password } = req.body;
     
@@ -310,53 +275,8 @@ router.get('/me', (req, res) => {
     res.json({ authenticated: true, csrfToken: session.csrfToken, username: session.username, permissions: session.permissions });
 });
 
-// 4. STORAGE & LOGS
-const uploadMiddleware = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+// --- AI ENDPOINTS ---
 
-router.post('/admin/upload', requireAuth, uploadMiddleware.single('file'), async (req, res) => {
-    if (isMock) return res.status(500).json({ error: "DB Missing" });
-    try {
-        const file = req.file;
-        const ext = file.originalname.split('.').pop();
-        const path = `${crypto.randomUUID()}.${ext}`;
-        const { error } = await supabase.storage.from('items').upload(path, file.buffer, { contentType: file.mimetype, upsert: true });
-        if (error) throw error;
-        const { data } = supabase.storage.from('items').getPublicUrl(path);
-        res.json({ url: data.publicUrl });
-    } catch(e) { res.status(500).json({ error: e.message }); }
-});
-
-router.post('/visitor/heartbeat', async (req, res) => {
-    if (isMock) return res.json({ status: 'ignored' });
-    try {
-        const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-        const ipHash = crypto.createHash('sha256').update(ip || 'unknown').digest('hex').substring(0, 10);
-        
-        await supabase.from('visitor_logs').upsert({
-            visitor_id: req.body.visitorId,
-            display_name: xss(req.body.displayName || 'Guest'),
-            total_time_spent: req.body.timeSpent,
-            visit_count: req.body.visitCount,
-            last_active: new Date().toISOString(),
-            ip_hash: ipHash
-        }, { onConflict: 'visitor_id' });
-        res.json({ status: 'logged' });
-    } catch(e) { res.status(500).json({ error: e.message }); }
-});
-
-router.get('/admin/visitors', requireAuth, async (req, res) => {
-    if (isMock) return res.json([]);
-    const { data } = await supabase.from('visitor_logs').select('*').order('last_active', { ascending: false }).limit(100);
-    res.json(data || []);
-});
-
-router.get('/admin/logs', requireAuth, async (req, res) => {
-    if (isMock) return res.json([]);
-    const { data } = await supabase.from('audit_logs').select('*').order('timestamp', { ascending: false }).limit(100);
-    res.json(data || []);
-});
-
-// 5. AI
 router.post('/ai/chat', async (req, res) => {
     if (!aiClient) return res.status(503).json({ error: "AI Not Configured" });
     try {
@@ -377,6 +297,8 @@ router.post('/ai/chat', async (req, res) => {
     } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+const uploadMiddleware = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+
 router.post('/ai/parse', requireAuth, uploadMiddleware.single('file'), async (req, res) => {
     if (!aiClient) return res.status(503).json({ error: "AI Not Configured" });
     try {
@@ -393,7 +315,108 @@ router.post('/ai/parse', requireAuth, uploadMiddleware.single('file'), async (re
     } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-// Admin User Management
+// --- ADMIN ROUTES (Items) ---
+
+router.post('/admin/items', requireAuth, async (req, res) => {
+    if (!req.user.permissions.canEdit) return res.status(403).json({ error: "Forbidden" });
+    if (isMock) return res.status(500).json({ error: "Database not configured" });
+
+    try {
+        const payload = mapItemPayload(req.body);
+        // Supabase will generate ID if not provided, but we usually provide UUID from frontend
+        const { data, error } = await supabase.from('items').upsert(payload).select().single();
+        if (error) throw error;
+        await logAction(req.user.username, 'CREATE', `Created item ${data.title}`, req);
+        res.json({ success: true, item: data });
+    } catch (e) {
+        console.error("Create Error:", e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+router.put('/admin/items/:id', requireAuth, async (req, res) => {
+    if (!req.user.permissions.canEdit) return res.status(403).json({ error: "Forbidden" });
+    if (isMock) return res.status(500).json({ error: "Database not configured" });
+
+    try {
+        const payload = mapItemPayload(req.body);
+        delete payload.id; // Don't change PK
+        const { error } = await supabase.from('items').update(payload).eq('id', req.params.id);
+        if (error) throw error;
+        await logAction(req.user.username, 'UPDATE', `Updated item ${req.params.id}`, req);
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+router.delete('/admin/items/:id', requireAuth, async (req, res) => {
+    if (!req.user.permissions.canDelete) return res.status(403).json({ error: "Forbidden" });
+    if (isMock) return res.status(500).json({ error: "Database not configured" });
+
+    try {
+        const { error } = await supabase.from('items').delete().eq('id', req.params.id);
+        if (error) throw error;
+        await logAction(req.user.username, 'DELETE', `Deleted item ${req.params.id}`, req);
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// --- ADMIN ROUTES (Config) ---
+
+router.post('/admin/config', requireAuth, async (req, res) => {
+    if (isMock) return res.status(500).json({ error: "DB Missing" });
+    try {
+        const { error } = await supabase.from('global_config').upsert({ id: 1, config: req.body });
+        if(error) throw error;
+        await logAction(req.user.username, 'UPDATE_CONFIG', 'Updated global config', req);
+        res.json({ success: true });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+router.post('/admin/sectors', requireAuth, async (req, res) => {
+    if (isMock) return res.status(500).json({ error: "DB Missing" });
+    try {
+        const { error } = await supabase.from('global_config').upsert({ id: 2, config: req.body });
+        if(error) throw error;
+        await logAction(req.user.username, 'UPDATE_SECTORS', 'Updated sector config', req);
+        res.json({ success: true });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// --- ADMIN ROUTES (Storage) ---
+
+router.post('/admin/upload', requireAuth, uploadMiddleware.single('file'), async (req, res) => {
+    if (isMock) return res.status(500).json({ error: "DB Missing" });
+    try {
+        const file = req.file;
+        const ext = file.originalname.split('.').pop();
+        const path = `${crypto.randomUUID()}.${ext}`;
+        const { error } = await supabase.storage.from('items').upload(path, file.buffer, { contentType: file.mimetype, upsert: true });
+        if (error) throw error;
+        const { data } = supabase.storage.from('items').getPublicUrl(path);
+        res.json({ url: data.publicUrl });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// --- ADMIN ROUTES (Logs & Visitors) ---
+
+router.get('/admin/visitors', requireAuth, async (req, res) => {
+    if (isMock) return res.json([]);
+    const { data } = await supabase.from('visitor_logs').select('*').order('last_active', { ascending: false }).limit(100);
+    res.json(data || []);
+});
+
+router.get('/admin/logs', requireAuth, async (req, res) => {
+    if (isMock) return res.json([]);
+    const { data } = await supabase.from('audit_logs').select('*').order('timestamp', { ascending: false }).limit(100);
+    res.json(data || []);
+});
+
+// --- ADMIN ROUTES (User Management) ---
+
 router.get('/admin/users', requireAuth, async (req, res) => {
     if (isMock) return res.json([]);
     const { data } = await supabase.from('admin_users').select('username, permissions, last_active');
@@ -423,7 +446,8 @@ router.post('/admin/users/delete', requireAuth, async (req, res) => {
     } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-// Import/Export
+// --- IMPORT/EXPORT ROUTES ---
+
 router.get('/admin/export', requireAuth, async (req, res) => {
     if (isMock) return res.status(500).json({ error: "DB Missing" });
     try {
@@ -462,6 +486,7 @@ async function logAction(username, action, details, req) {
 app.use('/api', router);
 
 try {
+    // Only listen if running directly (standalone mode), NOT if imported by Vercel
     if (process.argv[1] === fileURLToPath(import.meta.url)) {
         app.listen(PORT, () => {
             console.log(`✅ CoreConnect Server running on port ${PORT}`);
