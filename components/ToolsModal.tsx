@@ -1,7 +1,7 @@
 
+
 import React, { useState, useEffect } from 'react';
-import { Lineage, type UserProfile, SECTORS } from '../types';
-import { GlobalConfig } from '../App';
+import { Lineage, type UserProfile, SECTORS, GlobalConfig } from '../types';
 import { X, Clock, ClipboardList, User, Palette, Save, Type, PaintBucket, LayoutTemplate, Plus, Link as LinkIcon, Eye, Sun, Moon, Accessibility, Activity, RotateCw } from 'lucide-react';
 import Pomodoro from './Pomodoro';
 import Kanban from './Kanban';

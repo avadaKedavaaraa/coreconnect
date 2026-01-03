@@ -1,8 +1,8 @@
 
+
 import React, { useState, useEffect } from 'react';
-import { Lineage, type UserProfile } from '../types';
+import { Lineage, type UserProfile, GlobalConfig } from '../types';
 import { ShieldCheck, RotateCw, BatteryMedium, BatteryFull, BatteryLow, Terminal, Sparkles, WifiOff, Zap, User, Accessibility, Send, Edit2, HelpCircle } from 'lucide-react';
-import { GlobalConfig } from '../App';
 
 interface HUDProps {
   lineage: Lineage;

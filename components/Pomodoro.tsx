@@ -1,6 +1,7 @@
+
+
 import React, { useState, useEffect, useRef } from 'react';
-import { Lineage } from '../types';
-import { GlobalConfig } from '../App';
+import { Lineage, GlobalConfig } from '../types';
 import { Play, Pause, RotateCcw, FlaskConical, Cpu, Timer, Check, Bell, BellOff, Volume2 } from 'lucide-react';
 
 interface PomodoroProps {

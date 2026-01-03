@@ -1,7 +1,7 @@
 
+
 import React, { useState, useEffect } from 'react';
-import { Lineage } from '../types';
-import { GlobalConfig } from '../App';
+import { Lineage, GlobalConfig } from '../types';
 import { Sparkles, Terminal, Wand2, Cpu, ArrowRight, User } from 'lucide-react';
 
 interface IdentityGateProps {

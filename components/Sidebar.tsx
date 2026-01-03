@@ -1,7 +1,7 @@
 
+
 import React from 'react';
-import { Lineage, Sector } from '../types';
-import { GlobalConfig } from '../App';
+import { Lineage, Sector, GlobalConfig } from '../types';
 // Explicitly import icons to avoid runtime errors with dynamic lookups
 import { 
   Settings2, CircleHelp,

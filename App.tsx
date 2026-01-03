@@ -1,11 +1,12 @@
 
+
 import React, { useState, useEffect, useMemo, Suspense, lazy, useRef } from 'react';
 import IdentityGate from './components/IdentityGate';
 import Sidebar from './components/Sidebar';
 import Carousel from './components/Carousel';
 import HUD from './components/HUD';
 import LiveBackground from './components/LiveBackground';
-import { Lineage, SECTORS, type CarouselItem, type UserProfile, type Sector, type AdminPermissions, type LectureRule } from './types';
+import { Lineage, SECTORS, type CarouselItem, type UserProfile, type Sector, type AdminPermissions, type LectureRule, GlobalConfig } from './types';
 import { Menu, Briefcase, Lock, LayoutList, Loader2, Info, ShieldAlert, Activity } from 'lucide-react';
 import { supabase } from './lib/supabase';
 
@@ -42,24 +43,6 @@ async function safeFetch(url: string, options: RequestInit = {}) {
     } catch (e) {
         return { ok: false, data: { error: "Network Error" }, status: 0 };
     }
-}
-
-export interface GlobalConfig {
-  wizardTitle: string;
-  muggleTitle: string;
-  wizardLogoText: string;
-  muggleLogoText: string;
-  wizardGateText: string;
-  muggleGateText: string;
-  wizardAlarmUrl: string;
-  muggleAlarmUrl: string;
-  wizardImage: string;
-  muggleImage: string;
-  wizardLogoUrl?: string; 
-  muggleLogoUrl?: string;
-  telegramLink?: string; 
-  schedules?: LectureRule[]; 
-  cursorStyle?: 'classic' | 'minimal' | 'blade' | 'enchanted';
 }
 
 const DEFAULT_CONFIG: GlobalConfig = {

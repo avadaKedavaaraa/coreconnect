@@ -1,4 +1,5 @@
 
+
 export enum Lineage {
   WIZARD = 'WIZARD',
   MUGGLE = 'MUGGLE'
@@ -103,6 +104,24 @@ export interface AuditLog {
   details: string;
   timestamp: string;
   ip: string;
+}
+
+export interface GlobalConfig {
+  wizardTitle: string;
+  muggleTitle: string;
+  wizardLogoText: string;
+  muggleLogoText: string;
+  wizardGateText: string;
+  muggleGateText: string;
+  wizardAlarmUrl: string;
+  muggleAlarmUrl: string;
+  wizardImage: string;
+  muggleImage: string;
+  wizardLogoUrl?: string; 
+  muggleLogoUrl?: string;
+  telegramLink?: string; 
+  schedules?: LectureRule[]; 
+  cursorStyle?: 'classic' | 'minimal' | 'blade' | 'enchanted';
 }
 
 export const SECTORS: Sector[] = [

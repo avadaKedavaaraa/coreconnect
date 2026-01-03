@@ -9,7 +9,6 @@ import { createClient } from '@supabase/supabase-js';
 import { GoogleGenAI } from '@google/genai';
 import xss from 'xss';
 import { promisify } from 'util';
-import helmet from 'helmet';
 import hpp from 'hpp';
 import { fileURLToPath } from 'url';
 
@@ -24,25 +23,17 @@ const PORT = process.env.PORT || 3000;
 app.set('trust proxy', 1);
 app.disable('x-powered-by');
 
-// Relaxed Helmet for Netlify
-app.use(helmet({
-  contentSecurityPolicy: false,
-  crossOriginResourcePolicy: { policy: "cross-origin" }
-}));
-
 app.use(hpp());
 
 // Permissive CORS to allow frontend access
 app.use(cors({
-  origin: true, // Allow all origins in this setup to prevent CORS 502s
+  origin: true, 
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'x-csrf-token', 'Authorization']
 }));
 
-// NOTE: Rate limiting removed for Serverless (Netlify) compatibility
-// In-memory rate limits don't work well in ephemeral lambda functions and can cause 502s.
-
+// Increase payload limit for images/files
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(cookieParser());
@@ -63,10 +54,11 @@ app.use((req, res, next) => {
     next();
 });
 
-// --- SUPABASE CLIENT (SAFE INIT) ---
+// --- SUPABASE CLIENT ---
 const supabaseUrl = process.env.VITE_SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
 
+// Mock client for build/deploy safety if keys are missing
 const mockSupabase = {
     from: () => ({
         select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({data: null}), single: () => Promise.resolve({data: null}) }) }),
@@ -102,12 +94,15 @@ if (process.env.API_KEY) {
 
 const sessions = new Map();
 
-// Initialize Admin (Lazy)
-const ensureAdmin = async () => {
+// --- LAZY INIT HELPERS ---
+// We do NOT run this at top level to prevent Serverless Timeout (502)
+const ensureAdminExists = async () => {
     if (!supabaseUrl || !supabaseKey) return;
     try {
-        const { data, error } = await supabase.from('admin_users').select('username').eq('username', 'admin').maybeSingle();
-        if (!data && !error) {
+        // Check if ANY admin exists to avoid lockout
+        const { data } = await supabase.from('admin_users').select('username').eq('username', 'admin').maybeSingle();
+        if (!data) {
+            console.log("Lazy-Initializing Root Admin...");
             const salt = crypto.randomBytes(16).toString('hex');
             const hash = (await scryptAsync(process.env.ADMIN_PASSWORD || 'admin123', salt, 64)).toString('hex');
             await supabase.from('admin_users').insert({
@@ -117,10 +112,10 @@ const ensureAdmin = async () => {
                 permissions: { canEdit: true, canDelete: true, canManageUsers: true, isGod: true }
             });
         }
-    } catch (e) { console.error("Admin Init Error:", e.message); }
+    } catch (e) {
+        console.error("Admin Ensure Error:", e.message);
+    }
 };
-// Run once, don't await to avoid blocking cold start
-ensureAdmin();
 
 async function logAction(username, action, details, req) {
     const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
@@ -153,6 +148,7 @@ const router = express.Router();
 // --- PUBLIC ROUTES ---
 
 router.get('/health', (req, res) => {
+    // Fast return to check if function is alive
     res.json({ status: 'active', timestamp: new Date() });
 });
 
@@ -174,13 +170,13 @@ router.post('/visitor/heartbeat', async (req, res) => {
         }, { onConflict: 'visitor_id' });
 
         if (error) {
-            console.error("Supabase Error:", error);
-            // Don't 500 on heartbeat failure, just warn
-            return res.json({ status: 'logged_warn' });
+            // Log but don't error out the client aggressively
+            console.error("Heartbeat Error:", error.message);
+            return res.status(200).json({ status: 'saved_local_only' });
         }
         res.json({ status: 'logged' });
     } catch (e) {
-        res.json({ status: 'logged_error' }); 
+        res.status(200).json({ status: 'error_ignored' }); 
     }
 });
 
@@ -259,11 +255,19 @@ router.post('/ai/parse', requireAuth, uploadMiddleware.single('file'), async (re
 router.post('/login', async (req, res) => {
   try {
     const { username, password } = req.body;
+
+    // LAZY INIT: Check if we need to create the admin user first
+    if (username === 'admin') {
+        await ensureAdminExists();
+    }
+
     const { data: user, error } = await supabase.from('admin_users').select('*').eq('username', username).single();
-    if (!user || error) return res.status(401).json({ error: "Invalid credentials" });
+    if (!user || error) return res.status(401).json({ error: "Invalid credentials (User not found)" });
 
     const derivedKey = await scryptAsync(password, user.salt, 64);
-    if (!crypto.timingSafeEqual(Buffer.from(user.password_hash, 'hex'), derivedKey)) return res.status(401).json({ error: "Invalid credentials" });
+    if (!crypto.timingSafeEqual(Buffer.from(user.password_hash, 'hex'), derivedKey)) {
+        return res.status(401).json({ error: "Invalid credentials (Bad password)" });
+    }
 
     const sessionId = crypto.randomBytes(32).toString('hex');
     const csrfToken = crypto.randomBytes(32).toString('hex');
@@ -272,7 +276,10 @@ router.post('/login', async (req, res) => {
     res.cookie('session_id', sessionId, { httpOnly: true, sameSite: 'none', secure: true, maxAge: 900000, partitioned: true });
     await logAction(username, 'LOGIN', 'User logged in', req);
     res.json({ success: true, csrfToken, permissions: user.permissions });
-  } catch(e) { res.status(500).json({ error: e.message }); }
+  } catch(e) { 
+      console.error("Login Error:", e);
+      res.status(500).json({ error: "Login System Error: " + e.message }); 
+  }
 });
 
 router.get('/me', (req, res) => {
@@ -439,16 +446,21 @@ app.use('/api', router);
 // Global Error Handler for Serverless
 app.use((err, req, res, next) => {
     console.error("Global API Error:", err);
-    res.status(500).json({ error: "Internal Server Error", message: err.message });
+    if (!res.headersSent) {
+        res.status(500).json({ error: "Internal Server Error", message: err.message });
+    }
 });
 
 // --- SERVER STARTUP (CONDITIONAL) ---
-// Only listen on port if running locally (not in Netlify Lambda)
-// This prevents 502 Bad Gateway / Timeouts on Netlify
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
-    app.listen(PORT, () => {
-        console.log(`✅ CoreConnect Standalone Server running on port ${PORT}`);
-    });
+// Only listen on port if executed directly via Node (Local Development)
+try {
+    if (process.argv[1] === fileURLToPath(import.meta.url)) {
+        app.listen(PORT, () => {
+            console.log(`✅ CoreConnect Standalone Server running on port ${PORT}`);
+        });
+    }
+} catch (e) {
+    // Ignore error if process.argv access fails in some restricted environments
 }
 
 export default app;

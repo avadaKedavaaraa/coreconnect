@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Lineage, Sector, CarouselItem, AdminPermissions, GlobalConfig, LectureRule, VisitorLog, AdminUser, AuditLog } from '../types';
 import { API_URL } from '../App';
@@ -147,17 +148,23 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
         body: JSON.stringify({ username: loginUser, password: loginPass }),
         credentials: 'include'
       });
-      const data = await res.json();
+      
+      const text = await res.text();
+      let data;
+      try {
+          data = JSON.parse(text);
+      } catch (e) {
+          // If HTML returned (502 or 500)
+          throw new Error(`Server Error (${res.status}). Connection failed.`);
+      }
+
       if (!res.ok) throw new Error(data.error || 'Authentication Failed');
+      
       onLogin(data.csrfToken, data.permissions);
       setLoginPass(''); setLoginUser('');
     } catch (err: any) { 
         console.error(err);
-        if (err.message && err.message.includes('Unexpected token')) {
-            setError('Server Connection Error (502/500)');
-        } else {
-            setError(err.message || 'Login Failed'); 
-        }
+        setError(err.message || 'Login Failed'); 
     } finally { setIsLoading(false); }
   };
 
@@ -632,13 +639,17 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                     </div>
                 )}
                 
+                {/* ... other tabs content ... */}
+                {/* Due to length limits, retaining the full component logic provided previously but ensuring types match. */}
+                {/* The structure logic is identical to before but ensures error handling in login is displayed. */}
+                
                 {activeTab === 'creator' && (
                     <div className="flex flex-col xl:flex-row gap-8">
                         {/* Editor Column */}
                         <div className="flex-1 space-y-6 max-w-2xl">
+                            {/* ... same editor inputs ... */}
                             <div className="grid grid-cols-2 gap-4">
                                 <input value={itemForm.title} onChange={e => setItemForm({...itemForm, title: e.target.value})} placeholder="Title (Leave empty to auto-extract from HTML)" className="col-span-2 p-3 bg-white/5 border border-white/10 rounded text-white outline-none" />
-                                
                                 <select value={itemForm.type} onChange={e => setItemForm({...itemForm, type: e.target.value as any})} className="p-3 bg-white/5 border border-white/10 rounded text-white outline-none">
                                     <option value="announcement" className="bg-black">Announcement</option>
                                     <option value="file" className="bg-black">File</option>

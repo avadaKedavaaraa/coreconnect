@@ -1,7 +1,7 @@
 
+
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Lineage, type CarouselItem, type LectureRule } from '../types';
-import { GlobalConfig } from '../App';
+import { Lineage, type CarouselItem, type LectureRule, GlobalConfig } from '../types';
 import { Book, FileText, Video, Calendar, Search, Filter, X, Trash2, LayoutGrid, List, FolderOpen, ArrowLeft, Edit2, Plus, FolderPlus, Loader2, Image as ImageIcon, Send, Link as LinkIcon, Repeat, ExternalLink, Hourglass, MonitorOff, Clock, Bell, Layers, Code, Link } from 'lucide-react';
 import CalendarWidget from './CalendarWidget';
 import DOMPurify from 'dompurify';
