@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Lineage, type CarouselItem } from '../types';
-import { X, FileText, ExternalLink, ScrollText, MessageCircle, Share2, CornerDownRight } from 'lucide-react';
+import { X, FileText, ExternalLink, MessageCircle, Share2, CornerDownRight } from 'lucide-react';
 import DOMPurify from 'dompurify';
 
 interface ItemViewerProps {
@@ -53,38 +53,46 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
   const cleanContent = DOMPurify.sanitize(item.content);
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-[fade-in_0.2s_ease-out]">
+    <div className="fixed inset-0 z-[120] flex items-center justify-center p-0 md:p-4 animate-[fade-in_0.2s_ease-out]">
       {/* Backdrop with heavy blur */}
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-xl" onClick={onClose}></div>
+      <div className="absolute inset-0 bg-black/80 backdrop-blur-xl" onClick={onClose}></div>
 
       {/* Main Container - Chat Bubble / Slate Aesthetic */}
-      <div className={`w-full max-w-4xl max-h-[90vh] flex flex-col rounded-3xl shadow-2xl overflow-hidden relative z-10 border transition-all
+      <div className={`w-full h-full md:h-[90vh] md:max-w-4xl flex flex-col md:rounded-3xl shadow-2xl overflow-hidden relative z-10 border-0 md:border transition-all
         ${isWizard 
-            ? 'bg-[#0f1510]/90 border-emerald-500/30 shadow-[0_0_50px_rgba(16,185,129,0.2)]' 
-            : 'bg-[#150f1a]/90 border-fuchsia-500/30 shadow-[0_0_50px_rgba(217,70,239,0.2)]'}
+            ? 'bg-[#0f1510] md:bg-[#0f1510]/95 border-emerald-500/30 shadow-[0_0_50px_rgba(16,185,129,0.2)]' 
+            : 'bg-[#150f1a] md:bg-[#150f1a]/95 border-fuchsia-500/30 shadow-[0_0_50px_rgba(217,70,239,0.2)]'}
       `}>
         
-        {/* Header Bar */}
-        <div className={`flex items-center justify-between p-6 border-b shrink-0 
-            ${isWizard ? 'border-emerald-900/50 bg-emerald-950/40' : 'border-fuchsia-900/50 bg-fuchsia-950/40'}
+        {/* Header Bar - Sticky & Safe Area Aware */}
+        <div className={`flex items-center justify-between p-4 md:p-6 border-b shrink-0 sticky top-0 z-50 pt-safe-top
+            ${isWizard ? 'border-emerald-900/50 bg-[#0f1510] md:bg-emerald-950/40' : 'border-fuchsia-900/50 bg-[#150f1a] md:bg-fuchsia-950/40'}
         `}>
             <div className="flex items-start gap-4">
-                <div className={`p-3 rounded-2xl shrink-0 shadow-lg ${isWizard ? 'bg-emerald-900 text-emerald-300' : 'bg-fuchsia-900 text-fuchsia-300'}`}>
-                    {isFile ? <FileText size={24} /> : <MessageCircle size={24} />}
+                <div className={`p-2 md:p-3 rounded-2xl shrink-0 shadow-lg ${isWizard ? 'bg-emerald-900 text-emerald-300' : 'bg-fuchsia-900 text-fuchsia-300'}`}>
+                    {isFile ? <FileText size={20} /> : <MessageCircle size={20} />}
                 </div>
-                <div className="min-w-0">
-                    <h3 className={`text-2xl font-bold leading-tight line-clamp-2 mb-1`} style={titleStyle}>
+                <div className="min-w-0 pr-8"> {/* Right padding prevents overlap with close button */}
+                    <h3 className={`text-lg md:text-2xl font-bold leading-tight line-clamp-2 mb-1`} style={titleStyle}>
                         {item.title}
                     </h3>
-                    <div className="flex items-center gap-2 text-xs opacity-60 uppercase tracking-widest font-mono">
+                    <div className="flex items-center gap-2 text-[10px] md:text-xs opacity-60 uppercase tracking-widest font-mono">
                         <span className={isWizard ? 'text-emerald-400' : 'text-fuchsia-400'}>{item.author || 'System'}</span>
                         <span>•</span>
                         <span>{item.date}</span>
                     </div>
                 </div>
             </div>
-            <button onClick={onClose} className={`p-2 rounded-full transition-all hover:rotate-90 ${isWizard ? 'text-emerald-500 hover:bg-emerald-900/50' : 'text-fuchsia-500 hover:bg-fuchsia-900/50'}`}>
-                <X size={28} />
+            
+            {/* Prominent Close Button */}
+            <button 
+                onClick={onClose} 
+                className={`absolute top-4 right-4 md:static p-2 rounded-full transition-all hover:scale-110 active:scale-95 shadow-lg
+                    ${isWizard ? 'bg-emerald-900/50 text-emerald-400 border border-emerald-500/50' : 'bg-fuchsia-900/50 text-fuchsia-400 border border-fuchsia-500/50'}
+                `}
+                title="Close"
+            >
+                <X size={24} />
             </button>
         </div>
 
@@ -93,7 +101,7 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
             
             {/* If Media (File/Video) */}
             {isFile && safeUrl ? (
-                <div className="w-full h-full min-h-[400px] bg-black/50 flex flex-col items-center justify-center p-4">
+                <div className="w-full h-full min-h-[300px] bg-black/50 flex flex-col items-center justify-center p-4">
                     {isVideo ? (
                         <video src={safeUrl} controls className="max-w-full max-h-full rounded-lg shadow-2xl" />
                     ) : isPdf ? (
@@ -108,7 +116,7 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                 </div>
             ) : (
                 /* Text Content - Stylized as a high-end message */
-                <div className="p-6 md:p-10 space-y-8">
+                <div className="p-6 md:p-10 space-y-8 pb-24">
                     {/* The Message Body */}
                     <div className="prose prose-invert max-w-none">
                         <div 

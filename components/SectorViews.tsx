@@ -359,10 +359,10 @@ const SectorView: React.FC<SectorViewProps> = ({
                     : 'bg-black/60 border-fuchsia-900/50 hover:border-fuchsia-500/50 shadow-[0_0_20px_rgba(217,70,239,0.05)]'}
                 `}
               >
-                {/* Background Image Logic */}
+                {/* Background Image Logic with Blur */}
                 {coverImage ? (
                     <>
-                        <div className="absolute inset-0 bg-cover bg-center blur-sm opacity-40 group-hover:opacity-60 transition-opacity duration-700 transform scale-110" style={{ backgroundImage: `url(${coverImage})` }}></div>
+                        <div className="absolute inset-0 bg-cover bg-center blur-md opacity-40 group-hover:opacity-60 transition-opacity duration-700 transform scale-110" style={{ backgroundImage: `url(${coverImage})` }}></div>
                         <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-black/30"></div>
                     </>
                 ) : (
@@ -424,6 +424,15 @@ const SectorView: React.FC<SectorViewProps> = ({
                                 ${isWizard ? 'border-emerald-500 text-emerald-100 placeholder:text-emerald-800' : 'border-fuchsia-500 text-fuchsia-100 placeholder:text-fuchsia-800'}
                             `}
                           />
+                          <input 
+                            type="text"
+                            value={newSubjectImage}
+                            onChange={(e) => setNewSubjectImage(e.target.value)}
+                            placeholder="Cover Image URL (Optional)..."
+                            className={`w-full bg-transparent border-b outline-none text-center text-[10px] mb-2 opacity-70
+                                ${isWizard ? 'border-emerald-800 text-emerald-200' : 'border-fuchsia-800 text-fuchsia-200'}
+                            `}
+                          />
                           <div className="flex gap-2">
                               <button 
                                 onClick={handleCreateSubject}
@@ -467,7 +476,13 @@ const SectorView: React.FC<SectorViewProps> = ({
              ) : (
                  <div className="text-center py-20 opacity-40">
                     <Search size={48} className="mx-auto mb-4" />
-                    <p>{isWizard ? "The archives yield nothing." : "No matching records found."}</p>
+                    {/* COMING SOON MESSAGE */}
+                    <div className={`text-2xl font-bold mb-2 ${isWizard ? 'font-wizardTitle text-emerald-300' : 'font-muggle text-fuchsia-300'}`}>
+                        COMING SOON!
+                    </div>
+                    <p className="text-sm opacity-60">
+                        {isWizard ? "The magic is still brewing..." : "Data stream compiling..."}
+                    </p>
                  </div>
              )
            ) : (

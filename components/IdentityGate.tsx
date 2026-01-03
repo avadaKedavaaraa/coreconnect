@@ -30,7 +30,7 @@ const IdentityGate: React.FC<IdentityGateProps> = ({ onSelect, config }) => {
     }
   }, []);
 
-  // Default fallbacks
+  // Use Config images directly. The parent component (App.tsx) fetches these globally.
   const wizardBg = config.wizardImage || 'https://images.unsplash.com/photo-1598153346810-860daa0d6cad?q=80&w=2070&auto=format&fit=crop';
   const muggleBg = config.muggleImage || 'https://images.unsplash.com/photo-1480714378408-67cf0d13bc1b?q=80&w=2070&auto=format&fit=crop';
 
@@ -94,7 +94,6 @@ const IdentityGate: React.FC<IdentityGateProps> = ({ onSelect, config }) => {
 
                 <form onSubmit={handleNameSubmit} className="space-y-6">
                     <div className="relative group">
-                        {/* FIX: text-base to prevent iOS Zoom */}
                         <input 
                             type="text" 
                             value={name}
@@ -137,10 +136,14 @@ const IdentityGate: React.FC<IdentityGateProps> = ({ onSelect, config }) => {
         `}
       >
         <div 
-            className="absolute inset-0 bg-cover bg-center transition-opacity duration-1000 mix-blend-overlay opacity-30 group-hover:opacity-50"
-            style={{ backgroundImage: `url('${wizardBg}')`, opacity: selected === Lineage.WIZARD ? 0.6 : undefined }}
+            className="absolute inset-0 bg-cover bg-center transition-all duration-1000"
+            style={{ 
+                backgroundImage: `url('${wizardBg}')`, 
+                opacity: selected === Lineage.WIZARD ? 1 : 0.6, // Ensure full visibility when selected
+                filter: selected === Lineage.WIZARD ? 'none' : 'brightness(0.5)'
+            }}
         ></div>
-        <div className="absolute inset-0 bg-gradient-to-b from-black via-black/20 to-black opacity-90"></div>
+        <div className={`absolute inset-0 bg-gradient-to-b from-black/80 via-black/40 to-black/80 transition-opacity duration-1000 ${selected === Lineage.WIZARD ? 'opacity-40' : 'opacity-80'}`}></div>
         
         <div className={`absolute inset-0 flex flex-col items-center justify-center p-8 text-center z-10 transition-all duration-1000 ${selected === Lineage.MUGGLE ? 'opacity-0 scale-90' : 'opacity-100 scale-100'}`}>
           <Wand2 className={`w-16 h-16 text-emerald-500 mb-6 animate-float ${selected === Lineage.WIZARD ? 'scale-150 mb-12' : ''} transition-all duration-1000 drop-shadow-[0_0_15px_rgba(16,185,129,0.8)]`} />
@@ -171,10 +174,14 @@ const IdentityGate: React.FC<IdentityGateProps> = ({ onSelect, config }) => {
         `}
       >
         <div 
-            className="absolute inset-0 bg-cover bg-center transition-opacity duration-1000 mix-blend-screen opacity-30 group-hover:opacity-50"
-            style={{ backgroundImage: `url('${muggleBg}')`, opacity: selected === Lineage.MUGGLE ? 0.6 : undefined }}
+            className="absolute inset-0 bg-cover bg-center transition-all duration-1000"
+            style={{ 
+                backgroundImage: `url('${muggleBg}')`, 
+                opacity: selected === Lineage.MUGGLE ? 1 : 0.6,
+                filter: selected === Lineage.MUGGLE ? 'none' : 'brightness(0.5)'
+            }}
         ></div>
-        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-black opacity-90"></div>
+        <div className={`absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/80 transition-opacity duration-1000 ${selected === Lineage.MUGGLE ? 'opacity-40' : 'opacity-80'}`}></div>
         
         <div className={`absolute inset-0 flex flex-col items-center justify-center p-8 text-center z-10 transition-all duration-1000 ${selected === Lineage.WIZARD ? 'opacity-0 scale-90' : 'opacity-100 scale-100'}`}>
           <Cpu className={`w-16 h-16 text-fuchsia-500 mb-6 animate-pulse ${selected === Lineage.MUGGLE ? 'scale-150 mb-12' : ''} transition-all duration-1000 drop-shadow-[0_0_15px_rgba(217,70,239,0.8)]`} />

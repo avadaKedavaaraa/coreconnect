@@ -1,7 +1,9 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Lineage, CarouselItem } from '../types';
 import { consultTheOracle } from '../services/geminiService';
 import { Send, Sparkles, Terminal, X, Minimize2, Maximize2, Loader2, Bot } from 'lucide-react';
+import DOMPurify from 'dompurify';
 
 interface OracleInterfaceProps {
   lineage: Lineage;
@@ -60,9 +62,6 @@ const OracleInterface: React.FC<OracleInterfaceProps> = ({ lineage, isOpen, onCl
     const history = messages.map(m => ({ role: m.role, text: m.text }));
     
     // Prepare Context from Items
-    // Providing "whole frontend data" as requested.
-    // Increased limit to 1000 items and optimized content string for density.
-    // The server is hardened to handle up to 500k characters of context.
     const context = items
         .slice(0, 1000) 
         .map(i => `[ID:${i.id}|SECTOR:${i.sector?.toUpperCase()}|TYPE:${i.type}|TITLE:${i.title}|DATE:${i.date}|CONTENT:${i.content.substring(0, 800).replace(/\n/g, ' ')}]`)
@@ -122,9 +121,14 @@ const OracleInterface: React.FC<OracleInterfaceProps> = ({ lineage, isOpen, onCl
                     <div className={`max-w-[85%] rounded-lg p-3 relative
                        ${msg.role === 'user' 
                           ? (isWizard ? 'bg-emerald-900/40 text-emerald-100 border border-emerald-500/30 rounded-tr-none' : 'bg-fuchsia-900/40 text-fuchsia-100 border border-fuchsia-500/30 rounded-tr-none') 
-                          : (isWizard ? 'bg-black/40 text-emerald-200 border-l-2 border-emerald-600 rounded-tl-none italic' : 'bg-black/40 text-fuchsia-300 font-mono border-l-2 border-fuchsia-600 rounded-tl-none')}
+                          : (isWizard ? 'bg-black/40 text-emerald-100 border-l-2 border-emerald-600 rounded-tl-none' : 'bg-black/40 text-fuchsia-100 font-mono border-l-2 border-fuchsia-600 rounded-tl-none')}
                     `}>
-                        <p className={`text-sm ${isWizard ? 'font-wizard' : 'font-muggle'}`}>{msg.text}</p>
+                        {/* Use system font for readability in chat body */}
+                        <div 
+                            className="text-sm font-sans leading-relaxed whitespace-pre-wrap"
+                            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(msg.text.replace(/\n/g, '<br>')) }}
+                        ></div>
+                        
                         {msg.role === 'model' && isWizard && <div className="absolute -left-2 -top-2 text-emerald-600 opacity-50"><Sparkles size={10}/></div>}
                     </div>
                 </div>

@@ -120,13 +120,14 @@ const HUD: React.FC<HUDProps> = ({ lineage, onToggleLineage, profile, onOpenOrac
              ${isWizard ? 'bg-emerald-900/20 border-emerald-500/40 hover:bg-emerald-900/40' : 'bg-fuchsia-900/20 border-fuchsia-900/40 hover:bg-fuchsia-900/40'}
           `}
           style={profile.themeColor ? { borderColor: `${profile.themeColor}60`, backgroundColor: `${profile.themeColor}20` } : {}}
+          title={isWizard ? "Consult the Oracle (AI Chat)" : "Access Command Interface (AI Chat)"}
         >
             {isWizard ? <Sparkles size={14} /> : <Terminal size={14} />}
             <span className="text-xs font-bold whitespace-nowrap">{isWizard ? "Ask Oracle" : "Sys_Cmd"}</span>
         </button>
       </div>
 
-      {/* Center: Reality Switcher */}
+      {/* Center: Reality Switcher (Hidden on Mobile) */}
       <div className="flex items-center hidden sm:flex">
         <button
           onClick={onToggleLineage}
@@ -135,7 +136,7 @@ const HUD: React.FC<HUDProps> = ({ lineage, onToggleLineage, profile, onOpenOrac
               ? 'bg-emerald-900/30 border-emerald-500/50 hover:bg-emerald-800/40 text-emerald-200' 
               : 'bg-fuchsia-900/30 border-fuchsia-500/50 hover:bg-fuchsia-800/40 text-fuchsia-200'}
           `}
-          title="Shift Reality"
+          title="Switch between Wizard and Muggle Reality"
         >
           <RotateCw size={14} className={isWizard ? 'animate-spin-slow' : ''} />
           <span className="text-[10px] font-bold tracking-widest uppercase hidden sm:block">
@@ -159,16 +160,16 @@ const HUD: React.FC<HUDProps> = ({ lineage, onToggleLineage, profile, onOpenOrac
             className={`p-2 rounded-full border transition-all hover:scale-110 active:scale-95 flex items-center justify-center relative group
                 ${isWizard ? 'bg-emerald-900/50 border-emerald-500 text-emerald-400' : 'bg-fuchsia-900/50 border-fuchsia-500 text-fuchsia-400'}
             `}
-            title={config?.telegramLink ? "Join Telegram Channel" : "Configure Telegram Link"}
+            title={config?.telegramLink ? "Join Official Telegram Channel" : "Configure Telegram Link (Admin Only)"}
         >
             <Send size={16} />
-            {!config?.telegramLink && (
-                <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full animate-ping"></div>
-            )}
+            {/* Always Blink Pulse for Visibility */}
+            <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full animate-ping"></div>
+            <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></div>
         </button>
 
         {/* Battery & Time (Visible on mobile now) */}
-        <div className="text-right leading-tight opacity-70">
+        <div className="text-right leading-tight opacity-70" title="System Status">
           <div className="text-[10px] font-bold flex items-center justify-end gap-1">
              {getBatteryIcon()} {battery ? `${Math.round(battery.level * 100)}%` : ''}
           </div>
@@ -184,7 +185,7 @@ const HUD: React.FC<HUDProps> = ({ lineage, onToggleLineage, profile, onOpenOrac
                 className={`w-8 h-8 rounded-full border flex items-center justify-center transition-all hover:scale-110 active:scale-95 overflow-hidden
                     ${isWizard ? 'bg-emerald-900/50 border-emerald-500' : 'bg-fuchsia-900/50 border-fuchsia-500'}
                 `}
-                title="User Profile"
+                title="User Profile & Settings"
             >
                 <User size={16} />
             </button>

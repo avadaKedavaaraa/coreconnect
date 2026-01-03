@@ -167,9 +167,13 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
           const res = await fetch(`${API_URL}/api/admin/visitors`, { headers: {'x-csrf-token': csrfToken}, credentials: 'include' });
           if(res.ok) {
               const data = await res.json();
-              setVisitors(Array.isArray(data) ? data : []);
+              if (Array.isArray(data)) {
+                  setVisitors(data);
+              } else {
+                  setVisitors([]);
+              }
           }
-      } catch(e) {}
+      } catch(e) { console.error("Visitor fetch failed", e); setVisitors([]); }
   };
 
   const fetchAuditLogs = async () => {

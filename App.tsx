@@ -6,7 +6,7 @@ import Carousel from './components/Carousel';
 import HUD from './components/HUD';
 import LiveBackground from './components/LiveBackground';
 import { Lineage, SECTORS, type CarouselItem, type UserProfile, type Sector, type AdminPermissions, type LectureRule } from './types';
-import { Menu, Briefcase, Lock, LayoutList, Loader2 } from 'lucide-react';
+import { Menu, Briefcase, Lock, LayoutList, Loader2, Info, ShieldAlert, Activity } from 'lucide-react';
 import { supabase } from './lib/supabase';
 
 const SectorView = lazy(() => import('./components/SectorViews'));
@@ -53,7 +53,7 @@ export interface GlobalConfig {
   muggleLogoUrl?: string;
   telegramLink?: string; 
   schedules?: LectureRule[]; 
-  cursorStyle?: 'classic' | 'minimal' | 'blade' | 'enchanted'; // New Cursor Config
+  cursorStyle?: 'classic' | 'minimal' | 'blade' | 'enchanted';
 }
 
 const DEFAULT_CONFIG: GlobalConfig = {
@@ -107,8 +107,9 @@ const App: React.FC = () => {
           totalTimeSpent: 0, 
           visitCount: 1, 
           lastActive: new Date().toISOString(),
-          brightness: 100, // Default
-          contrast: 100 // Default
+          brightness: 100,
+          contrast: 100,
+          themeColor: '#f43f5e' // Default Crimson Red
       };
   });
 
@@ -269,9 +270,9 @@ const App: React.FC = () => {
       }
   };
 
-  // Swipe Logic (Fixed for Scroll Jitter)
+  // Swipe Logic
   const touchStartX = useRef<number | null>(null);
-  const touchStartY = useRef<number | null>(null); // Add vertical tracker
+  const touchStartY = useRef<number | null>(null); 
 
   const handleTouchStart = (e: React.TouchEvent) => { 
       touchStartX.current = e.touches[0].clientX; 
@@ -281,13 +282,11 @@ const App: React.FC = () => {
   const handleTouchEnd = (e: React.TouchEvent) => {
       if (!touchStartX.current || !touchStartY.current) return;
       const target = e.target as HTMLElement;
-      // Ignore if on interactive elements
       if (target.closest('.no-swipe') || target.closest('.overflow-x-auto') || target.closest('.overflow-y-auto') || target.closest('input') || target.closest('textarea')) return;
       
       const diffX = touchStartX.current - e.changedTouches[0].clientX;
       const diffY = touchStartY.current - e.changedTouches[0].clientY;
 
-      // CRITICAL FIX: If vertical movement is larger than horizontal, assume scroll and ignore swipe
       if (Math.abs(diffY) > Math.abs(diffX)) {
            touchStartX.current = null;
            touchStartY.current = null;
@@ -310,6 +309,10 @@ const App: React.FC = () => {
       setLineage(l);
       setProfile(prev => ({ ...prev, displayName: name || prev.displayName, visitCount: prev.visitCount + 1 }));
       if (profile.defaultSector) setActiveSectorId(profile.defaultSector);
+  };
+
+  const toggleLineage = () => {
+      setLineage(prev => prev === Lineage.WIZARD ? Lineage.MUGGLE : Lineage.WIZARD);
   };
 
   const handleCreateItem = async (item: CarouselItem) => {
@@ -354,12 +357,9 @@ const App: React.FC = () => {
   const isWizard = lineage === Lineage.WIZARD;
   const activeSector = sectors.find(s => s.id === activeSectorId) || sectors[0];
   
-  // Determine Cursor Class
   const cursorStyle = globalConfig.cursorStyle || 'classic';
   const cursorClass = `cursor-${cursorStyle}-${isWizard ? 'wizard' : 'muggle'}`;
 
-  // Accessibility & Visual Filters
-  // We apply brightness and contrast globally to the app container
   const visualFilter = `brightness(${profile.brightness || 100}%) contrast(${profile.contrast || 100}%)`;
   const a11yClass = profile.highContrast ? 'contrast-125 brightness-110 saturate-150' : '';
 
@@ -372,7 +372,6 @@ const App: React.FC = () => {
     >
       <div className={`absolute inset-0 z-50 pointer-events-none ${isWizard ? 'parchment-grain' : 'crt-scanlines'}`}></div>
       
-      {/* New Live Background */}
       <LiveBackground lineage={lineage} />
 
       <Sidebar 
@@ -384,7 +383,7 @@ const App: React.FC = () => {
       <main className="flex-1 flex flex-col relative overflow-hidden z-10 transition-all lg:ml-20">
         <HUD 
             lineage={lineage} 
-            onToggleLineage={() => setLineage(prev => prev === Lineage.WIZARD ? Lineage.MUGGLE : Lineage.WIZARD)} 
+            onToggleLineage={toggleLineage} 
             profile={profile} 
             onOpenOracle={() => setOracleOpen(true)}
             onOpenTools={() => setToolsOpen(true)}
@@ -393,7 +392,7 @@ const App: React.FC = () => {
             onEditConfig={() => { setAdminInitialTab('config'); setAdminPanelOpen(true); }}
         />
 
-        <div className="flex-1 overflow-y-auto relative z-10 flex flex-col pb-24 md:pb-0">
+        <div className="flex-1 overflow-y-auto relative z-10 flex flex-col pb-24 md:pb-0 scroll-smooth">
           <div className="lg:hidden p-4">
             <button onClick={() => setSidebarOpen(true)} className={`p-2 rounded border ${isWizard ? 'border-emerald-500/30 text-emerald-400' : 'border-fuchsia-500/30 text-fuchsia-400'}`} style={profile.themeColor ? {borderColor: profile.themeColor, color: profile.themeColor} : {}}><Menu /></button>
           </div>
@@ -438,6 +437,36 @@ const App: React.FC = () => {
               </Suspense>
             )}
           </div>
+
+          {/* ABOUT WEBSITE SECTION */}
+          <div className={`mt-16 w-full max-w-5xl mx-auto p-8 border-t border-white/10 ${isWizard ? 'bg-emerald-950/20' : 'bg-fuchsia-950/20'}`}>
+              <div className="flex flex-col md:flex-row gap-8 items-start">
+                  <div className="flex-1">
+                      <h3 className={`text-2xl font-bold mb-4 flex items-center gap-2 ${isWizard ? 'text-emerald-300 font-wizardTitle' : 'text-fuchsia-300 font-muggle'}`}>
+                          <Info size={24}/> {isWizard ? "About the Archives" : "System Information"}
+                      </h3>
+                      <p className={`mb-4 text-sm leading-relaxed opacity-80 ${isWizard ? 'font-wizard' : 'font-muggle'}`}>
+                          Welcome to CoreConnect. This platform acts as a bridge between the mystical and the logical. Use the sidebar to navigate through various sectors including lectures, tasks, and resources. 
+                          The <strong>Oracle</strong> provides AI-assisted knowledge retrieval, while the <strong>Tools</strong> section offers productivity utilities like Pomodoro and Kanban.
+                      </p>
+                      <div className={`p-4 rounded-lg border border-dashed ${isWizard ? 'border-yellow-600/50 bg-yellow-900/10' : 'border-yellow-600/50 bg-yellow-900/10'}`}>
+                          <div className="flex items-center gap-2 text-yellow-500 font-bold mb-1 text-xs uppercase tracking-widest">
+                              <ShieldAlert size={14}/> Privacy Notice
+                          </div>
+                          <p className="text-xs text-yellow-200/70">
+                              Please be aware that administrative overseers have visibility into visitor logs, including timestamps and basic usage statistics, to ensure the security and integrity of the portal.
+                          </p>
+                      </div>
+                  </div>
+                  <div className={`flex-1 grid grid-cols-2 gap-4 text-xs opacity-70 ${isWizard ? 'font-wizard' : 'font-muggle'}`}>
+                      <div className="flex items-center gap-2"><Activity size={16}/> Real-time Updates</div>
+                      <div className="flex items-center gap-2"><Lock size={16}/> Secure Access</div>
+                      <div className="flex items-center gap-2"><LayoutList size={16}/> Course Management</div>
+                      <div className="flex items-center gap-2"><Briefcase size={16}/> Student Tools</div>
+                  </div>
+              </div>
+          </div>
+
         </div>
 
         <div className="absolute bottom-6 left-6 z-40">
@@ -445,7 +474,7 @@ const App: React.FC = () => {
         </div>
 
         <Suspense fallback={null}>
-            {toolsOpen && <ToolsModal lineage={lineage} onClose={() => setToolsOpen(false)} profile={profile} setProfile={setProfile} config={globalConfig} />}
+            {toolsOpen && <ToolsModal lineage={lineage} onClose={() => setToolsOpen(false)} profile={profile} setProfile={setProfile} config={globalConfig} onToggleLineage={toggleLineage} />}
             <CommandCenter lineage={lineage} isOpen={commandCenterOpen} onClose={() => setCommandCenterOpen(false)} onImportItems={(items) => items.forEach(i => handleCreateItem(i))} />
             <OracleInterface lineage={lineage} isOpen={oracleOpen} onClose={() => setOracleOpen(false)} items={allGameData} />
             <AdminPanel 

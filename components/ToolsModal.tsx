@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Lineage, type UserProfile, SECTORS } from '../types';
 import { GlobalConfig } from '../App';
-import { X, Clock, ClipboardList, User, Palette, Save, Type, PaintBucket, LayoutTemplate, Plus, Link as LinkIcon, Eye, Sun, Moon, Accessibility, Activity } from 'lucide-react';
+import { X, Clock, ClipboardList, User, Palette, Save, Type, PaintBucket, LayoutTemplate, Plus, Link as LinkIcon, Eye, Sun, Moon, Accessibility, Activity, RotateCw } from 'lucide-react';
 import Pomodoro from './Pomodoro';
 import Kanban from './Kanban';
 import StudentID from './StudentID';
@@ -13,9 +13,10 @@ interface ToolsModalProps {
   profile: UserProfile;
   setProfile: React.Dispatch<React.SetStateAction<UserProfile>>;
   config?: GlobalConfig;
+  onToggleLineage?: () => void;
 }
 
-const ToolsModal: React.FC<ToolsModalProps> = ({ lineage, onClose, profile, setProfile, config }) => {
+const ToolsModal: React.FC<ToolsModalProps> = ({ lineage, onClose, profile, setProfile, config, onToggleLineage }) => {
   const [activeTab, setActiveTab] = useState<'timer' | 'tasks' | 'profile'>('profile');
   const [showFontPanel, setShowFontPanel] = useState(false);
   const isWizard = lineage === Lineage.WIZARD;
@@ -116,7 +117,6 @@ const ToolsModal: React.FC<ToolsModalProps> = ({ lineage, onClose, profile, setP
               </div>
               
               <div className="p-4 flex gap-2 border-b border-white/10 bg-black/20">
-                  {/* Removed autoFocus to prevent scroll jumping on mobile */}
                   <input placeholder="Enter Custom Google Font Name (e.g. 'Roboto Slab')" className="flex-1 bg-black/40 border border-white/10 rounded px-3 py-2 text-white outline-none" id="custom-font-input" />
                   <button 
                     onClick={() => {
@@ -234,6 +234,21 @@ const ToolsModal: React.FC<ToolsModalProps> = ({ lineage, onClose, profile, setP
                    {/* Right: Customization Form */}
                    <div className={`flex-1 overflow-y-auto pr-2 space-y-6 ${isWizard ? 'scrollbar-wizard' : 'scrollbar-muggle'}`}>
                        
+                       {/* Lineage Toggle (Mobile Only feature moved here) */}
+                       {onToggleLineage && (
+                           <button 
+                             onClick={onToggleLineage}
+                             className={`w-full py-4 rounded-lg border font-bold flex items-center justify-center gap-3 transition-all
+                                ${isWizard 
+                                    ? 'bg-emerald-900/30 border-emerald-500 text-emerald-100' 
+                                    : 'bg-fuchsia-900/30 border-fuchsia-500 text-fuchsia-100'}
+                             `}
+                           >
+                               <RotateCw size={20} className={isWizard ? 'animate-spin-slow' : ''} />
+                               SWITCH REALITY ({isWizard ? 'Muggle' : 'Wizard'})
+                           </button>
+                       )}
+
                        {/* Display Name */}
                        <div className="space-y-2">
                            <label className="flex items-center gap-2 text-sm font-bold text-white">
