@@ -16,6 +16,7 @@ const CommandPalette = lazy(() => import('./components/CommandPalette'));
 const CommandCenter = lazy(() => import('./components/CommandCenter'));
 const AdminPanel = lazy(() => import('./components/AdminPanel'));
 const OracleInterface = lazy(() => import('./components/OracleInterface'));
+const SystemInfoView = lazy(() => import('./components/SystemInfoView'));
 
 const getEnvVar = (key: string) => {
   try { return (import.meta as any).env?.[key]; } catch { return undefined; }
@@ -141,6 +142,8 @@ const App: React.FC = () => {
                   timeSpent: profile.totalTimeSpent, 
                   visitCount: profile.visitCount 
               })
+          }).then(({ ok, status }) => {
+              if (!ok) console.warn("Visitor heartbeat failed", status);
           });
       }
   }, [profile]);
@@ -423,6 +426,11 @@ const App: React.FC = () => {
                      <LayoutList size={18} /> <span>{isWizard ? "Open Full Archives" : "View Database List"}</span>
                  </button>
               </div>
+            ) : activeSectorId === 'system_info' ? (
+                /* NEW SYSTEM INFO SECTOR */
+                <Suspense fallback={<LoadingSpinner lineage={lineage} color={profile.themeColor}/>}>
+                    <SystemInfoView lineage={lineage} isAdmin={isAdmin} />
+                </Suspense>
             ) : (
               <Suspense fallback={<LoadingSpinner lineage={lineage} color={profile.themeColor}/>}>
                   <SectorView 
@@ -436,35 +444,6 @@ const App: React.FC = () => {
                   />
               </Suspense>
             )}
-          </div>
-
-          {/* ABOUT WEBSITE SECTION */}
-          <div className={`mt-16 w-full max-w-5xl mx-auto p-8 border-t border-white/10 ${isWizard ? 'bg-emerald-950/20' : 'bg-fuchsia-950/20'}`}>
-              <div className="flex flex-col md:flex-row gap-8 items-start">
-                  <div className="flex-1">
-                      <h3 className={`text-2xl font-bold mb-4 flex items-center gap-2 ${isWizard ? 'text-emerald-300 font-wizardTitle' : 'text-fuchsia-300 font-muggle'}`}>
-                          <Info size={24}/> {isWizard ? "About the Archives" : "System Information"}
-                      </h3>
-                      <p className={`mb-4 text-sm leading-relaxed opacity-80 ${isWizard ? 'font-wizard' : 'font-muggle'}`}>
-                          Welcome to CoreConnect. This platform acts as a bridge between the mystical and the logical. Use the sidebar to navigate through various sectors including lectures, tasks, and resources. 
-                          The <strong>Oracle</strong> provides AI-assisted knowledge retrieval, while the <strong>Tools</strong> section offers productivity utilities like Pomodoro and Kanban.
-                      </p>
-                      <div className={`p-4 rounded-lg border border-dashed ${isWizard ? 'border-yellow-600/50 bg-yellow-900/10' : 'border-yellow-600/50 bg-yellow-900/10'}`}>
-                          <div className="flex items-center gap-2 text-yellow-500 font-bold mb-1 text-xs uppercase tracking-widest">
-                              <ShieldAlert size={14}/> Privacy Notice
-                          </div>
-                          <p className="text-xs text-yellow-200/70">
-                              Please be aware that administrative overseers have visibility into visitor logs, including timestamps and basic usage statistics, to ensure the security and integrity of the portal.
-                          </p>
-                      </div>
-                  </div>
-                  <div className={`flex-1 grid grid-cols-2 gap-4 text-xs opacity-70 ${isWizard ? 'font-wizard' : 'font-muggle'}`}>
-                      <div className="flex items-center gap-2"><Activity size={16}/> Real-time Updates</div>
-                      <div className="flex items-center gap-2"><Lock size={16}/> Secure Access</div>
-                      <div className="flex items-center gap-2"><LayoutList size={16}/> Course Management</div>
-                      <div className="flex items-center gap-2"><Briefcase size={16}/> Student Tools</div>
-                  </div>
-              </div>
           </div>
 
         </div>

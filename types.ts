@@ -153,5 +153,13 @@ export const SECTORS: Sector[] = [
     wizardIcon: 'ScrollText',
     muggleIcon: 'ClipboardList',
     description: 'Assessments and practical evaluations.'
+  },
+  {
+    id: 'system_info',
+    wizardName: 'Ministry Archives',
+    muggleName: 'System Protocols',
+    wizardIcon: 'CircleHelp',
+    muggleIcon: 'Settings2',
+    description: 'Operational status and documentation.'
   }
 ];

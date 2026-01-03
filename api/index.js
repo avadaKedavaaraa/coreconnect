@@ -164,7 +164,7 @@ router.post('/visitor/heartbeat', async (req, res) => {
     const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
     const ipHash = crypto.createHash('sha256').update(ip || 'unknown').digest('hex').substring(0, 10);
     try {
-        await supabase.from('visitor_logs').upsert({
+        const { error } = await supabase.from('visitor_logs').upsert({
             visitor_id: visitorId,
             display_name: xss(displayName || 'Guest'),
             total_time_spent: Number(timeSpent) || 0,
@@ -172,13 +172,22 @@ router.post('/visitor/heartbeat', async (req, res) => {
             last_active: new Date().toISOString(),
             ip_hash: ipHash
         }, { onConflict: 'visitor_id' });
+        
+        if (error) {
+            console.error("Supabase Visitor Upsert Error:", error);
+            return res.status(500).json({ error: error.message });
+        }
         res.json({ status: 'logged' });
-    } catch (e) { res.status(200).json({ status: 'ignored' }); }
+    } catch (e) { 
+        console.error("Visitor Log Exception:", e.message);
+        res.status(500).json({ error: e.message }); 
+    }
 });
 
 router.get('/admin/visitors', requireAuth, async (req, res) => {
     if(!req.user.permissions.canViewLogs) return res.status(403).json({error: "Forbidden"});
-    const { data } = await supabase.from('visitor_logs').select('*').order('last_active', { ascending: false }).limit(100);
+    const { data, error } = await supabase.from('visitor_logs').select('*').order('last_active', { ascending: false }).limit(100);
+    if(error) return res.status(500).json({error: error.message});
     res.json(data || []);
 });
 
