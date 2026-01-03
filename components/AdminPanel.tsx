@@ -282,14 +282,32 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
       setEditingItemId(item.id); setIsEditingItem(true); setActiveTab('creator'); 
   };
 
+  const extractTitleFromHtml = (html: string) => {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+      const hTag = doc.querySelector('h1, h2, h3');
+      if (hTag && hTag.textContent) return hTag.textContent;
+      // Fallback to text content
+      const text = doc.body.textContent || '';
+      return text.substring(0, 50) + (text.length > 50 ? '...' : '');
+  };
+
   const handleSaveItem = () => {
       if (!permissions?.canEdit) return alert("Permission denied");
       const formattedDate = itemForm.date.replace(/-/g, '.');
       const newItemId = crypto.randomUUID ? crypto.randomUUID() : `item-${Date.now()}`;
       
+      // AUTO EXTRACT TITLE IF EMPTY
+      let titleToSave = itemForm.title;
+      if (!titleToSave.trim() && itemForm.content) {
+          titleToSave = extractTitleFromHtml(itemForm.content);
+      }
+      
       const payload: CarouselItem = {
           id: isEditingItem && editingItemId ? editingItemId : newItemId, 
-          title: itemForm.title, content: itemForm.content, date: formattedDate, type: itemForm.type as any,
+          title: titleToSave, 
+          content: itemForm.content, 
+          date: formattedDate, type: itemForm.type as any,
           subject: itemForm.subject, image: itemForm.image, fileUrl: itemForm.fileUrl,
           author: itemForm.author || currentUser, likes: Number(itemForm.likes), isUnread: Boolean(itemForm.isUnread),
           isLiked: false, sector: itemForm.sector,
@@ -314,7 +332,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   };
 
   // --- OTHER HANDLERS ---
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, field: 'image' | 'fileUrl') => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, field: 'image' | 'fileUrl' | 'wizardLogoUrl' | 'muggleLogoUrl') => {
     const file = e.target.files?.[0];
     if (!file || file.size > 10 * 1024 * 1024) return alert("File too large (>10MB)");
     setIsUploading(true);
@@ -328,8 +346,13 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                 credentials: 'include'
             });
             const data = await res.json();
-            if (res.ok && data.url) setItemForm(prev => ({ ...prev, [field]: data.url }));
-            else alert("Upload failed");
+            if (res.ok && data.url) {
+                if (field === 'wizardLogoUrl' || field === 'muggleLogoUrl') {
+                    setEditedConfig(prev => ({ ...prev, [field]: data.url }));
+                } else {
+                    setItemForm(prev => ({ ...prev, [field]: data.url }));
+                }
+            } else alert("Upload failed");
         } catch (e) { alert("Network Error"); } finally { setIsUploading(false); }
     };
   };
@@ -750,7 +773,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                         {/* Editor Column */}
                         <div className="flex-1 space-y-6 max-w-2xl">
                             <div className="grid grid-cols-2 gap-4">
-                                <input value={itemForm.title} onChange={e => setItemForm({...itemForm, title: e.target.value})} placeholder="Title" className="col-span-2 p-3 bg-white/5 border border-white/10 rounded text-white outline-none" />
+                                <input value={itemForm.title} onChange={e => setItemForm({...itemForm, title: e.target.value})} placeholder="Title (Leave empty to auto-extract from HTML)" className="col-span-2 p-3 bg-white/5 border border-white/10 rounded text-white outline-none" />
                                 <select value={itemForm.type} onChange={e => setItemForm({...itemForm, type: e.target.value as any})} className="p-3 bg-white/5 border border-white/10 rounded text-white outline-none">
                                     <option value="announcement" className="bg-black">Announcement</option>
                                     <option value="file" className="bg-black">File</option>
@@ -774,9 +797,12 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                             <button key={tag} onClick={() => insertTag(tag)} className="px-3 py-1 bg-black/40 rounded text-xs font-mono hover:bg-black/60">&lt;{tag}&gt;</button>
                                         ))}
                                     </div>
-                                    <span className="text-[10px] uppercase opacity-50 bg-white/10 px-2 py-1 rounded">HTML Supported</span>
+                                    <span className="text-[10px] uppercase opacity-50 bg-white/10 px-2 py-1 rounded">HTML + CSS Supported</span>
                                 </div>
-                                <textarea ref={contentRef} value={itemForm.content} onChange={e => setItemForm({...itemForm, content: e.target.value})} placeholder="Content..." className="w-full h-64 bg-transparent outline-none text-sm font-mono text-zinc-300 resize-none"/>
+                                <textarea ref={contentRef} value={itemForm.content} onChange={e => setItemForm({...itemForm, content: e.target.value})} placeholder="Content... Use <style> for custom CSS (scoped automatically)" className="w-full h-64 bg-transparent outline-none text-sm font-mono text-zinc-300 resize-none"/>
+                                <div className="text-[10px] text-yellow-500/60 mt-2 flex items-center gap-1">
+                                    <AlertTriangle size={10} /> CSS is supported via &lt;style&gt; tags. Please avoid global selectors (like 'body') to prevent layout breakage.
+                                </div>
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -836,12 +862,12 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                         className="text-3xl font-bold leading-tight mb-4 drop-shadow-md"
                                         style={previewTitleStyle}
                                     >
-                                        {itemForm.title || "Untitled Item"}
+                                        {itemForm.title || "Untitled Item (Auto-extracted if empty)"}
                                     </h2>
                                     <div 
                                         className="text-sm font-sans leading-relaxed"
                                         style={{ color: itemForm.contentColor }}
-                                        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(itemForm.content || "Content preview...") }}
+                                        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(itemForm.content || "Content preview...", { ADD_TAGS: ['style'] }) }}
                                     ></div>
                                 </div>
                             </div>
@@ -1118,6 +1144,29 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                     <input value={editedConfig.telegramLink || ''} onChange={e => setEditedConfig({...editedConfig, telegramLink: e.target.value})} placeholder="https://t.me/..." className="w-full p-2 bg-black border border-white/10 rounded" />
                                 </div>
                             </div>
+                        </div>
+
+                        {/* NEW LOGO UPLOAD SECTION */}
+                        <div className="p-6 border border-white/10 rounded bg-white/5 space-y-4">
+                            <h3 className="font-bold flex items-center gap-2"><FileUp size={18}/> Custom Logos</h3>
+                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label className="text-xs opacity-50 mb-1 block">Wizard Mode Logo</label>
+                                    <div className="flex gap-2">
+                                        <input value={editedConfig.wizardLogoUrl || ''} onChange={e => setEditedConfig({...editedConfig, wizardLogoUrl: e.target.value})} placeholder="URL..." className="flex-1 p-2 bg-black border border-white/10 rounded" />
+                                        <label className="p-2 bg-white/10 rounded cursor-pointer hover:bg-white/20"><Upload size={14}/><input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'wizardLogoUrl')}/></label>
+                                    </div>
+                                    {editedConfig.wizardLogoUrl && <img src={editedConfig.wizardLogoUrl} alt="Preview" className="h-10 mt-2 object-contain" />}
+                                </div>
+                                <div>
+                                    <label className="text-xs opacity-50 mb-1 block">Muggle Mode Logo</label>
+                                    <div className="flex gap-2">
+                                        <input value={editedConfig.muggleLogoUrl || ''} onChange={e => setEditedConfig({...editedConfig, muggleLogoUrl: e.target.value})} placeholder="URL..." className="flex-1 p-2 bg-black border border-white/10 rounded" />
+                                        <label className="p-2 bg-white/10 rounded cursor-pointer hover:bg-white/20"><Upload size={14}/><input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'muggleLogoUrl')}/></label>
+                                    </div>
+                                    {editedConfig.muggleLogoUrl && <img src={editedConfig.muggleLogoUrl} alt="Preview" className="h-10 mt-2 object-contain" />}
+                                </div>
+                             </div>
                         </div>
 
                         <div className="p-6 border border-white/10 rounded bg-white/5 space-y-4">

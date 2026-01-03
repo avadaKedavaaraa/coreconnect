@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Lineage, type UserProfile } from '../types';
-import { ShieldCheck, RotateCw, BatteryMedium, BatteryFull, BatteryLow, Terminal, Sparkles, WifiOff, Zap, User, Accessibility, Send, Edit2 } from 'lucide-react';
+import { ShieldCheck, RotateCw, BatteryMedium, BatteryFull, BatteryLow, Terminal, Sparkles, WifiOff, Zap, User, Accessibility, Send, Edit2, HelpCircle } from 'lucide-react';
 import { GlobalConfig } from '../App';
 
 interface HUDProps {
@@ -13,6 +13,7 @@ interface HUDProps {
   isOffline?: boolean;
   config?: GlobalConfig;
   onEditConfig?: () => void; // Shortcut to open config
+  onNavigate?: (sectorId: string) => void;
 }
 
 // Battery API Types (non-standard)
@@ -25,7 +26,7 @@ interface BatteryManager extends EventTarget {
   removeEventListener(type: string, listener: EventListenerOrEventListenerObject | null, options?: boolean | EventListenerOptions): void;
 }
 
-const HUD: React.FC<HUDProps> = ({ lineage, onToggleLineage, profile, onOpenOracle, onOpenTools, isOffline, config, onEditConfig }) => {
+const HUD: React.FC<HUDProps> = ({ lineage, onToggleLineage, profile, onOpenOracle, onOpenTools, isOffline, config, onEditConfig, onNavigate }) => {
   const [time, setTime] = useState(new Date());
   const [battery, setBattery] = useState<{level: number, charging: boolean} | null>(null);
 
@@ -125,6 +126,22 @@ const HUD: React.FC<HUDProps> = ({ lineage, onToggleLineage, profile, onOpenOrac
             {isWizard ? <Sparkles size={14} /> : <Terminal size={14} />}
             <span className="text-xs font-bold whitespace-nowrap">{isWizard ? "Ask Oracle" : "Sys_Cmd"}</span>
         </button>
+
+        {/* HELP / SYSTEM INFO TRIGGER - GLOWING */}
+        <button
+          onClick={() => onNavigate && onNavigate('system_info')}
+          className={`relative flex items-center justify-center p-1.5 rounded-full border transition-all hover:scale-110 active:scale-95 group
+            ${isWizard ? 'border-yellow-500/50 bg-yellow-900/20 text-yellow-300' : 'border-cyan-500/50 bg-cyan-900/20 text-cyan-300'}
+          `}
+          title="System Protocols / Help"
+        >
+          {/* Intense constant glow effect */}
+          <div className={`absolute inset-0 rounded-full blur-[8px] opacity-60 animate-pulse 
+             ${isWizard ? 'bg-yellow-500' : 'bg-cyan-500'}
+          `}></div>
+          <HelpCircle size={16} className="relative z-10" />
+        </button>
+
       </div>
 
       {/* Center: Reality Switcher (Hidden on Mobile) */}

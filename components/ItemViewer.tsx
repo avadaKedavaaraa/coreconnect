@@ -50,7 +50,8 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
       fontSize: '1rem'
   };
 
-  const cleanContent = DOMPurify.sanitize(item.content);
+  // ALLOW STYLE TAGS for custom CSS support
+  const cleanContent = DOMPurify.sanitize(item.content, { ADD_TAGS: ['style'] });
 
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center p-0 md:p-4 animate-[fade-in_0.2s_ease-out]">

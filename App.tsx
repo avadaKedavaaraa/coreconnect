@@ -393,6 +393,7 @@ const App: React.FC = () => {
             isOffline={isOffline} 
             config={globalConfig}
             onEditConfig={() => { setAdminInitialTab('config'); setAdminPanelOpen(true); }}
+            onNavigate={setActiveSectorId}
         />
 
         <div className="flex-1 overflow-y-auto relative z-10 flex flex-col pb-24 md:pb-0 scroll-smooth">
