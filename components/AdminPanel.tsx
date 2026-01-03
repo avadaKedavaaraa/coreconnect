@@ -1,43 +1,37 @@
-
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Lineage, type CarouselItem, type Sector, type AdminUser, type AuditLog, SECTORS, type VisitorLog, type LectureRule } from '../types';
-import { type GlobalConfig, API_URL } from '../App';
+import React, { useState, useEffect, useRef } from 'react';
+import { Lineage, Sector, CarouselItem, AdminPermissions, GlobalConfig, LectureRule, VisitorLog, AdminUser, AuditLog } from '../types';
+import { API_URL } from '../App';
 import { 
-    ShieldAlert, Lock, Unlock, Plus, Image as ImageIcon, X, Trash2, Calendar, 
-    Tag, Layers, Upload, FileUp, Loader2, Edit3, Save, Users, Settings, Volume2, Play,
-    Search, HelpCircle, Info, Filter, Eye, Terminal, KeyRound, CheckCircle, Shield, Ban,
-    Bold, Italic, Underline, Palette, Type, Database, Sparkles, Wand2, Wrench, Replace,
-    ChevronDown, ChevronUp, RefreshCw, PenTool, LayoutTemplate, FileText, Video, ScrollText,
-    BrainCircuit, FileCheck, ArrowRight, ScanFace, Fingerprint, Hexagon, FileIcon, MessageSquare,
-    Activity, Clock, CalendarDays, Link, Repeat, Send, AlertTriangle, HardDrive, Download, UploadCloud, MousePointer2
+  X, Unlock, Lock, Loader2, Database, PenTool, CalendarDays, HardDrive, 
+  BrainCircuit, ScanFace, Users, Activity, Settings, LayoutTemplate, Search, 
+  Filter, Replace, Edit3, Trash2, Plus, Upload, ImageIcon, Save, Shield, 
+  ShieldAlert, FileUp, AlertTriangle, RefreshCw
 } from 'lucide-react';
 import DOMPurify from 'dompurify';
 
 interface AdminPanelProps {
-  lineage: Lineage;
+  lineage: Lineage | null;
   isOpen: boolean;
   onClose: () => void;
   isAdmin: boolean;
   csrfToken: string;
-  onLogin: (token: string, permissions: any) => void;
+  onLogin: (token: string, permissions: AdminPermissions) => void;
   onLogout: () => void;
   currentUser: string;
-  permissions: any; 
-  initialTab?: 'database' | 'creator' | 'scheduler' | 'config' | 'users' | 'visitors' | 'backup' | 'ai-lab' | 'structure' | 'logs';
+  permissions: AdminPermissions | null;
+  initialTab?: 'database' | 'creator' | 'scheduler' | 'config' | 'users' | 'visitors' | 'backup' | 'ai-lab' | 'structure';
+  
+  allItems: CarouselItem[];
+  sectors: Sector[];
+  globalConfig: GlobalConfig;
+  initialEditingItem: CarouselItem | null;
+  defaultSector: string;
 
-  // Data
-  allItems?: CarouselItem[];
-  sectors?: Sector[];
-  globalConfig?: GlobalConfig;
-  initialEditingItem?: CarouselItem | null;
-  defaultSector?: string;
-
-  // Actions
   onAddItem: (item: CarouselItem) => void;
-  onUpdateItem?: (item: CarouselItem) => void;
-  onDeleteItem?: (id: string) => void;
-  onUpdateSectors?: (sectors: Sector[]) => void;
-  onUpdateConfig?: (config: GlobalConfig) => Promise<void>; // Updated signature to Promise
+  onUpdateItem: (item: CarouselItem) => void;
+  onDeleteItem: (id: string) => void;
+  onUpdateSectors: (sectors: Sector[]) => Promise<void>;
+  onUpdateConfig: (config: GlobalConfig) => Promise<void>;
   onClearData: () => void;
 }
 
@@ -53,140 +47,95 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   const [loginPass, setLoginPass] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
-  const [isSavingConfig, setIsSavingConfig] = useState(false); // New state for config save
 
-  // Content Editing State
+  // Database Tab State
   const [itemSearch, setItemSearch] = useState('');
-  const [typeFilter, setTypeFilter] = useState<string>('all'); 
+  const [typeFilter, setTypeFilter] = useState('all');
+  const [findText, setFindText] = useState('');
+  const [replaceText, setReplaceText] = useState('');
+  const [foundMatches, setFoundMatches] = useState<{id: string, title: string, context: string}[]>([]);
+
+  // Creator Tab State
+  const [itemForm, setItemForm] = useState<CarouselItem>({
+      id: '', title: '', content: '', date: new Date().toISOString().split('T')[0].replace(/-/g, '.'),
+      type: 'announcement', sector: defaultSector, subject: 'General', isUnread: true, likes: 0,
+      style: { titleColor: '#ffffff', contentColor: '#e4e4e7', fontFamily: 'sans', isGradient: false }
+  });
   const [isEditingItem, setIsEditingItem] = useState(false);
-  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const contentRef = useRef<HTMLTextAreaElement>(null);
   
-  // Scheduler State
-  const [schedules, setSchedules] = useState<LectureRule[]>(globalConfig?.schedules || []);
-  const [newRule, setNewRule] = useState<Partial<LectureRule>>({
-      subject: '', dayOfWeek: 'Monday', startTime: '10:00', link: '', recurrence: 'weekly', isActive: true
+  // Scheduler Tab State
+  const [schedules, setSchedules] = useState<LectureRule[]>(globalConfig.schedules || []);
+  const [newRule, setNewRule] = useState<LectureRule>({
+      id: '', subject: '', dayOfWeek: 'Monday', startTime: '10:00', link: '', recurrence: 'weekly', isActive: true
   });
 
-  // Backup State
-  const [importStatus, setImportStatus] = useState<string>('');
-  const [importProgress, setImportProgress] = useState(0);
-  const importFileRef = useRef<HTMLInputElement>(null);
+  // Config Tab State
+  const [editedConfig, setEditedConfig] = useState<GlobalConfig>(globalConfig);
+  const [isSavingConfig, setIsSavingConfig] = useState(false);
 
-  // AI Magic State 
+  // Structure Tab State
+  const [editedSectors, setEditedSectors] = useState<Sector[]>(sectors);
+
+  // Users Tab State
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [newUser, setNewUser] = useState('');
+  const [newUserPass, setNewUserPass] = useState('');
+  const [newPermissions, setNewPermissions] = useState<AdminPermissions>({ canEdit: false, canDelete: false, canManageUsers: false, canViewLogs: false, isGod: false });
+
+  // Logs/Visitors Tab State
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [visitors, setVisitors] = useState<VisitorLog[]>([]);
+
+  // AI Lab State
   const [aiPrompt, setAiPrompt] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
-  const [aiResult, setAiResult] = useState<any>(null); 
+  const [aiResult, setAiResult] = useState<any>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Content Form
-  const [itemForm, setItemForm] = useState({
-    title: '', content: '', type: 'announcement', subject: '', 
-    date: new Date().toISOString().split('T')[0],
-    image: '', fileUrl: '', author: '', likes: 0, isUnread: true,
-    sector: 'announcements', 
-    titleColor: '#ffffff', titleColorEnd: '#d4d4d8', contentColor: '#e4e4e7', fontFamily: 'sans', isGradient: false
-  });
+  // Backup Tab State
+  const importFileRef = useRef<HTMLInputElement>(null);
+  const [importStatus, setImportStatus] = useState('');
+  const [importProgress, setImportProgress] = useState(0);
 
-  const contentRef = useRef<HTMLTextAreaElement>(null);
-
-  // Structure & Config
-  const [editedSectors, setEditedSectors] = useState<Sector[]>(sectors);
-  const [editedConfig, setEditedConfig] = useState<GlobalConfig>(globalConfig || {
-      wizardTitle: '', muggleTitle: '', wizardGateText: '', muggleGateText: '',
-      wizardAlarmUrl: '', muggleAlarmUrl: '', wizardImage: '', muggleImage: '',
-      wizardLogoText: 'C', muggleLogoText: 'CC', wizardLogoUrl: '', muggleLogoUrl: '',
-      telegramLink: '', schedules: [], cursorStyle: 'classic'
-  });
-  
-  // Sync props
-  useEffect(() => { if (globalConfig) { setEditedConfig(globalConfig); setSchedules(globalConfig.schedules || []); } }, [globalConfig]);
-  useEffect(() => { if (sectors.length > 0) setEditedSectors(sectors); }, [sectors]);
-  useEffect(() => { if (initialTab) setActiveTab(initialTab); }, [initialTab, isOpen]);
-
-  // Users & Logs
-  const [users, setUsers] = useState<AdminUser[]>([]);
-  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
-  const [newUser, setNewUser] = useState('');
-  const [newUserPass, setNewUserPass] = useState('');
-  const [newPermissions, setNewPermissions] = useState({
-      canEdit: true, canDelete: false, canManageUsers: false, canViewLogs: false, isGod: false
-  });
-  const [visitors, setVisitors] = useState<VisitorLog[]>([]);
-
-  // Find & Replace
-  const [findText, setFindText] = useState('');
-  const [replaceText, setReplaceText] = useState('');
-  const [foundMatches, setFoundMatches] = useState<{itemId: string, title: string, context: 'title'|'content'}[]>([]);
-
-  // Init Editing
+  // --- EFFECTS ---
   useEffect(() => {
-    if (isOpen) {
-        if (initialEditingItem) {
-            startEditItem(initialEditingItem);
-            setActiveTab('creator');
-        } else if (!isEditingItem) {
-            if (defaultSector && itemForm.sector !== defaultSector) {
-                setItemForm(prev => ({ ...prev, sector: defaultSector }));
-            }
-        }
-    }
-  }, [initialEditingItem, defaultSector, isOpen]);
+    if (initialTab) setActiveTab(initialTab);
+  }, [initialTab, isOpen]);
 
-  // Data Fetching
   useEffect(() => {
-    if (isAdmin) {
-        if (activeTab === 'users' && permissions?.canManageUsers) fetchUsers();
-        if (activeTab === 'visitors' && permissions?.canViewLogs) fetchVisitors();
-        if (activeTab === 'logs' && permissions?.canViewLogs) fetchAuditLogs();
-    }
-  }, [activeTab, isAdmin, permissions]);
+      if (initialEditingItem) {
+          setItemForm(initialEditingItem);
+          setIsEditingItem(true);
+          setActiveTab('creator');
+      } else {
+          resetItemForm();
+      }
+  }, [initialEditingItem, isOpen]);
 
-  // Shortcuts
   useEffect(() => {
-      const handleLazySave = (e: KeyboardEvent) => {
-          if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && isOpen && activeTab === 'creator') {
-              e.preventDefault();
-              handleSaveItem();
-          }
-      };
-      window.addEventListener('keydown', handleLazySave);
-      return () => window.removeEventListener('keydown', handleLazySave);
-  }, [isOpen, activeTab, itemForm]); 
+      setEditedConfig(globalConfig);
+      setSchedules(globalConfig.schedules || []);
+      setEditedSectors(sectors);
+  }, [globalConfig, sectors, isOpen]);
 
-  // --- API CALLS ---
-  const fetchUsers = async () => {
-      try {
-          const res = await fetch(`${API_URL}/api/admin/users`, { headers: {'x-csrf-token': csrfToken}, credentials: 'include' });
-          if(res.ok) setUsers(await res.json());
-      } catch(e) {}
+  useEffect(() => {
+      if(activeTab === 'users' && isAdmin) fetchUsers();
+      if(activeTab === 'visitors' && isAdmin) fetchVisitors();
+      if(activeTab === 'logs' && isAdmin) fetchAuditLogs();
+  }, [activeTab, isAdmin]);
+
+  const resetItemForm = () => {
+      setItemForm({
+          id: crypto.randomUUID(), title: '', content: '', date: new Date().toISOString().split('T')[0].replace(/-/g, '.'),
+          type: 'announcement', sector: defaultSector, subject: 'General', isUnread: true, likes: 0,
+          style: { titleColor: '#ffffff', contentColor: '#e4e4e7', fontFamily: 'sans', isGradient: false }
+      });
+      setIsEditingItem(false);
   };
 
-  const fetchVisitors = async () => {
-      try {
-          const res = await fetch(`${API_URL}/api/admin/visitors`, { headers: {'x-csrf-token': csrfToken}, credentials: 'include' });
-          if(res.ok) {
-              const data = await res.json();
-              if (Array.isArray(data)) {
-                  setVisitors(data);
-              } else {
-                  setVisitors([]);
-              }
-          }
-      } catch(e) { console.error("Visitor fetch failed", e); setVisitors([]); }
-  };
-
-  const fetchAuditLogs = async () => {
-      try {
-          const res = await fetch(`${API_URL}/api/admin/logs`, { headers: {'x-csrf-token': csrfToken}, credentials: 'include' });
-          if(res.ok) {
-              const data = await res.json();
-              setAuditLogs(Array.isArray(data) ? data : []);
-          }
-      } catch(e) {}
-  };
-
+  // --- API HANDLERS ---
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -202,328 +151,83 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
       if (!res.ok) throw new Error(data.error || 'Authentication Failed');
       onLogin(data.csrfToken, data.permissions);
       setLoginPass(''); setLoginUser('');
-    } catch (err: any) { setError(err.message); } finally { setIsLoading(false); }
-  };
-
-  // --- CHUNKED IMPORT LOGIC ---
-  const handleImportData = async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      
-      if (!confirm("WARNING: Import overwrites IDs. Proceed?")) {
-          e.target.value = ''; return;
-      }
-
-      setIsLoading(true);
-      setImportStatus("Reading file...");
-      setImportProgress(0);
-
-      const reader = new FileReader();
-      reader.onload = async (event) => {
-          try {
-              const json = JSON.parse(event.target?.result as string);
-              const items = json.data?.items || [];
-              
-              // Restore Config first (small)
-              if (json.data?.global_config) {
-                  setImportStatus("Restoring Config...");
-                  await fetch(`${API_URL}/api/admin/import`, {
-                      method: 'POST', headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrfToken },
-                      body: JSON.stringify({ data: { ...json.data, items: [] } }), 
-                      credentials: 'include'
-                  });
-              }
-
-              // Chunk items to 50 per request
-              const CHUNK_SIZE = 50;
-              const total = items.length;
-              
-              if (total > 0) {
-                  for (let i = 0; i < total; i += CHUNK_SIZE) {
-                      const chunk = items.slice(i, i + CHUNK_SIZE);
-                      setImportStatus(`Importing Items ${i + 1}-${Math.min(i + CHUNK_SIZE, total)} of ${total}...`);
-                      setImportProgress(Math.round(((i + CHUNK_SIZE) / total) * 100));
-                      
-                      const res = await fetch(`${API_URL}/api/admin/import`, {
-                          method: 'POST', headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrfToken },
-                          body: JSON.stringify({ data: { items: chunk, global_config: [], sectors: [], visitor_logs: [] } }),
-                          credentials: 'include'
-                      });
-                      
-                      if (!res.ok) throw new Error(`Chunk ${i} failed`);
-                  }
-              }
-
-              alert("Import Complete!");
-              window.location.reload();
-          } catch (err: any) {
-              alert("Import Error: " + err.message);
-              setImportStatus("Failed.");
-          } finally {
-              setIsLoading(false);
-              setImportStatus("");
-              setImportProgress(0);
-              if (importFileRef.current) importFileRef.current.value = '';
-          }
-      };
-      reader.readAsText(file);
-  };
-
-  // --- ITEM EDITING LOGIC ---
-  const startEditItem = (item: CarouselItem) => {
-      if (!permissions?.canEdit) return;
-      setItemForm({
-          title: item.title, content: item.content, type: item.type, subject: item.subject || '',
-          date: item.date.replace(/\./g, '-'), image: item.image || '', fileUrl: item.fileUrl || '',
-          author: item.author || '', likes: item.likes || 0, isUnread: item.isUnread || false,
-          sector: item.sector || 'announcements',
-          titleColor: item.style?.titleColor || '#ffffff', titleColorEnd: item.style?.titleColorEnd || '#d4d4d8', 
-          contentColor: item.style?.contentColor || '#e4e4e7', fontFamily: item.style?.fontFamily || 'sans', isGradient: item.style?.isGradient || false
-      });
-      setEditingItemId(item.id); setIsEditingItem(true); setActiveTab('creator'); 
-  };
-
-  const extractTitleFromHtml = (html: string) => {
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(html, 'text/html');
-      const hTag = doc.querySelector('h1, h2, h3');
-      if (hTag && hTag.textContent) return hTag.textContent;
-      // Fallback to text content
-      const text = doc.body.textContent || '';
-      return text.substring(0, 50) + (text.length > 50 ? '...' : '');
-  };
-
-  const handleSaveItem = () => {
-      if (!permissions?.canEdit) return alert("Permission denied");
-      const formattedDate = itemForm.date.replace(/-/g, '.');
-      const newItemId = crypto.randomUUID ? crypto.randomUUID() : `item-${Date.now()}`;
-      
-      // AUTO EXTRACT TITLE IF EMPTY
-      let titleToSave = itemForm.title;
-      if (!titleToSave.trim() && itemForm.content) {
-          titleToSave = extractTitleFromHtml(itemForm.content);
-      }
-      
-      const payload: CarouselItem = {
-          id: isEditingItem && editingItemId ? editingItemId : newItemId, 
-          title: titleToSave, 
-          content: itemForm.content, 
-          date: formattedDate, type: itemForm.type as any,
-          subject: itemForm.subject, image: itemForm.image, fileUrl: itemForm.fileUrl,
-          author: itemForm.author || currentUser, likes: Number(itemForm.likes), isUnread: Boolean(itemForm.isUnread),
-          isLiked: false, sector: itemForm.sector,
-          style: {
-              titleColor: itemForm.titleColor, titleColorEnd: itemForm.titleColorEnd,
-              contentColor: itemForm.contentColor, fontFamily: itemForm.fontFamily as any, isGradient: itemForm.isGradient
-          }
-      };
-
-      if (isEditingItem && editingItemId && onUpdateItem) onUpdateItem(payload);
-      else onAddItem(payload);
-      resetForm(); setActiveTab('database'); 
-  };
-
-  const resetForm = () => {
-      setItemForm({ 
-        title: '', content: '', type: 'announcement', subject: '', date: new Date().toISOString().split('T')[0], 
-        image: '', fileUrl: '', author: currentUser || '', likes: 0, isUnread: true, sector: defaultSector || 'announcements',
-        titleColor: '#ffffff', titleColorEnd: '#d4d4d8', contentColor: '#e4e4e7', fontFamily: 'sans', isGradient: false
-      });
-      setIsEditingItem(false); setEditingItemId(null);
-  };
-
-  // --- OTHER HANDLERS ---
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, field: 'image' | 'fileUrl' | 'wizardLogoUrl' | 'muggleLogoUrl' | 'wizardImage' | 'muggleImage') => {
-    const file = e.target.files?.[0];
-    if (!file || file.size > 10 * 1024 * 1024) return alert("File too large (>10MB)");
-    setIsUploading(true);
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = async () => {
-        try {
-            const res = await fetch(`${API_URL}/api/admin/upload`, {
-                method: 'POST', headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrfToken },
-                body: JSON.stringify({ fileName: file.name, fileType: file.type, fileData: (reader.result as string).split(',')[1], bucket: 'items' }),
-                credentials: 'include'
-            });
-            const data = await res.json();
-            if (res.ok && data.url) {
-                if (field === 'wizardLogoUrl' || field === 'muggleLogoUrl' || field === 'wizardImage' || field === 'muggleImage') {
-                    setEditedConfig(prev => ({ ...prev, [field]: data.url }));
-                } else {
-                    setItemForm(prev => ({ ...prev, [field]: data.url }));
-                }
-            } else alert("Upload failed");
-        } catch (e) { alert("Network Error"); } finally { setIsUploading(false); }
-    };
-  };
-
-  const handleExportData = async () => {
-      if (!confirm("Generate backup?")) return;
-      setIsLoading(true);
-      try {
-          const res = await fetch(`${API_URL}/api/admin/export`, { headers: { 'x-csrf-token': csrfToken }, credentials: 'include' });
-          if (!res.ok) throw new Error("Export failed");
-          const blob = await res.blob();
-          const url = window.URL.createObjectURL(blob);
-          const a = document.createElement('a'); a.href = url; a.download = `core_backup_${Date.now()}.json`;
-          document.body.appendChild(a); a.click(); a.remove(); window.URL.revokeObjectURL(url);
-      } catch (e: any) { alert("Error: " + e.message); } finally { setIsUploading(false); }
-  };
-
-  const handleSaveConfig = async () => {
-    if (onUpdateConfig) { 
-        setIsSavingConfig(true);
-        try {
-            await onUpdateConfig(editedConfig); 
-            // Give a little visual delay so user sees "Saving..."
-            setTimeout(() => {
-                alert("Config Saved! Re-logging might be required for all changes to appear.");
-                setIsSavingConfig(false);
-            }, 500);
-        } catch(e) {
-            setIsSavingConfig(false);
+    } catch (err: any) { 
+        console.error(err);
+        if (err.message && err.message.includes('Unexpected token')) {
+            setError('Server Connection Error (502/500)');
+        } else {
+            setError(err.message || 'Login Failed'); 
         }
-    }
+    } finally { setIsLoading(false); }
   };
 
-  // User Management Handlers
-  const handleCreateUser = async () => { 
-      if (!permissions?.canManageUsers) return;
+  const fetchUsers = async () => {
+      try {
+          const res = await fetch(`${API_URL}/api/admin/users`, { headers: { 'x-csrf-token': csrfToken } });
+          const data = await res.json();
+          if(res.ok) setUsers(data);
+      } catch(e) {}
+  };
+
+  const handleCreateUser = async () => {
+      if(!newUser || !newUserPass) return;
       try {
           const res = await fetch(`${API_URL}/api/admin/users/add`, {
               method: 'POST',
-              headers: {'Content-Type': 'application/json', 'x-csrf-token': csrfToken},
-              body: JSON.stringify({ username: newUser, password: newUserPass, permissions: newPermissions }),
-              credentials: 'include'
+              headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrfToken },
+              body: JSON.stringify({ username: newUser, password: newUserPass, permissions: newPermissions })
           });
-          if(res.ok) {
-              setNewUser(''); setNewUserPass(''); fetchUsers();
-          } else {
-              alert("Failed to create user.");
-          }
+          if(res.ok) { fetchUsers(); setNewUser(''); setNewUserPass(''); alert('User created'); }
+          else { const d = await res.json(); alert(d.error); }
       } catch(e) {}
   };
-  
-  const handleDeleteUser = async (targetUser: string) => {
-      if(!confirm("Delete this user?")) return;
+
+  const handleDeleteUser = async (username: string) => {
+      if(!confirm(`Delete user ${username}?`)) return;
       try {
           const res = await fetch(`${API_URL}/api/admin/users/delete`, {
               method: 'POST',
-              headers: {'Content-Type': 'application/json', 'x-csrf-token': csrfToken},
-              body: JSON.stringify({ targetUser }),
-              credentials: 'include'
+              headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrfToken },
+              body: JSON.stringify({ targetUser: username })
           });
           if(res.ok) fetchUsers();
+          else { const d = await res.json(); alert(d.error); }
       } catch(e) {}
   };
 
-  // Sector Handler
-  const handleSaveSectors = () => {
-    if (onUpdateSectors) {
-        onUpdateSectors(editedSectors);
-        alert("Sectors updated successfully.");
-    }
+  const fetchVisitors = async () => {
+      try {
+          const res = await fetch(`${API_URL}/api/admin/visitors`, { headers: { 'x-csrf-token': csrfToken } });
+          const data = await res.json();
+          if(res.ok) setVisitors(data);
+      } catch(e) {}
   };
 
-  const handleUpdateSector = (index: number, field: keyof Sector, value: string) => {
-      const updated = [...editedSectors];
-      updated[index] = { ...updated[index], [field]: value };
-      setEditedSectors(updated);
+  const fetchAuditLogs = async () => {
+      try {
+          const res = await fetch(`${API_URL}/api/admin/logs`, { headers: { 'x-csrf-token': csrfToken } });
+          const data = await res.json();
+          if(res.ok) setAuditLogs(data);
+      } catch(e) {}
   };
 
-  // Scheduler Handler
-  const handleAddRule = () => {
-      if (!newRule.subject || !newRule.link) return alert("Subject and Link are required");
-      
-      const rule: LectureRule = {
-          id: crypto.randomUUID(),
-          subject: newRule.subject || 'Unknown',
-          dayOfWeek: newRule.dayOfWeek || 'Monday',
-          startTime: newRule.startTime || '10:00',
-          link: newRule.link || '#',
-          recurrence: newRule.recurrence as 'weekly'|'monthly',
-          isActive: true,
-          endDate: newRule.endDate
-      };
-
-      const updatedSchedules = [...schedules, rule];
-      setSchedules(updatedSchedules);
-      
-      if (onUpdateConfig) {
-          onUpdateConfig({ ...editedConfig, schedules: updatedSchedules });
+  // --- CREATOR LOGIC ---
+  const handleSaveItem = () => {
+      if (!itemForm.title) {
+          // Auto extract from content if possible
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(itemForm.content, 'text/html');
+          const extractedTitle = doc.body.textContent?.substring(0, 50) || 'Untitled';
+          itemForm.title = extractedTitle;
       }
-      setNewRule({ ...newRule, subject: '', link: '' });
-  };
-
-  const handleDeleteRule = (id: string) => {
-      const updatedSchedules = schedules.filter(s => s.id !== id);
-      setSchedules(updatedSchedules);
-      if (onUpdateConfig) {
-          onUpdateConfig({ ...editedConfig, schedules: updatedSchedules });
+      
+      if (isEditingItem) {
+          onUpdateItem(itemForm);
+      } else {
+          onAddItem({...itemForm, id: crypto.randomUUID()});
       }
-  };
-
-  // AI Handler
-  const handleAiParse = async () => {
-    const file = selectedFile || fileInputRef.current?.files?.[0];
-    if (!aiPrompt && !file) {
-        alert("Please provide text instructions or upload a file.");
-        return;
-    }
-    
-    setAiLoading(true);
-    
-    try {
-        const formData = new FormData();
-        if (aiPrompt) formData.append('prompt', aiPrompt);
-        if (file) formData.append('file', file);
-
-        const res = await fetch(`${API_URL}/api/ai/parse`, {
-            method: 'POST',
-            headers: { 
-                'x-csrf-token': csrfToken 
-            },
-            body: formData,
-            credentials: 'include'
-        });
-        const data = await res.json();
-        
-        if (res.ok) {
-            const allowedTypes = ['announcement', 'file', 'video', 'task', 'mixed', 'link', 'code'];
-            const normalizedType = data.type && allowedTypes.includes(data.type.toLowerCase()) 
-                                    ? data.type.toLowerCase() 
-                                    : 'announcement';
-            
-            setAiResult({
-                title: data.title || '',
-                content: data.content || '',
-                date: data.date ? data.date.replace(/\./g, '-') : new Date().toISOString().split('T')[0],
-                type: normalizedType,
-                subject: data.subject || ''
-            });
-        } else {
-            alert("AI Error: " + data.error);
-        }
-    } catch (e) {
-        console.error(e);
-        alert("Connection Error");
-    } finally {
-        setAiLoading(false);
-    }
-  };
-
-  const transferAiToForm = () => {
-      if (!aiResult) return;
-      setItemForm(prev => ({
-          ...prev,
-          ...aiResult
-      }));
-      setActiveTab('creator');
-      setAiResult(null); 
-      setAiPrompt('');
-      setSelectedFile(null); 
-      if(fileInputRef.current) fileInputRef.current.value = '';
+      resetItemForm();
+      setActiveTab('database');
   };
 
   const insertTag = (tag: string) => {
@@ -532,72 +236,216 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
       const end = contentRef.current.selectionEnd;
       const text = itemForm.content;
       const before = text.substring(0, start);
-      const selected = text.substring(start, end);
       const after = text.substring(end);
-      
-      const newText = `${before}<${tag}>${selected}</${tag}>${after}`;
-      setItemForm({ ...itemForm, content: newText });
-      
-      setTimeout(() => {
-          contentRef.current?.focus();
-          contentRef.current?.setSelectionRange(start + tag.length + 2, end + tag.length + 2);
-      }, 0);
+      const insert = `<${tag}>${text.substring(start, end)}</${tag}>`;
+      setItemForm({ ...itemForm, content: before + insert + after });
   };
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, field: 'image' | 'fileUrl' | 'wizardLogoUrl' | 'muggleLogoUrl' | 'wizardImage' | 'muggleImage') => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      try {
+          const res = await fetch(`${API_URL}/api/admin/upload`, {
+              method: 'POST',
+              headers: { 'x-csrf-token': csrfToken },
+              body: formData
+          });
+          const data = await res.json();
+          if (res.ok) {
+              if (field === 'wizardLogoUrl' || field === 'muggleLogoUrl' || field === 'wizardImage' || field === 'muggleImage') {
+                  setEditedConfig(prev => ({ ...prev, [field]: data.url }));
+              } else {
+                  setItemForm(prev => ({ ...prev, [field]: data.url }));
+              }
+          } else {
+              alert('Upload failed: ' + data.error);
+          }
+      } catch (e) {
+          alert('Upload failed');
+      }
+  };
+
+  // --- DATABASE LOGIC ---
+  const filteredItems = allItems.filter(item => {
+      const matchSearch = item.title.toLowerCase().includes(itemSearch.toLowerCase()) || 
+                          item.content.toLowerCase().includes(itemSearch.toLowerCase());
+      const matchType = typeFilter === 'all' || item.type === typeFilter;
+      return matchSearch && matchType;
+  });
+
   const scanForMatches = () => {
-      if (!findText) return;
-      const matches: typeof foundMatches = [];
-      allItems.forEach(item => {
-          if (item.title.includes(findText)) matches.push({ itemId: item.id, title: item.title, context: 'title' });
-          if (item.content.includes(findText)) matches.push({ itemId: item.id, title: item.title, context: 'content' });
-      });
+      if(!findText) return;
+      const matches = allItems.filter(i => i.content.includes(findText) || i.title.includes(findText))
+          .map(i => ({ id: i.id, title: i.title, context: 'Content/Title' }));
       setFoundMatches(matches);
   };
 
-  const executeReplaceAll = async () => {
-      if (!confirm(`Replace all ${foundMatches.length} occurrences? This might take a moment.`)) return;
+  const executeReplaceAll = () => {
+      if (!findText) return;
+      if (!confirm(`Replace "${findText}" with "${replaceText}" in ${foundMatches.length} items?`)) return;
       
-      const affectedItems = new Set(foundMatches.map(m => m.itemId));
-      
-      for (const id of affectedItems) {
-          const item = allItems.find(i => i.id === id);
-          if (!item) continue;
-          
-          let newTitle = item.title;
-          let newContent = item.content;
-          
-          if (foundMatches.some(m => m.itemId === id && m.context === 'title')) {
-              newTitle = newTitle.split(findText).join(replaceText);
+      foundMatches.forEach(match => {
+          const item = allItems.find(i => i.id === match.id);
+          if (item) {
+              const updated = {
+                  ...item,
+                  title: item.title.replace(new RegExp(findText, 'g'), replaceText),
+                  content: item.content.replace(new RegExp(findText, 'g'), replaceText)
+              };
+              onUpdateItem(updated);
           }
-          if (foundMatches.some(m => m.itemId === id && m.context === 'content')) {
-              newContent = newContent.split(findText).join(replaceText);
-          }
-          
-          if (newTitle !== item.title || newContent !== item.content) {
-             if (onUpdateItem) await onUpdateItem({ ...item, title: newTitle, content: newContent });
-          }
-      }
+      });
       setFoundMatches([]);
-      alert("Replacement complete.");
+      setFindText('');
+  };
+  
+  const startEditItem = (item: CarouselItem) => {
+      setItemForm(item);
+      setIsEditingItem(true);
+      setActiveTab('creator');
   };
 
-  // Filtering
-  const uniqueSubjects = useMemo(() => Array.from(new Set(allItems.map(i => i.subject))).filter(Boolean).sort(), [allItems]);
-  const filteredItems = useMemo(() => allItems.filter(i => (i.title.toLowerCase().includes(itemSearch.toLowerCase()) || i.content.toLowerCase().includes(itemSearch.toLowerCase())) && (typeFilter === 'all' || i.type === typeFilter)), [allItems, itemSearch, typeFilter]);
-
-  // Styles for Preview
-  const previewTitleStyle = itemForm.isGradient ? {
-      backgroundImage: `linear-gradient(to right, ${itemForm.titleColor}, ${itemForm.titleColorEnd || itemForm.titleColor})`,
-      WebkitBackgroundClip: 'text',
-      WebkitTextFillColor: 'transparent',
-      backgroundClip: 'text',
-      color: 'transparent',
-      fontFamily: itemForm.fontFamily === 'wizard' ? '"EB Garamond", serif' : itemForm.fontFamily === 'muggle' ? '"JetBrains Mono", monospace' : 'inherit',
-      display: 'inline-block'
-  } : {
-      color: itemForm.titleColor,
-      fontFamily: itemForm.fontFamily === 'wizard' ? '"EB Garamond", serif' : itemForm.fontFamily === 'muggle' ? '"JetBrains Mono", monospace' : 'inherit'
+  // --- SCHEDULER LOGIC ---
+  const handleAddRule = () => {
+      if(!newRule.subject) return;
+      const rule: LectureRule = { ...newRule, id: crypto.randomUUID() };
+      const updated = [...schedules, rule];
+      setSchedules(updated);
+      setEditedConfig({ ...editedConfig, schedules: updated });
+      // We don't save immediately, user must click 'Save Config' or we can auto-save schedule separately
+      // For UX consistency, let's update global config state so when they click save config it saves.
   };
+
+  const handleDeleteRule = (id: string) => {
+      const updated = schedules.filter(s => s.id !== id);
+      setSchedules(updated);
+      setEditedConfig({ ...editedConfig, schedules: updated });
+  };
+
+  // --- AI LAB LOGIC ---
+  const handleAiParse = async () => {
+      setAiLoading(true);
+      setAiResult(null);
+      try {
+          const formData = new FormData();
+          formData.append('prompt', aiPrompt);
+          if (selectedFile) formData.append('file', selectedFile);
+
+          const res = await fetch(`${API_URL}/api/ai/parse`, {
+              method: 'POST',
+              headers: { 'x-csrf-token': csrfToken },
+              body: formData
+          });
+          const data = await res.json();
+          if (res.ok) setAiResult(data);
+          else alert(data.error);
+      } catch (e) { alert('AI Error'); }
+      finally { setAiLoading(false); }
+  };
+
+  const transferAiToForm = () => {
+      if (!aiResult) return;
+      setItemForm(prev => ({
+          ...prev,
+          title: aiResult.title || prev.title,
+          content: aiResult.content || prev.content,
+          date: aiResult.date ? aiResult.date.replace(/-/g, '.') : prev.date,
+          type: aiResult.type || prev.type,
+          subject: aiResult.subject || prev.subject
+      }));
+      setActiveTab('creator');
+  };
+
+  // --- CONFIG LOGIC ---
+  const handleSaveConfig = async () => {
+      setIsSavingConfig(true);
+      try {
+          await onUpdateConfig(editedConfig);
+      } finally {
+          setIsSavingConfig(false);
+      }
+  };
+
+  // --- STRUCTURE LOGIC ---
+  const handleUpdateSector = (idx: number, field: keyof Sector, value: string) => {
+      const updated = [...editedSectors];
+      updated[idx] = { ...updated[idx], [field]: value };
+      setEditedSectors(updated);
+  };
+
+  const handleSaveSectors = async () => {
+      await onUpdateSectors(editedSectors);
+  };
+
+  // --- EXPORT/IMPORT ---
+  const handleExportData = async () => {
+      setIsLoading(true);
+      try {
+          const res = await fetch(`${API_URL}/api/admin/export`, { headers: { 'x-csrf-token': csrfToken } });
+          const blob = await res.blob();
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `core_connect_backup_${new Date().toISOString()}.json`;
+          a.click();
+      } catch (e) { alert("Export failed"); }
+      finally { setIsLoading(false); }
+  };
+
+  const handleImportData = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      setIsLoading(true);
+      setImportStatus('Reading file...');
+      setImportProgress(10);
+      
+      const reader = new FileReader();
+      reader.onload = async (evt) => {
+          try {
+              const json = JSON.parse(evt.target?.result as string);
+              setImportStatus('Uploading to server...');
+              setImportProgress(50);
+              
+              const res = await fetch(`${API_URL}/api/admin/import`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrfToken },
+                  body: JSON.stringify(json)
+              });
+              
+              if (res.ok) {
+                  setImportStatus('Complete! Reloading...');
+                  setImportProgress(100);
+                  setTimeout(() => window.location.reload(), 1000);
+              } else {
+                  const d = await res.json();
+                  alert(d.error);
+                  setImportStatus('Failed');
+              }
+          } catch (e) {
+              alert("Invalid Backup File");
+              setImportStatus('Error');
+          } finally {
+              setIsLoading(false);
+          }
+      };
+      reader.readAsText(file);
+  };
+
+  // --- RENDER HELPERS ---
+  const uniqueSubjects = Array.from(new Set(allItems.map(i => i.subject || 'General'))).sort();
+  const previewTitleStyle = itemForm.style?.isGradient ? {
+        backgroundImage: `linear-gradient(to right, ${itemForm.style.titleColor}, ${itemForm.style.titleColorEnd || itemForm.style.titleColor})`,
+        WebkitBackgroundClip: 'text',
+        WebkitTextFillColor: 'transparent',
+        backgroundClip: 'text',
+        color: 'transparent'
+    } : {
+        color: itemForm.style?.titleColor
+    };
 
   if (!isOpen) return null;
 
@@ -662,7 +510,11 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                 `}
                             />
                         </div>
-                        {error && <div className="text-red-500 text-xs text-center font-bold">{error}</div>}
+                        {error && (
+                            <div className="p-3 bg-red-900/30 border border-red-500/50 rounded text-red-300 text-xs text-center font-bold animate-pulse">
+                                {error}
+                            </div>
+                        )}
                         <button 
                             type="submit" disabled={isLoading}
                             className={`w-full py-4 rounded-lg font-bold tracking-[0.2em] transition-all hover:scale-105 hover:shadow-lg flex items-center justify-center gap-2
@@ -771,7 +623,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                     </div>
                                     <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                         <button onClick={() => startEditItem(item)} className="p-2 bg-blue-600 rounded hover:bg-blue-500"><Edit3 size={16}/></button>
-                                        <button onClick={() => { if(confirm('Delete?')) onDeleteItem?.(item.id) }} className="p-2 bg-red-600 rounded hover:bg-red-500"><Trash2 size={16}/></button>
+                                        <button onClick={() => { if(confirm('Delete?')) onDeleteItem(item.id) }} className="p-2 bg-red-600 rounded hover:bg-red-500"><Trash2 size={16}/></button>
                                     </div>
                                 </div>
                             )})}
@@ -780,13 +632,13 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                     </div>
                 )}
                 
-                {/* CREATOR TAB */}
                 {activeTab === 'creator' && (
                     <div className="flex flex-col xl:flex-row gap-8">
                         {/* Editor Column */}
                         <div className="flex-1 space-y-6 max-w-2xl">
                             <div className="grid grid-cols-2 gap-4">
                                 <input value={itemForm.title} onChange={e => setItemForm({...itemForm, title: e.target.value})} placeholder="Title (Leave empty to auto-extract from HTML)" className="col-span-2 p-3 bg-white/5 border border-white/10 rounded text-white outline-none" />
+                                
                                 <select value={itemForm.type} onChange={e => setItemForm({...itemForm, type: e.target.value as any})} className="p-3 bg-white/5 border border-white/10 rounded text-white outline-none">
                                     <option value="announcement" className="bg-black">Announcement</option>
                                     <option value="file" className="bg-black">File</option>
@@ -827,24 +679,24 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                 <div className="space-y-4">
                                     <h4 className="text-xs font-bold uppercase opacity-50">Item Styling</h4>
                                     <div className="flex items-center gap-2">
-                                        <input type="color" value={itemForm.titleColor} onChange={e => setItemForm({...itemForm, titleColor: e.target.value})} className="h-8 w-8 bg-transparent border-0 cursor-pointer"/>
+                                        <input type="color" value={itemForm.style?.titleColor} onChange={e => setItemForm({...itemForm, style: {...itemForm.style, titleColor: e.target.value}})} className="h-8 w-8 bg-transparent border-0 cursor-pointer"/>
                                         <span className="text-xs">Title Color</span>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        <input type="checkbox" checked={itemForm.isGradient} onChange={e => setItemForm({...itemForm, isGradient: e.target.checked})} id="grad-check" className="cursor-pointer"/>
+                                        <input type="checkbox" checked={itemForm.style?.isGradient} onChange={e => setItemForm({...itemForm, style: {...itemForm.style, isGradient: e.target.checked}})} id="grad-check" className="cursor-pointer"/>
                                         <label htmlFor="grad-check" className="text-xs cursor-pointer">Enable Gradient Title</label>
                                     </div>
-                                    {itemForm.isGradient && (
+                                    {itemForm.style?.isGradient && (
                                         <div className="flex items-center gap-2">
-                                            <input type="color" value={itemForm.titleColorEnd} onChange={e => setItemForm({...itemForm, titleColorEnd: e.target.value})} className="h-8 w-8 bg-transparent border-0 cursor-pointer"/>
+                                            <input type="color" value={itemForm.style?.titleColorEnd} onChange={e => setItemForm({...itemForm, style: {...itemForm.style, titleColorEnd: e.target.value}})} className="h-8 w-8 bg-transparent border-0 cursor-pointer"/>
                                             <span className="text-xs">Gradient End Color</span>
                                         </div>
                                     )}
                                     <div className="flex items-center gap-2">
-                                        <input type="color" value={itemForm.contentColor} onChange={e => setItemForm({...itemForm, contentColor: e.target.value})} className="h-8 w-8 bg-transparent border-0 cursor-pointer"/>
+                                        <input type="color" value={itemForm.style?.contentColor} onChange={e => setItemForm({...itemForm, style: {...itemForm.style, contentColor: e.target.value}})} className="h-8 w-8 bg-transparent border-0 cursor-pointer"/>
                                         <span className="text-xs">Content Text Color</span>
                                     </div>
-                                    <select value={itemForm.fontFamily} onChange={e => setItemForm({...itemForm, fontFamily: e.target.value as any})} className="w-full bg-white/5 border border-white/10 rounded p-2 text-xs">
+                                    <select value={itemForm.style?.fontFamily} onChange={e => setItemForm({...itemForm, style: {...itemForm.style, fontFamily: e.target.value as any}})} className="w-full bg-white/5 border border-white/10 rounded p-2 text-xs">
                                         <option value="sans" className="bg-black">Sans Serif (Readable)</option>
                                         <option value="wizard" className="bg-black">Wizard Serif</option>
                                         <option value="muggle" className="bg-black">Muggle Mono</option>
@@ -879,7 +731,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                     </h2>
                                     <div 
                                         className="text-sm font-sans leading-relaxed"
-                                        style={{ color: itemForm.contentColor }}
+                                        style={{ color: itemForm.style?.contentColor }}
                                         dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(itemForm.content || "Content preview...", { ADD_TAGS: ['style'] }) }}
                                     ></div>
                                 </div>
@@ -963,7 +815,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                         <div className="flex-1 grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
                                             <span className="font-bold text-white">{rule.subject}</span>
                                             <span className="opacity-70">{rule.dayOfWeek} @ {rule.startTime}</span>
-                                            <a href={rule.link} target="_blank" className="text-blue-400 hover:underline truncate">{rule.link}</a>
+                                            <a href={rule.link} target="_blank" rel="noreferrer" className="text-blue-400 hover:underline truncate">{rule.link}</a>
                                             <span className="opacity-50 capitalize">{rule.recurrence}</span>
                                         </div>
                                         <button onClick={() => handleDeleteRule(rule.id)} className="p-2 text-red-500 hover:bg-white/10 rounded"><Trash2 size={14}/></button>
