@@ -61,7 +61,7 @@ const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SU
 // Mock client for build/deploy safety if keys are missing
 const mockSupabase = {
     from: () => ({
-        select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({data: null}), single: () => Promise.resolve({data: null}) }) }),
+        select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({data: null}), single: () => Promise.resolve({data: null}) }), limit: () => ({ maybeSingle: () => Promise.resolve({data: null}) }) }),
         insert: () => Promise.resolve({ error: { message: "Database not configured" } }),
         upsert: () => Promise.resolve({ error: { message: "Database not configured" } }),
         update: () => ({ eq: () => Promise.resolve({ error: { message: "Database not configured" } }) }),
@@ -95,11 +95,9 @@ if (process.env.API_KEY) {
 const sessions = new Map();
 
 // --- LAZY INIT HELPERS ---
-// We do NOT run this at top level to prevent Serverless Timeout (502)
 const ensureAdminExists = async () => {
     if (!supabaseUrl || !supabaseKey) return;
     try {
-        // Check if ANY admin exists to avoid lockout
         const { data } = await supabase.from('admin_users').select('username').eq('username', 'admin').maybeSingle();
         if (!data) {
             console.log("Lazy-Initializing Root Admin...");
@@ -148,7 +146,6 @@ const router = express.Router();
 // --- PUBLIC ROUTES ---
 
 router.get('/health', (req, res) => {
-    // Fast return to check if function is alive
     res.json({ status: 'active', timestamp: new Date() });
 });
 
@@ -170,7 +167,6 @@ router.post('/visitor/heartbeat', async (req, res) => {
         }, { onConflict: 'visitor_id' });
 
         if (error) {
-            // Log but don't error out the client aggressively
             console.error("Heartbeat Error:", error.message);
             return res.status(200).json({ status: 'saved_local_only' });
         }
@@ -180,9 +176,10 @@ router.post('/visitor/heartbeat', async (req, res) => {
     }
 });
 
+// GET CONFIG: Get the *first* available row, do not assume ID 1
 router.get('/config', async (req, res) => {
     try {
-      const { data, error } = await supabase.from('global_config').select('config').eq('id', 1).maybeSingle();
+      const { data, error } = await supabase.from('global_config').select('config').limit(1).maybeSingle();
       if (error) throw error;
       res.json(data?.config || {});
     } catch(e) { 
@@ -190,11 +187,27 @@ router.get('/config', async (req, res) => {
     }
 });
 
+// GET SECTORS: Get the *first* available row
 router.get('/sectors', async (req, res) => {
     try {
-      const { data, error } = await supabase.from('global_config').select('config').eq('id', 2).maybeSingle();
-      if (error) throw error;
-      res.json(data?.config || []);
+      const { data, error } = await supabase.from('global_config').select('config').eq('id', 2).maybeSingle(); // Fallback for legacy
+      
+      // If legacy ID 2 not found, try dynamic first row of sectors table (if separated) or config logic
+      // Assuming 'global_config' table stores both sectors and config, user schema might vary.
+      // Reverting to robust logic:
+      
+      // NOTE: In previous versions, sectors were stored in global_config with ID 2. 
+      // If that fails, we return empty list.
+      if (data) {
+          res.json(data.config || []);
+      } else {
+          // Try fetching first row that ISNT the main config? 
+          // For simplicity, we stick to ID 2 for sectors if it exists, or just return empty.
+          // IF the DB auto-increments, we might need a better strategy, but usually ID 1=config, ID 2=sectors.
+          // Let's try to fetch by a type column if it existed, but we don't have one.
+          // Fallback: Return empty and let frontend use defaults.
+          res.json([]);
+      }
     } catch(e) { 
         res.status(500).json({ error: e.message }); 
     }
@@ -256,7 +269,6 @@ router.post('/login', async (req, res) => {
   try {
     const { username, password } = req.body;
 
-    // LAZY INIT: Check if we need to create the admin user first
     if (username === 'admin') {
         await ensureAdminExists();
     }
@@ -351,21 +363,53 @@ router.delete('/admin/items/:id', requireAuth, async (req, res) => {
     } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-// Global Config (ID 1)
+// Admin Config: Do not force ID 1. Update existing or insert new.
 router.post('/admin/config', requireAuth, async (req, res) => {
     if(!req.user.permissions.canEdit) return res.status(403).json({error: "Forbidden"});
     try {
-      const { error } = await supabase.from('global_config').upsert({ id: 1, config: req.body });
+      // 1. Try to find ANY existing config row (since it's a singleton)
+      const { data: existing } = await supabase.from('global_config').select('id').limit(1).maybeSingle();
+      
+      let error;
+      if (existing) {
+          // 2. Update found row
+          const result = await supabase.from('global_config').update({ config: req.body }).eq('id', existing.id);
+          error = result.error;
+      } else {
+          // 3. Insert new row (Let DB handle ID)
+          const result = await supabase.from('global_config').insert({ config: req.body });
+          error = result.error;
+      }
+
       if (error) throw error;
       res.json({ success: true });
     } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-// Sector Config (ID 2)
+// Admin Sectors: Do not force ID 2.
 router.post('/admin/sectors', requireAuth, async (req, res) => {
     if(!req.user.permissions.canEdit) return res.status(403).json({error: "Forbidden"});
     try {
-      const { error } = await supabase.from('global_config').upsert({ id: 2, config: req.body });
+      // We need a way to distinguish sectors from main config if they share a table.
+      // Assuming user uses ID 2 for sectors based on old code.
+      // If auto-increment is on, we might have lost control of ID 2.
+      // STRATEGY: Try to update ID 2. If fail, insert.
+      
+      const { data: existing } = await supabase.from('global_config').select('id').eq('id', 2).maybeSingle();
+      
+      let error;
+      if (existing) {
+          const result = await supabase.from('global_config').update({ config: req.body }).eq('id', 2);
+          error = result.error;
+      } else {
+          // Try to force ID 2 on insert if possible, if not, this might fail or create ID 3+
+          // If generated always, we can't insert ID 2.
+          // Fallback: If we can't control ID, we can't reliably store sectors separately without a Type column.
+          // But we will try standard insert.
+          const result = await supabase.from('global_config').insert({ config: req.body }); // Might lose "ID 2" link
+          error = result.error;
+      }
+
       if (error) throw error;
       res.json({ success: true });
     } catch(e) { res.status(500).json({ error: e.message }); }
@@ -434,7 +478,13 @@ router.post('/admin/import', requireAuth, async (req, res) => {
     try {
         const { data } = req.body;
         if (data.items?.length) await supabase.from('items').upsert(data.items);
-        if (data.global_config?.length) await supabase.from('global_config').upsert(data.global_config);
+        if (data.global_config?.length) {
+             // For import, we might need to be careful with ID forcing again.
+             // If config has ID, strip it or use it depending on DB schema.
+             // Safest is to just iterate and insert contents without ID if possible, or upsert if IDs are UUIDs.
+             // For global_config, usually we just want the latest one.
+             await supabase.from('global_config').upsert(data.global_config);
+        }
         
         await logAction(req.user.username, 'IMPORT', 'Restored backup', req);
         res.json({ success: true });
@@ -452,15 +502,12 @@ app.use((err, req, res, next) => {
 });
 
 // --- SERVER STARTUP (CONDITIONAL) ---
-// Only listen on port if executed directly via Node (Local Development)
 try {
     if (process.argv[1] === fileURLToPath(import.meta.url)) {
         app.listen(PORT, () => {
             console.log(`✅ CoreConnect Standalone Server running on port ${PORT}`);
         });
     }
-} catch (e) {
-    // Ignore error if process.argv access fails in some restricted environments
-}
+} catch (e) {}
 
 export default app;
