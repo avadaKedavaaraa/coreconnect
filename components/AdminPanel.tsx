@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Lineage, Sector, CarouselItem, AdminPermissions, GlobalConfig, LectureRule, VisitorLog, AdminUser, AuditLog } from '../types';
+import { Lineage, Sector, CarouselItem, AdminPermissions, GlobalConfig, LectureRule, VisitorLog, AdminUser, AuditLog, FONT_LIBRARY } from '../types';
 import { API_URL } from '../App';
 import { 
   X, Unlock, Lock, Loader2, Database, PenTool, CalendarDays, HardDrive, 
   BrainCircuit, ScanFace, Users, Activity, Settings, LayoutTemplate, Search, 
   Filter, Replace, Edit3, Trash2, Plus, Upload, ImageIcon, Save, Shield, 
-  ShieldAlert, FileUp, AlertTriangle, RefreshCw
+  ShieldAlert, FileUp, AlertTriangle, RefreshCw, Key, Type
 } from 'lucide-react';
 import DOMPurify from 'dompurify';
 
@@ -34,6 +34,19 @@ interface AdminPanelProps {
   onUpdateConfig: (config: GlobalConfig) => Promise<void>;
   onClearData: () => void;
 }
+
+const loadFontPreview = (fontId: string) => {
+    const font = FONT_LIBRARY.find(f => f.id === fontId);
+    if (!font) return;
+    const linkId = `font-admin-preview-${font.id}`;
+    if (!document.getElementById(linkId)) {
+        const link = document.createElement('link');
+        link.id = linkId;
+        link.href = `https://fonts.googleapis.com/css2?family=${font.name.replace(/ /g, '+')}&display=swap`;
+        link.rel = 'stylesheet';
+        document.head.appendChild(link);
+    }
+};
 
 const AdminPanel: React.FC<AdminPanelProps> = ({ 
   lineage, isOpen, onClose, isAdmin, csrfToken, onLogin, onLogout, currentUser, permissions, initialTab = 'database',
@@ -83,6 +96,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   const [newUser, setNewUser] = useState('');
   const [newUserPass, setNewUserPass] = useState('');
   const [newPermissions, setNewPermissions] = useState<AdminPermissions>({ canEdit: false, canDelete: false, canManageUsers: false, canViewLogs: false, isGod: false });
+  const [changePassData, setChangePassData] = useState({ current: '', new: '', confirm: '' });
 
   // Logs/Visitors Tab State
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
@@ -108,6 +122,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   useEffect(() => {
       if (initialEditingItem) {
           setItemForm(initialEditingItem);
+          // Pre-load font if editing
+          if(initialEditingItem.style?.fontFamily) loadFontPreview(initialEditingItem.style.fontFamily);
           setIsEditingItem(true);
           setActiveTab('creator');
       } else {
@@ -204,6 +220,40 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
           if(res.ok) fetchUsers();
           else { const d = await res.json(); alert(d.error); }
       } catch(e) {}
+  };
+
+  const handleChangePassword = async () => {
+      if (!changePassData.current || !changePassData.new || !changePassData.confirm) {
+          alert("Please fill all password fields.");
+          return;
+      }
+      if (changePassData.new !== changePassData.confirm) {
+          alert("New passwords do not match.");
+          return;
+      }
+      setIsLoading(true);
+      try {
+          const res = await fetch(`${API_URL}/api/admin/change-password`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrfToken },
+              body: JSON.stringify({ 
+                  currentPassword: changePassData.current, 
+                  newPassword: changePassData.new 
+              }),
+              credentials: 'include'
+          });
+          const data = await res.json();
+          if (res.ok) {
+              alert("Password changed successfully.");
+              setChangePassData({ current: '', new: '', confirm: '' });
+          } else {
+              alert(data.error || "Failed to change password.");
+          }
+      } catch (e) {
+          alert("Network error.");
+      } finally {
+          setIsLoading(false);
+      }
   };
 
   const fetchVisitors = async () => {
@@ -449,14 +499,19 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
   // --- RENDER HELPERS ---
   const uniqueSubjects = Array.from(new Set(allItems.map(i => i.subject || 'General'))).sort();
+  
+  // Resolve preview style
+  const selectedFont = FONT_LIBRARY.find(f => f.id === itemForm.style?.fontFamily);
   const previewTitleStyle = itemForm.style?.isGradient ? {
         backgroundImage: `linear-gradient(to right, ${itemForm.style.titleColor}, ${itemForm.style.titleColorEnd || itemForm.style.titleColor})`,
         WebkitBackgroundClip: 'text',
         WebkitTextFillColor: 'transparent',
         backgroundClip: 'text',
-        color: 'transparent'
+        color: 'transparent',
+        fontFamily: selectedFont?.family
     } : {
-        color: itemForm.style?.titleColor
+        color: itemForm.style?.titleColor,
+        fontFamily: selectedFont?.family
     };
 
   if (!isOpen) return null;
@@ -740,11 +795,27 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                         <input type="color" value={itemForm.style?.contentColor} onChange={e => setItemForm({...itemForm, style: {...itemForm.style, contentColor: e.target.value}})} className="h-8 w-8 bg-transparent border-0 cursor-pointer"/>
                                         <span className="text-xs">Content Text Color</span>
                                     </div>
-                                    <select value={itemForm.style?.fontFamily} onChange={e => setItemForm({...itemForm, style: {...itemForm.style, fontFamily: e.target.value as any}})} className="w-full bg-white/5 border border-white/10 rounded p-2 text-xs">
-                                        <option value="sans" className="bg-black">Sans Serif (Readable)</option>
-                                        <option value="wizard" className="bg-black">Wizard Serif</option>
-                                        <option value="muggle" className="bg-black">Muggle Mono</option>
-                                    </select>
+                                    <div className="space-y-1">
+                                        <label className="text-xs opacity-50">Title Font (60+ Options)</label>
+                                        <div className="relative">
+                                            <select 
+                                                value={itemForm.style?.fontFamily || 'sans'} 
+                                                onChange={e => {
+                                                    const newFont = e.target.value;
+                                                    setItemForm({...itemForm, style: {...itemForm.style, fontFamily: newFont}});
+                                                    loadFontPreview(newFont);
+                                                }} 
+                                                className="w-full bg-white/5 border border-white/10 rounded p-2 text-xs appearance-none"
+                                            >
+                                                {FONT_LIBRARY.map(font => (
+                                                    <option key={font.id} value={font.id} className="bg-black text-white">
+                                                        {font.name} ({font.category})
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            <Type size={14} className="absolute right-2 top-2 opacity-50 pointer-events-none"/>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                             <button onClick={handleSaveItem} className="w-full py-4 bg-green-600 hover:bg-green-500 rounded font-bold text-lg shadow-lg">{isEditingItem ? 'UPDATE' : 'PUBLISH'}</button>
@@ -990,6 +1061,44 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                 {/* USERS TAB */}
                 {activeTab === 'users' && (
                     <div className="max-w-2xl mx-auto space-y-8">
+                        
+                        {/* Change Password */}
+                        <div className="p-6 border border-white/10 rounded bg-white/5">
+                            <h3 className="font-bold mb-4 flex items-center gap-2"><Key size={18}/> Change My Password</h3>
+                            <div className="grid gap-4">
+                                <input 
+                                    type="password" 
+                                    value={changePassData.current} 
+                                    onChange={e => setChangePassData({...changePassData, current: e.target.value})} 
+                                    placeholder="Current Password" 
+                                    className="p-3 rounded bg-black border border-white/10 outline-none" 
+                                />
+                                <div className="grid grid-cols-2 gap-4">
+                                    <input 
+                                        type="password" 
+                                        value={changePassData.new} 
+                                        onChange={e => setChangePassData({...changePassData, new: e.target.value})} 
+                                        placeholder="New Password" 
+                                        className="p-3 rounded bg-black border border-white/10 outline-none" 
+                                    />
+                                    <input 
+                                        type="password" 
+                                        value={changePassData.confirm} 
+                                        onChange={e => setChangePassData({...changePassData, confirm: e.target.value})} 
+                                        placeholder="Confirm New Password" 
+                                        className="p-3 rounded bg-black border border-white/10 outline-none" 
+                                    />
+                                </div>
+                                <button 
+                                    onClick={handleChangePassword} 
+                                    disabled={isLoading}
+                                    className="w-full py-3 bg-blue-600 hover:bg-blue-500 rounded font-bold"
+                                >
+                                    {isLoading ? <Loader2 className="animate-spin mx-auto"/> : 'UPDATE PASSWORD'}
+                                </button>
+                            </div>
+                        </div>
+
                         <div className="p-6 border border-white/10 rounded bg-white/5">
                             <h3 className="font-bold mb-4 flex items-center gap-2"><Plus size={18}/> Create Administrator</h3>
                             <div className="grid gap-4">

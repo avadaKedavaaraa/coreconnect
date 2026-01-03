@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Lineage, type CarouselItem } from '../types';
 import { X, FileText, ExternalLink, MessageCircle, Share2, CornerDownRight } from 'lucide-react';
@@ -69,7 +68,8 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
   // Content is FORCED to be readable Sans Serif but allows color override
   const contentStyle = {
       color: customStyle.contentColor || '#e4e4e7',
-      fontFamily: '"Inter", "Segoe UI", system-ui, sans-serif', // Force readability
+      // Explicitly set font here, but class 'safe-font' will enforce it via !important if needed
+      fontFamily: '"Inter", "Segoe UI", system-ui, sans-serif', 
       lineHeight: '1.6',
       fontSize: '1rem'
   };
@@ -149,10 +149,10 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
             ) : (
                 /* Text Content - Stylized as a high-end message */
                 <div className="p-6 md:p-10 space-y-8 pb-24">
-                    {/* The Message Body */}
+                    {/* The Message Body - Added 'safe-font' class to protect from global override */}
                     <div className="prose prose-invert max-w-none">
                         <div 
-                            className="bg-white/5 p-6 md:p-8 rounded-2xl border border-white/5 shadow-inner"
+                            className="bg-white/5 p-6 md:p-8 rounded-2xl border border-white/5 shadow-inner safe-font"
                             style={contentStyle}
                             dangerouslySetInnerHTML={{__html: cleanContent}}
                         ></div>

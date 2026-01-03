@@ -460,6 +460,44 @@ router.post('/admin/users/delete', requireAuth, async (req, res) => {
     } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+router.post('/admin/change-password', requireAuth, async (req, res) => {
+    if (isMock) return res.status(500).json({ error: "DB Missing" });
+    const { currentPassword, newPassword } = req.body;
+    const username = req.user.username;
+
+    if (!currentPassword || !newPassword) return res.status(400).json({ error: "Missing fields" });
+
+    try {
+        // 1. Fetch User
+        const { data: user } = await supabase.from('admin_users').select('*').eq('username', username).single();
+        if (!user) return res.status(404).json({ error: "User not found" });
+
+        // 2. Verify Old Password
+        const derivedKey = await scryptAsync(currentPassword, user.salt, 64);
+        if (!crypto.timingSafeEqual(Buffer.from(user.password_hash, 'hex'), derivedKey)) {
+            return res.status(401).json({ error: "Incorrect current password" });
+        }
+
+        // 3. Hash New Password
+        const newSalt = crypto.randomBytes(16).toString('hex');
+        const newHash = (await scryptAsync(newPassword, newSalt, 64)).toString('hex');
+
+        // 4. Update DB
+        const { error } = await supabase.from('admin_users').update({
+            salt: newSalt,
+            password_hash: newHash
+        }).eq('username', username);
+
+        if (error) throw error;
+
+        await logAction(username, 'CHANGE_PASS', 'Updated own password', req);
+        res.json({ success: true });
+
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 // ------------------------------------------------------------------
 // IMPORT/EXPORT ROUTES
 // ------------------------------------------------------------------

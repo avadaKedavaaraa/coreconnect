@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Lineage, type UserProfile, SECTORS, GlobalConfig } from '../types';
+import { Lineage, type UserProfile, SECTORS, GlobalConfig, FONT_LIBRARY } from '../types';
 import { X, Clock, ClipboardList, User, Palette, Save, Type, PaintBucket, LayoutTemplate, Plus, Link as LinkIcon, Eye, Sun, Moon, Accessibility, Activity, RotateCw, Download, Search } from 'lucide-react';
 import Pomodoro from './Pomodoro';
 import Kanban from './Kanban';
@@ -14,78 +14,6 @@ interface ToolsModalProps {
   onToggleLineage?: () => void;
 }
 
-// --- EXTENDED FONT LIBRARY (60+ Options) ---
-const defaultFonts = [
-    { id: 'wizard', name: 'Wizard Serif', family: '"EB Garamond", serif', category: 'Classic' },
-    { id: 'muggle', name: 'Muggle Mono', family: '"JetBrains Mono", monospace', category: 'Tech' },
-    { id: 'sans', name: 'Modern Sans', family: '"Inter", sans-serif', category: 'Clean' },
-];
-
-const fontLibrary = [
-    // --- SERIF & ELEGANT ---
-    { id: 'playfair', name: 'Playfair Display', family: '"Playfair Display", serif', category: 'Elegant' },
-    { id: 'merriweather', name: 'Merriweather', family: '"Merriweather", serif', category: 'Serif' },
-    { id: 'lora', name: 'Lora', family: '"Lora", serif', category: 'Serif' },
-    { id: 'pt-serif', name: 'PT Serif', family: '"PT Serif", serif', category: 'Serif' },
-    { id: 'crimson', name: 'Crimson Text', family: '"Crimson Text", serif', category: 'Classic' },
-    { id: 'libre-baskerville', name: 'Libre Baskerville', family: '"Libre Baskerville", serif', category: 'Classic' },
-    { id: 'cinzel', name: 'Cinzel', family: '"Cinzel", serif', category: 'Fantasy' },
-    { id: 'abril', name: 'Abril Fatface', family: '"Abril Fatface", cursive', category: 'Display' },
-    { id: 'dm-serif', name: 'DM Serif Display', family: '"DM Serif Display", serif', category: 'Display' },
-    { id: 'bree', name: 'Bree Serif', family: '"Bree Serif", serif', category: 'Friendly' },
-    { id: 'arvo', name: 'Arvo', family: '"Arvo", serif', category: 'Slab' },
-    { id: 'bitter', name: 'Bitter', family: '"Bitter", serif', category: 'Slab' },
-    { id: 'rokkitt', name: 'Rokkitt', family: '"Rokkitt", serif', category: 'Slab' },
-
-    // --- SANS SERIF & CLEAN ---
-    { id: 'roboto', name: 'Roboto', family: '"Roboto", sans-serif', category: 'Clean' },
-    { id: 'opensans', name: 'Open Sans', family: '"Open Sans", sans-serif', category: 'Clean' },
-    { id: 'lato', name: 'Lato', family: '"Lato", sans-serif', category: 'Clean' },
-    { id: 'montserrat', name: 'Montserrat', family: '"Montserrat", sans-serif', category: 'Modern' },
-    { id: 'poppins', name: 'Poppins', family: '"Poppins", sans-serif', category: 'Modern' },
-    { id: 'raleway', name: 'Raleway', family: '"Raleway", sans-serif', category: 'Elegant' },
-    { id: 'nunito', name: 'Nunito', family: '"Nunito", sans-serif', category: 'Round' },
-    { id: 'rubik', name: 'Rubik', family: '"Rubik", sans-serif', category: 'Modern' },
-    { id: 'work-sans', name: 'Work Sans', family: '"Work Sans", sans-serif', category: 'Clean' },
-    { id: 'quicksand', name: 'Quicksand', family: '"Quicksand", sans-serif', category: 'Round' },
-    { id: 'oswald', name: 'Oswald', family: '"Oswald", sans-serif', category: 'Condensed' },
-    { id: 'anton', name: 'Anton', family: '"Anton", sans-serif', category: 'Condensed' },
-    { id: 'bebas', name: 'Bebas Neue', family: '"Bebas Neue", sans-serif', category: 'Condensed' },
-
-    // --- TECH & MONOSPACE ---
-    { id: 'orbitron', name: 'Orbitron', family: '"Orbitron", sans-serif', category: 'Sci-Fi' },
-    { id: 'audiowide', name: 'Audiowide', family: '"Audiowide", sans-serif', category: 'Sci-Fi' },
-    { id: 'exo', name: 'Exo 2', family: '"Exo 2", sans-serif', category: 'Sci-Fi' },
-    { id: 'rajdhani', name: 'Rajdhani', family: '"Rajdhani", sans-serif', category: 'Tech' },
-    { id: 'ubuntu', name: 'Ubuntu', family: '"Ubuntu", sans-serif', category: 'Tech' },
-    { id: 'courier', name: 'Courier Prime', family: '"Courier Prime", monospace', category: 'Mono' },
-    { id: 'fira', name: 'Fira Code', family: '"Fira Code", monospace', category: 'Code' },
-    { id: 'space', name: 'Space Mono', family: '"Space Mono", monospace', category: 'Mono' },
-    { id: 'vt323', name: 'VT323', family: '"VT323", monospace', category: 'Pixel' },
-    { id: 'press', name: 'Press Start 2P', family: '"Press Start 2P", cursive', category: 'Pixel' },
-    { id: 'share-tech', name: 'Share Tech Mono', family: '"Share Tech Mono", monospace', category: 'Tech' },
-
-    // --- HANDWRITTEN & DISPLAY ---
-    { id: 'cursive', name: 'Dancing Script', family: '"Dancing Script", cursive', category: 'Script' },
-    { id: 'pacific', name: 'Pacifico', family: '"Pacifico", cursive', category: 'Script' },
-    { id: 'shadows', name: 'Shadows Into Light', family: '"Shadows Into Light", cursive', category: 'Hand' },
-    { id: 'indie', name: 'Indie Flower', family: '"Indie Flower", cursive', category: 'Hand' },
-    { id: 'amatic', name: 'Amatic SC', family: '"Amatic SC", cursive', category: 'Hand' },
-    { id: 'caveat', name: 'Caveat', family: '"Caveat", cursive', category: 'Hand' },
-    { id: 'permanent', name: 'Permanent Marker', family: '"Permanent Marker", cursive', category: 'Bold' },
-    { id: 'satisfy', name: 'Satisfy', family: '"Satisfy", cursive', category: 'Script' },
-    { id: 'great-vibes', name: 'Great Vibes', family: '"Great Vibes", cursive', category: 'Elegant' },
-    { id: 'lobster', name: 'Lobster', family: '"Lobster", cursive', category: 'Display' },
-    { id: 'righteous', name: 'Righteous', family: '"Righteous", cursive', category: 'Retro' },
-    { id: 'fredoka', name: 'Fredoka One', family: '"Fredoka One", cursive', category: 'Round' },
-    { id: 'bangers', name: 'Bangers', family: '"Bangers", cursive', category: 'Comic' },
-    { id: 'creepster', name: 'Creepster', family: '"Creepster", cursive', category: 'Horror' },
-    { id: 'special-elite', name: 'Special Elite', family: '"Special Elite", cursive', category: 'Typewriter' },
-    { id: 'monoton', name: 'Monoton', family: '"Monoton", cursive', category: 'Retro' },
-    { id: 'rye', name: 'Rye', family: '"Rye", serif', category: 'Western' },
-    { id: 'unifraktur', name: 'UnifrakturMaguntia', family: '"UnifrakturMaguntia", cursive', category: 'Gothic' },
-];
-
 const themeColors = [
     { id: '', name: 'Default Lineage Color' },
     { id: '#f43f5e', name: 'Crimson Red' }, 
@@ -98,6 +26,7 @@ const themeColors = [
     { id: '#ffffff', name: 'Spectral White' },
 ];
 
+// Helper to load a single font (for import feature)
 const loadFontPreview = (fontName: string) => {
     const linkId = `font-preview-${fontName.replace(/\s+/g, '-')}`;
     if (!document.getElementById(linkId)) {
@@ -121,6 +50,29 @@ const FontPanel: React.FC<FontPanelProps> = ({ isWizard, onClose, onSelect, curr
     const [customFont, setCustomFont] = useState('');
     const [search, setSearch] = useState('');
 
+    // Bulk load all fonts in the library so previews work immediately
+    useEffect(() => {
+        // Chunk fonts to avoid URL length limits (approx 20 per chunk)
+        const chunkSize = 20;
+        for (let i = 0; i < FONT_LIBRARY.length; i += chunkSize) {
+            const chunk = FONT_LIBRARY.slice(i, i + chunkSize);
+            const families = chunk
+                .filter(f => !f.family.includes('sans-serif') && !f.family.includes('monospace') && !f.family.includes('serif')) // Skip generic system fonts if any
+                .map(f => f.name.replace(/\s+/g, '+'))
+                .join('&family=');
+            
+            if (families) {
+                const href = `https://fonts.googleapis.com/css2?family=${families}&display=swap`;
+                if (!document.querySelector(`link[href="${href}"]`)) {
+                    const link = document.createElement('link');
+                    link.href = href;
+                    link.rel = 'stylesheet';
+                    document.head.appendChild(link);
+                }
+            }
+        }
+    }, []);
+
     const handleImport = () => {
         if (!customFont.trim()) return;
         
@@ -143,7 +95,7 @@ const FontPanel: React.FC<FontPanelProps> = ({ isWizard, onClose, onSelect, curr
         onClose();
     };
 
-    const filteredFonts = fontLibrary.filter(f => f.name.toLowerCase().includes(search.toLowerCase()) || f.category.toLowerCase().includes(search.toLowerCase()));
+    const filteredFonts = FONT_LIBRARY.filter(f => f.name.toLowerCase().includes(search.toLowerCase()) || f.category.toLowerCase().includes(search.toLowerCase()));
 
     return (
         <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4 animate-[fade-in_0.2s]">
@@ -193,37 +145,8 @@ const FontPanel: React.FC<FontPanelProps> = ({ isWizard, onClose, onSelect, curr
                 </div>
 
                 {/* Font Grid - SCROLLABLE AREA */}
-                <div className={`flex-1 overflow-y-auto p-6 min-h-0 ${isWizard ? 'scrollbar-wizard' : 'scrollbar-muggle'}`}>
+                <div className={`flex-1 overflow-y-auto overscroll-contain p-6 min-h-0 ${isWizard ? 'scrollbar-wizard' : 'scrollbar-muggle'}`}>
                     
-                    {/* Default Section */}
-                    {!search && (
-                        <div className="mb-8">
-                            <h4 className="text-xs font-bold uppercase tracking-widest opacity-50 mb-4 text-white">System Defaults</h4>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                {defaultFonts.map(font => {
-                                    const isSelected = currentFont === font.id;
-                                    return (
-                                        <button
-                                            key={font.id}
-                                            onClick={() => { onSelect(font.id); onClose(); }}
-                                            className={`p-4 rounded-lg border text-left flex flex-col gap-1 transition-all hover:scale-[1.02]
-                                                ${isSelected 
-                                                    ? (isWizard ? 'bg-emerald-900/40 border-emerald-500 text-white' : 'bg-fuchsia-900/40 border-fuchsia-500 text-white') 
-                                                    : 'bg-white/5 border-white/10 text-zinc-400 hover:bg-white/10 hover:text-white'}
-                                            `}
-                                        >
-                                            <div className="flex justify-between items-center w-full">
-                                                <span className="text-[10px] font-bold uppercase tracking-wider opacity-50">{font.category}</span>
-                                                {isSelected && <Eye size={14} className={isWizard ? 'text-emerald-400' : 'text-fuchsia-400'}/>}
-                                            </div>
-                                            <div className="text-xl" style={{ fontFamily: font.family }}>{font.name}</div>
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    )}
-
                     {/* Extended Library */}
                     <h4 className="text-xs font-bold uppercase tracking-widest opacity-50 mb-4 text-white">
                         {search ? `Searching "${search}"` : "The Extended Collection"}
@@ -235,7 +158,7 @@ const FontPanel: React.FC<FontPanelProps> = ({ isWizard, onClose, onSelect, curr
                                 <button
                                     key={font.id}
                                     onClick={() => { loadFontPreview(font.name); onSelect(font.id); onClose(); }}
-                                    className={`p-4 rounded-lg border text-left flex flex-col gap-2 transition-all hover:scale-[1.02] relative group overflow-hidden
+                                    className={`p-4 rounded-lg border text-left flex flex-col gap-2 transition-all hover:scale-[1.02] relative group overflow-hidden h-28 justify-between
                                         ${isSelected 
                                             ? (isWizard ? 'bg-emerald-900/40 border-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.2)]' : 'bg-fuchsia-900/40 border-fuchsia-500 text-white shadow-[0_0_15px_rgba(217,70,239,0.2)]') 
                                             : 'bg-white/5 border-white/10 text-zinc-400 hover:bg-white/10 hover:text-white'}
@@ -248,11 +171,11 @@ const FontPanel: React.FC<FontPanelProps> = ({ isWizard, onClose, onSelect, curr
                                         {isSelected && <CheckCircleIcon isWizard={isWizard} />}
                                     </div>
                                     
-                                    <div className="mt-2 relative z-10">
-                                        <div className="text-2xl truncate leading-none mb-1" style={{ fontFamily: font.family }}>
+                                    <div className="relative z-10 w-full">
+                                        <div className="text-xl truncate leading-none mb-1 w-full" style={{ fontFamily: font.family }}>
                                             {font.name}
                                         </div>
-                                        <div className="text-sm opacity-50 truncate" style={{ fontFamily: font.family }}>
+                                        <div className="text-[10px] opacity-50 truncate w-full" style={{ fontFamily: font.family }}>
                                             The quick brown fox jumps over the lazy dog.
                                         </div>
                                     </div>

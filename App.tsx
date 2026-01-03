@@ -4,7 +4,7 @@ import Sidebar from './components/Sidebar';
 import Carousel from './components/Carousel';
 import HUD from './components/HUD';
 import LiveBackground from './components/LiveBackground';
-import { Lineage, SECTORS, type CarouselItem, type UserProfile, type Sector, type AdminPermissions, type LectureRule, GlobalConfig } from './types';
+import { Lineage, SECTORS, type CarouselItem, type UserProfile, type Sector, type AdminPermissions, type LectureRule, GlobalConfig, FONT_LIBRARY } from './types';
 import { Menu, Briefcase, Lock, LayoutList, Loader2, Info, ShieldAlert, Activity } from 'lucide-react';
 import { supabase } from './lib/supabase';
 
@@ -174,15 +174,62 @@ const App: React.FC = () => {
     return () => window.removeEventListener('keydown', handleGlobalKeys);
   }, []);
 
-  // Apply Fonts
+  // Apply Fonts Globally (Style Injection)
   useEffect(() => {
       if (profile.preferredFont) {
-          const fontMap: Record<string, string> = {
-              'wizard': '"EB Garamond", serif', 'muggle': '"JetBrains Mono", monospace', 'sans': '"Inter", sans-serif',
-              'playfair': '"Playfair Display", serif', 'orbitron': '"Orbitron", sans-serif', 'montserrat': '"Montserrat", sans-serif',
-              'courier': '"Courier Prime", monospace', 'cursive': '"Dancing Script", cursive', 'tech': '"Audiowide", sans-serif', 'retro': '"Righteous", cursive'
-          };
-          document.body.style.fontFamily = fontMap[profile.preferredFont] || '';
+          // 1. Find or construct the font family string
+          let fontFamily = '';
+          const knownFont = FONT_LIBRARY.find(f => f.id === profile.preferredFont);
+          
+          if (knownFont) {
+              fontFamily = knownFont.family;
+              // Ensure Google Font Link is present
+              const linkId = `font-loader-${knownFont.name.replace(/\s+/g, '-')}`;
+              if (!document.getElementById(linkId)) {
+                  const link = document.createElement('link');
+                  link.id = linkId;
+                  link.href = `https://fonts.googleapis.com/css2?family=${knownFont.name.replace(/ /g, '+')}&display=swap`;
+                  link.rel = 'stylesheet';
+                  document.head.appendChild(link);
+              }
+          } else {
+              // Custom/Fallback
+              fontFamily = `"${profile.preferredFont}", sans-serif`;
+              // Try to load it blindly if it's not in library (fallback logic)
+              const linkId = `font-loader-${profile.preferredFont.replace(/\s+/g, '-')}`;
+              if (!document.getElementById(linkId)) {
+                  const link = document.createElement('link');
+                  link.id = linkId;
+                  link.href = `https://fonts.googleapis.com/css2?family=${profile.preferredFont.replace(/ /g, '+')}&display=swap`;
+                  link.rel = 'stylesheet';
+                  document.head.appendChild(link);
+              }
+          }
+
+          // 2. Inject CSS to override Tailwind classes globally
+          // We target body and specific utility classes to force the user preference
+          const styleId = 'global-font-override';
+          let styleEl = document.getElementById(styleId) as HTMLStyleElement;
+          if (!styleEl) {
+              styleEl = document.createElement('style');
+              styleEl.id = styleId;
+              document.head.appendChild(styleEl);
+          }
+
+          styleEl.innerHTML = `
+            :root {
+                --user-font: ${fontFamily};
+            }
+            body, button, input, select, textarea, 
+            .font-wizard, .font-muggle, .font-sans, .font-serif, .font-mono,
+            .font-wizardTitle {
+                font-family: var(--user-font) !important;
+            }
+            /* EXCEPTION: Protect the message content in ItemViewer */
+            .safe-font, .safe-font * {
+                font-family: "Inter", "Segoe UI", system-ui, sans-serif !important;
+            }
+          `;
       }
   }, [profile.preferredFont]);
 
