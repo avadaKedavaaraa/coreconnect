@@ -9,7 +9,7 @@
     "dev": "node --watch index.js"
   },
   "dependencies": {
-    "@google/genai": "*",
+    "@google/genai": "latest",
     "@supabase/supabase-js": "^2.39.0",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
