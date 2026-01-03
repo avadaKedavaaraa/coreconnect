@@ -6,12 +6,13 @@ import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import multer from 'multer';
 import { createClient } from '@supabase/supabase-js';
-import { GoogleGenAI } from '@google/genai'; 
+import { GoogleGenAI } from '@google/genai';
 import xss from 'xss';
 import { promisify } from 'util';
 import rateLimit from 'express-rate-limit';
-import helmet from 'helmet'; 
+import helmet from 'helmet';
 import hpp from 'hpp';
+import { fileURLToPath } from 'url';
 
 // Load env vars
 dotenv.config();
@@ -25,7 +26,7 @@ app.set('trust proxy', 1);
 app.disable('x-powered-by');
 
 app.use(helmet({
-  contentSecurityPolicy: false, 
+  contentSecurityPolicy: false,
   crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
 
@@ -34,22 +35,22 @@ app.use(hpp());
 // Permissive CORS for troubleshooting
 app.use(cors({
   origin: true,
-  credentials: true, 
+  credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'x-csrf-token', 'Authorization']
 }));
 
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, 
+  windowMs: 15 * 60 * 1000,
   max: 3000, // Increased limit for admin actions
-  standardHeaders: true, 
+  standardHeaders: true,
   legacyHeaders: false,
 });
 
-app.use(express.json({ limit: '50mb' })); // Increased limit for Backups
-app.use(express.urlencoded({ extended: true, limit: '50mb' })); 
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(cookieParser());
-app.use(limiter); 
+app.use(limiter);
 
 app.use((req, res, next) => {
     const sanitize = (obj) => {
@@ -66,19 +67,34 @@ app.use((req, res, next) => {
     next();
 });
 
-// --- SUPABASE CLIENT ---
+// --- SUPABASE CLIENT (SAFE INIT) ---
 const supabaseUrl = process.env.VITE_SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
 
-if (!supabaseUrl || !supabaseKey) {
-    console.error("CRITICAL: Supabase credentials missing.");
-}
+// Fallback mock to prevent 502 Crash on Cold Start if keys are missing in Netlify Env
+const mockSupabase = {
+    from: () => ({
+        select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({data: null}), single: () => Promise.resolve({data: null}) }) }),
+        insert: () => Promise.resolve({ error: { message: "Database not configured" } }),
+        upsert: () => Promise.resolve({ error: { message: "Database not configured" } }),
+        update: () => ({ eq: () => Promise.resolve({ error: { message: "Database not configured" } }) }),
+        delete: () => ({ eq: () => Promise.resolve({ error: { message: "Database not configured" } }) }),
+    }),
+    storage: { from: () => ({ upload: () => Promise.resolve({ error: { message: "Storage not configured" } }), getPublicUrl: () => ({ data: { publicUrl: "" } }) }) }
+};
 
-const supabase = createClient(
-  supabaseUrl,
-  supabaseKey, 
-  { auth: { autoRefreshToken: false, persistSession: false } }
-);
+let supabase;
+if (supabaseUrl && supabaseKey) {
+    try {
+        supabase = createClient(supabaseUrl, supabaseKey, { auth: { autoRefreshToken: false, persistSession: false } });
+    } catch (e) {
+        console.error("Supabase Init Error:", e);
+        supabase = mockSupabase;
+    }
+} else {
+    console.warn("⚠️ Supabase Credentials Missing - Using Mock Client. Set VITE_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in Netlify.");
+    supabase = mockSupabase;
+}
 
 // --- GEMINI CLIENT ---
 let aiClient = null;
@@ -94,6 +110,7 @@ const sessions = new Map();
 
 (async function init() {
     try {
+        if (!supabaseUrl || !supabaseKey) return;
         // Ensure Admin exists
         const { data, error } = await supabase.from('admin_users').select('username').eq('username', 'admin').maybeSingle();
         if (!data && !error) {
@@ -141,7 +158,7 @@ const router = express.Router();
 // --- PUBLIC ROUTES ---
 
 router.get('/health', (req, res) => {
-    res.json({ status: 'active' });
+    res.json({ status: 'active', timestamp: new Date() });
 });
 
 router.post('/visitor/heartbeat', async (req, res) => {
@@ -162,7 +179,7 @@ router.post('/visitor/heartbeat', async (req, res) => {
         }, { onConflict: 'visitor_id' });
 
         if (error) {
-            console.error("Supabase Visitor Error:", error);
+            console.error("Supabase Error:", error);
             return res.status(500).json({ error: error.message });
         }
         res.json({ status: 'logged' });
@@ -173,7 +190,6 @@ router.post('/visitor/heartbeat', async (req, res) => {
 
 router.get('/config', async (req, res) => {
     try {
-      // ID 1 is Global Config
       const { data, error } = await supabase.from('global_config').select('config').eq('id', 1).maybeSingle();
       if (error) throw error;
       res.json(data?.config || {});
@@ -182,12 +198,11 @@ router.get('/config', async (req, res) => {
     }
 });
 
-// Fetch Sectors (Stored in Global Config ID 2 for simplicity)
 router.get('/sectors', async (req, res) => {
     try {
       const { data, error } = await supabase.from('global_config').select('config').eq('id', 2).maybeSingle();
       if (error) throw error;
-      res.json(data?.config || []); // Return array or empty
+      res.json(data?.config || []);
     } catch(e) { 
         res.status(500).json({ error: e.message }); 
     }
@@ -361,7 +376,7 @@ router.get('/admin/logs', requireAuth, async (req, res) => {
     } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-// --- USER MANAGEMENT ROUTES (Restored) ---
+// --- USER MANAGEMENT ROUTES ---
 router.get('/admin/users', requireAuth, async (req, res) => {
     if (!req.user.permissions.canManageUsers) return res.status(403).json({error: "Forbidden"});
     try {
@@ -396,7 +411,7 @@ router.post('/admin/users/delete', requireAuth, async (req, res) => {
     } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-// --- IMPORT/EXPORT ROUTES (Restored) ---
+// --- IMPORT/EXPORT ROUTES ---
 router.get('/admin/export', requireAuth, async (req, res) => {
     if (!req.user.permissions.canEdit) return res.status(403).json({error: "Forbidden"});
     try {
@@ -423,8 +438,14 @@ router.post('/admin/import', requireAuth, async (req, res) => {
 });
 
 app.use('/api', router);
-app.use('/', router);
-app.use('/.netlify/functions/api', router);
+
+// --- SERVER STARTUP (CONDITIONAL) ---
+// Only listen on port if running locally (not in Netlify Lambda)
+// This prevents 502 Bad Gateway / Timeouts on Netlify
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+    app.listen(PORT, () => {
+        console.log(`✅ CoreConnect Standalone Server running on port ${PORT}`);
+    });
+}
 
 export default app;
-if (process.argv[1] && process.argv[1].endsWith('index.js')) { app.listen(PORT, () => console.log(`Server running on ${PORT}`)); }
