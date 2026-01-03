@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Lineage, Sector, CarouselItem, AdminPermissions, GlobalConfig, LectureRule, VisitorLog, AdminUser, AuditLog } from '../types';
 import { API_URL } from '../App';
@@ -142,6 +141,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     setIsLoading(true);
     setError('');
     try {
+      // Use credentials: 'include' to pass cookies, which is crucial for session based auth
       const res = await fetch(`${API_URL}/api/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -170,7 +170,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
   const fetchUsers = async () => {
       try {
-          const res = await fetch(`${API_URL}/api/admin/users`, { headers: { 'x-csrf-token': csrfToken } });
+          const res = await fetch(`${API_URL}/api/admin/users`, { headers: { 'x-csrf-token': csrfToken }, credentials: 'include' });
           const data = await res.json();
           if(res.ok) setUsers(data);
       } catch(e) {}
@@ -182,7 +182,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
           const res = await fetch(`${API_URL}/api/admin/users/add`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrfToken },
-              body: JSON.stringify({ username: newUser, password: newUserPass, permissions: newPermissions })
+              body: JSON.stringify({ username: newUser, password: newUserPass, permissions: newPermissions }),
+              credentials: 'include'
           });
           if(res.ok) { fetchUsers(); setNewUser(''); setNewUserPass(''); alert('User created'); }
           else { const d = await res.json(); alert(d.error); }
@@ -195,7 +196,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
           const res = await fetch(`${API_URL}/api/admin/users/delete`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrfToken },
-              body: JSON.stringify({ targetUser: username })
+              body: JSON.stringify({ targetUser: username }),
+              credentials: 'include'
           });
           if(res.ok) fetchUsers();
           else { const d = await res.json(); alert(d.error); }
@@ -204,7 +206,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
   const fetchVisitors = async () => {
       try {
-          const res = await fetch(`${API_URL}/api/admin/visitors`, { headers: { 'x-csrf-token': csrfToken } });
+          const res = await fetch(`${API_URL}/api/admin/visitors`, { headers: { 'x-csrf-token': csrfToken }, credentials: 'include' });
           const data = await res.json();
           if(res.ok) setVisitors(data);
       } catch(e) {}
@@ -212,7 +214,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
   const fetchAuditLogs = async () => {
       try {
-          const res = await fetch(`${API_URL}/api/admin/logs`, { headers: { 'x-csrf-token': csrfToken } });
+          const res = await fetch(`${API_URL}/api/admin/logs`, { headers: { 'x-csrf-token': csrfToken }, credentials: 'include' });
           const data = await res.json();
           if(res.ok) setAuditLogs(data);
       } catch(e) {}
@@ -259,7 +261,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
           const res = await fetch(`${API_URL}/api/admin/upload`, {
               method: 'POST',
               headers: { 'x-csrf-token': csrfToken },
-              body: formData
+              body: formData,
+              credentials: 'include'
           });
           const data = await res.json();
           if (res.ok) {
@@ -323,8 +326,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
       const updated = [...schedules, rule];
       setSchedules(updated);
       setEditedConfig({ ...editedConfig, schedules: updated });
-      // We don't save immediately, user must click 'Save Config' or we can auto-save schedule separately
-      // For UX consistency, let's update global config state so when they click save config it saves.
   };
 
   const handleDeleteRule = (id: string) => {
@@ -345,7 +346,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
           const res = await fetch(`${API_URL}/api/ai/parse`, {
               method: 'POST',
               headers: { 'x-csrf-token': csrfToken },
-              body: formData
+              body: formData,
+              credentials: 'include'
           });
           const data = await res.json();
           if (res.ok) setAiResult(data);
@@ -392,7 +394,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   const handleExportData = async () => {
       setIsLoading(true);
       try {
-          const res = await fetch(`${API_URL}/api/admin/export`, { headers: { 'x-csrf-token': csrfToken } });
+          const res = await fetch(`${API_URL}/api/admin/export`, { headers: { 'x-csrf-token': csrfToken }, credentials: 'include' });
           const blob = await res.blob();
           const url = window.URL.createObjectURL(blob);
           const a = document.createElement('a');
@@ -420,7 +422,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
               const res = await fetch(`${API_URL}/api/admin/import`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrfToken },
-                  body: JSON.stringify(json)
+                  body: JSON.stringify(json),
+                  credentials: 'include'
               });
               
               if (res.ok) {
@@ -639,10 +642,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                     </div>
                 )}
                 
-                {/* ... other tabs content ... */}
-                {/* Due to length limits, retaining the full component logic provided previously but ensuring types match. */}
-                {/* The structure logic is identical to before but ensures error handling in login is displayed. */}
-                
+                {/* CREATOR TAB */}
                 {activeTab === 'creator' && (
                     <div className="flex flex-col xl:flex-row gap-8">
                         {/* Editor Column */}

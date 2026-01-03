@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect, useMemo, Suspense, lazy, useRef } from 'react';
 import IdentityGate from './components/IdentityGate';
 import Sidebar from './components/Sidebar';
@@ -22,6 +20,7 @@ const SystemInfoView = lazy(() => import('./components/SystemInfoView'));
 const getEnvVar = (key: string) => {
   try { return (import.meta as any).env?.[key]; } catch { return undefined; }
 };
+// If VITE_API_URL is defined (production), use it. Otherwise empty string triggers local proxy to /api
 export const API_URL = (getEnvVar('VITE_API_URL') || '').replace(/\/$/, '');
 
 async function safeFetch(url: string, options: RequestInit = {}) {

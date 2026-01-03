@@ -20,7 +20,11 @@ const createMockBuilder = () => {
     order: () => mock,
     insert: () => mock,
     delete: () => mock,
+    update: () => mock,
     eq: () => mock,
+    upsert: () => mock,
+    single: () => mock,
+    maybeSingle: () => mock,
     // Make the object awaitable (Thenable) returning empty data
     then: (resolve: any) => resolve({ data: [], error: null })
   };

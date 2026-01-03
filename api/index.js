@@ -1,4 +1,3 @@
-
 import dotenv from 'dotenv';
 import express from 'express';
 import crypto from 'crypto';
@@ -25,7 +24,7 @@ const PORT = process.env.PORT || 3000;
 app.set('trust proxy', 1);
 app.disable('x-powered-by');
 
-// --- SECURITY ---
+// --- SECURITY MIDDLEWARE ---
 app.use(helmet({
   contentSecurityPolicy: false, 
   crossOriginResourcePolicy: { policy: "cross-origin" }
@@ -46,13 +45,13 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(cookieParser());
 
+// Rate Limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, 
   max: 5000, // Generous limit for admin usage
   standardHeaders: true,
   legacyHeaders: false,
 });
-// Apply rate limiting to API routes
 app.use('/api', limiter);
 
 // Sanitization Middleware
@@ -99,6 +98,7 @@ let aiClient = null;
 if (process.env.API_KEY) {
   try {
     aiClient = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    console.log("✅ API: Gemini AI Connected");
   } catch (e) {
     console.error("AI System Init Failed:", e.message);
   }
@@ -177,7 +177,9 @@ const mapItemPayload = (body) => {
 
 const router = express.Router();
 
-// --- PUBLIC ROUTES ---
+// ------------------------------------------------------------------
+// PUBLIC ROUTES
+// ------------------------------------------------------------------
 
 router.get('/health', (req, res) => res.json({ status: 'active', db: isMock ? 'mock' : 'connected' }));
 
@@ -275,7 +277,9 @@ router.get('/me', (req, res) => {
     res.json({ authenticated: true, csrfToken: session.csrfToken, username: session.username, permissions: session.permissions });
 });
 
-// --- AI ENDPOINTS ---
+// ------------------------------------------------------------------
+// AI ROUTES
+// ------------------------------------------------------------------
 
 router.post('/ai/chat', async (req, res) => {
     if (!aiClient) return res.status(503).json({ error: "AI Not Configured" });
@@ -315,7 +319,9 @@ router.post('/ai/parse', requireAuth, uploadMiddleware.single('file'), async (re
     } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-// --- ADMIN ROUTES (Items) ---
+// ------------------------------------------------------------------
+// ADMIN ROUTES (Items)
+// ------------------------------------------------------------------
 
 router.post('/admin/items', requireAuth, async (req, res) => {
     if (!req.user.permissions.canEdit) return res.status(403).json({ error: "Forbidden" });
@@ -364,7 +370,9 @@ router.delete('/admin/items/:id', requireAuth, async (req, res) => {
     }
 });
 
-// --- ADMIN ROUTES (Config) ---
+// ------------------------------------------------------------------
+// ADMIN ROUTES (Config)
+// ------------------------------------------------------------------
 
 router.post('/admin/config', requireAuth, async (req, res) => {
     if (isMock) return res.status(500).json({ error: "DB Missing" });
@@ -386,7 +394,9 @@ router.post('/admin/sectors', requireAuth, async (req, res) => {
     } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-// --- ADMIN ROUTES (Storage) ---
+// ------------------------------------------------------------------
+// ADMIN ROUTES (Storage)
+// ------------------------------------------------------------------
 
 router.post('/admin/upload', requireAuth, uploadMiddleware.single('file'), async (req, res) => {
     if (isMock) return res.status(500).json({ error: "DB Missing" });
@@ -401,7 +411,9 @@ router.post('/admin/upload', requireAuth, uploadMiddleware.single('file'), async
     } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-// --- ADMIN ROUTES (Logs & Visitors) ---
+// ------------------------------------------------------------------
+// ADMIN ROUTES (Logs & Visitors)
+// ------------------------------------------------------------------
 
 router.get('/admin/visitors', requireAuth, async (req, res) => {
     if (isMock) return res.json([]);
@@ -415,7 +427,9 @@ router.get('/admin/logs', requireAuth, async (req, res) => {
     res.json(data || []);
 });
 
-// --- ADMIN ROUTES (User Management) ---
+// ------------------------------------------------------------------
+// ADMIN ROUTES (User Management)
+// ------------------------------------------------------------------
 
 router.get('/admin/users', requireAuth, async (req, res) => {
     if (isMock) return res.json([]);
@@ -446,7 +460,9 @@ router.post('/admin/users/delete', requireAuth, async (req, res) => {
     } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-// --- IMPORT/EXPORT ROUTES ---
+// ------------------------------------------------------------------
+// IMPORT/EXPORT ROUTES
+// ------------------------------------------------------------------
 
 router.get('/admin/export', requireAuth, async (req, res) => {
     if (isMock) return res.status(500).json({ error: "DB Missing" });
@@ -482,7 +498,9 @@ async function logAction(username, action, details, req) {
     try { await supabase.from('audit_logs').insert({ username, action, details: xss(details).substring(0, 500), ip }); } catch(e){}
 }
 
-// *** IMPORTANT: MOUNT ROUTER TO /api ***
+// ------------------------------------------------------------------
+// MOUNT ROUTER (Resolves 404 Error)
+// ------------------------------------------------------------------
 app.use('/api', router);
 
 try {
