@@ -192,7 +192,7 @@ const SystemInfoView: React.FC<SystemInfoViewProps> = ({ lineage, isAdmin }) => 
             <h3 className={`text-2xl font-bold flex items-center gap-3 ${isWizard ? 'text-emerald-100 font-wizardTitle' : 'text-fuchsia-100 font-muggle'}`}>
                <Shield size={24} /> {isWizard ? "High Council Protocols" : "Admin Privileges"}
             </h3>
-            {!isAdmin && <Lock className="opacity-50" size={20} />}
+            {!isAdmin && <Lock className="opacity-50 text-zinc-400" size={20} />}
          </div>
          
          <div className="p-6 md:p-8">
@@ -210,15 +210,15 @@ const SystemInfoView: React.FC<SystemInfoViewProps> = ({ lineage, isAdmin }) => 
                         <div className={`mt-1 w-2 h-2 rounded-full shrink-0 ${isWizard ? 'bg-emerald-500' : 'bg-fuchsia-500'}`}></div>
                         <div>
                            <h4 className={`font-bold text-sm ${isWizard ? 'text-emerald-200' : 'text-fuchsia-200'}`}>{item.title}</h4>
-                           <p className="text-xs text-zinc-400 mt-1">{item.desc}</p>
+                           <p className="text-xs text-zinc-300 mt-1">{item.desc}</p>
                         </div>
                      </div>
                   ))}
                </div>
             ) : (
                <div className="text-center py-8 opacity-60">
-                  <Lock size={48} className="mx-auto mb-4 opacity-50" />
-                  <p className={`max-w-md mx-auto ${isWizard ? 'font-wizard' : 'font-muggle'}`}>
+                  <Lock size={48} className={`mx-auto mb-4 opacity-50 ${isWizard ? 'text-emerald-400' : 'text-fuchsia-400'}`} />
+                  <p className={`max-w-md mx-auto text-zinc-300 ${isWizard ? 'font-wizard' : 'font-muggle'}`}>
                      {isWizard 
                         ? "These secrets are sealed by the Headmaster. Only those with the Elder Wand (Admin Key) may view the operational protocols."
                         : "Administrator access required. Please authenticate via the Settings panel to view system management protocols."}
