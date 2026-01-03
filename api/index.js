@@ -52,6 +52,7 @@ const limiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
 });
+// Apply rate limiting to API routes
 app.use('/api', limiter);
 
 app.use((req, res, next) => {
@@ -456,6 +457,9 @@ async function logAction(username, action, details, req) {
     const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
     try { await supabase.from('audit_logs').insert({ username, action, details: xss(details).substring(0, 500), ip }); } catch(e){}
 }
+
+// *** IMPORTANT: MOUNT ROUTER TO /api ***
+app.use('/api', router);
 
 try {
     if (process.argv[1] === fileURLToPath(import.meta.url)) {
