@@ -1,6 +1,4 @@
-
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Lineage, type UserProfile, SECTORS, GlobalConfig } from '../types';
 import { X, Clock, ClipboardList, User, Palette, Save, Type, PaintBucket, LayoutTemplate, Plus, Link as LinkIcon, Eye, Sun, Moon, Accessibility, Activity, RotateCw } from 'lucide-react';
 import Pomodoro from './Pomodoro';
@@ -15,6 +13,126 @@ interface ToolsModalProps {
   config?: GlobalConfig;
   onToggleLineage?: () => void;
 }
+
+// --- FONT DATA ---
+const defaultFonts = [
+    { id: 'wizard', name: 'Wizard Serif', family: '"EB Garamond", serif' },
+    { id: 'muggle', name: 'Muggle Mono', family: '"JetBrains Mono", monospace' },
+    { id: 'sans', name: 'Modern Sans', family: '"Inter", sans-serif' },
+];
+
+const extraFonts = [
+    { id: 'playfair', name: 'Playfair Display', family: '"Playfair Display", serif' },
+    { id: 'orbitron', name: 'Orbitron Cyber', family: '"Orbitron", sans-serif' },
+    { id: 'montserrat', name: 'Montserrat Clean', family: '"Montserrat", sans-serif' },
+    { id: 'courier', name: 'Courier Prime', family: '"Courier Prime", monospace' },
+    { id: 'cursive', name: 'Dancing Script', family: '"Dancing Script", cursive' },
+    { id: 'tech', name: 'Audiowide Tech', family: '"Audiowide", sans-serif' },
+    { id: 'retro', name: 'Righteous Retro', family: '"Righteous", cursive' },
+    { id: 'cinzel', name: 'Cinzel Cinematic', family: '"Cinzel", serif' },
+    { id: 'oswald', name: 'Oswald Bold', family: '"Oswald", sans-serif' },
+    { id: 'lato', name: 'Lato Neutral', family: '"Lato", sans-serif' },
+    { id: 'raleway', name: 'Raleway Elegant', family: '"Raleway", sans-serif' },
+    { id: 'lobster', name: 'Lobster Fun', family: '"Lobster", cursive' },
+    { id: 'abril', name: 'Abril Fatface', family: '"Abril Fatface", cursive' },
+    { id: 'shadows', name: 'Shadows Into Light', family: '"Shadows Into Light", cursive' },
+    { id: 'pacifico', name: 'Pacifico Brush', family: '"Pacifico", cursive' },
+    { id: 'exo', name: 'Exo 2 Sci-Fi', family: '"Exo 2", sans-serif' },
+    { id: 'ubuntu', name: 'Ubuntu Tech', family: '"Ubuntu", sans-serif' },
+    { id: 'vt323', name: 'VT323 Pixel', family: '"VT323", monospace' },
+    { id: 'press', name: 'Press Start 2P', family: '"Press Start 2P", cursive' },
+    { id: 'monoton', name: 'Monoton Lines', family: '"Monoton", cursive' },
+];
+
+const themeColors = [
+    { id: '', name: 'Default Lineage Color' },
+    { id: '#f43f5e', name: 'Crimson Red' }, 
+    { id: '#d97706', name: 'Amber Gold' }, 
+    { id: '#84cc16', name: 'Lime Venom' }, 
+    { id: '#06b6d4', name: 'Cyan Neon' }, 
+    { id: '#6366f1', name: 'Indigo Spirit' }, 
+    { id: '#a855f7', name: 'Purple Haze' }, 
+    { id: '#ec4899', name: 'Pink Punk' }, 
+    { id: '#ffffff', name: 'Spectral White' },
+];
+
+const loadFontPreview = (fontName: string) => {
+    const link = document.createElement('link');
+    link.href = `https://fonts.googleapis.com/css2?family=${fontName.replace(/ /g, '+')}&display=swap`;
+    link.rel = 'stylesheet';
+    document.head.appendChild(link);
+};
+
+// --- FONT PANEL COMPONENT (Outside to prevent re-renders) ---
+interface FontPanelProps {
+    isWizard: boolean;
+    onClose: () => void;
+    onSelect: (fontId: string) => void;
+    currentFont?: string;
+}
+
+const FontPanel: React.FC<FontPanelProps> = ({ isWizard, onClose, onSelect, currentFont }) => {
+    const [customFont, setCustomFont] = useState('');
+
+    return (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4 animate-[fade-in_0.2s]">
+            <div className={`w-full max-w-3xl h-[80vh] flex flex-col rounded-xl border shadow-2xl relative overflow-hidden
+               ${isWizard ? 'bg-[#0a0f0a] border-emerald-600' : 'bg-[#0f0a15] border-fuchsia-600'}
+            `}>
+                <div className="p-4 border-b flex justify-between items-center shrink-0 border-white/10">
+                    <h3 className="text-xl font-bold text-white flex items-center gap-2"><Type size={20}/> Font Treasury</h3>
+                    <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full text-white"><X size={24}/></button>
+                </div>
+                
+                <div className="p-4 flex gap-2 border-b border-white/10 bg-black/20 shrink-0">
+                    <input 
+                        value={customFont}
+                        onChange={(e) => setCustomFont(e.target.value)}
+                        placeholder="Enter Custom Google Font Name (e.g. 'Roboto Slab')" 
+                        className="flex-1 bg-black/40 border border-white/10 rounded px-3 py-2 text-white outline-none" 
+                    />
+                    <button 
+                      onClick={() => {
+                          if(customFont) {
+                              loadFontPreview(customFont);
+                              onSelect(customFont);
+                              onClose();
+                          }
+                      }}
+                      className="px-4 py-2 bg-white/10 rounded hover:bg-white/20 text-white text-xs font-bold"
+                    >
+                        LOAD
+                    </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {[...defaultFonts, ...extraFonts].map(font => {
+                        const isSelected = currentFont === font.id;
+                        return (
+                            <button
+                                key={font.id}
+                                onClick={() => { onSelect(font.id); onClose(); }}
+                                className={`p-4 rounded border text-left flex flex-col gap-2 transition-all hover:scale-[1.02]
+                                    ${isSelected 
+                                        ? (isWizard ? 'bg-emerald-900/40 border-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.2)]' : 'bg-fuchsia-900/40 border-fuchsia-500 text-white shadow-[0_0_15px_rgba(217,70,239,0.2)]') 
+                                        : 'bg-white/5 border-white/10 text-zinc-400 hover:bg-white/10 hover:text-white'}
+                                `}
+                            >
+                                <div className="flex justify-between items-center w-full">
+                                    <span className="text-xs font-bold uppercase tracking-wider opacity-50">{font.name}</span>
+                                    {isSelected && <Eye size={14} className={isWizard ? 'text-emerald-400' : 'text-fuchsia-400'}/>}
+                                </div>
+                                <div className="text-2xl truncate" style={{ fontFamily: font.family }}>
+                                    The quick brown fox jumps...
+                                </div>
+                            </button>
+                        );
+                    })}
+                </div>
+            </div>
+        </div>
+    );
+};
 
 const ToolsModal: React.FC<ToolsModalProps> = ({ lineage, onClose, profile, setProfile, config, onToggleLineage }) => {
   const [activeTab, setActiveTab] = useState<'timer' | 'tasks' | 'profile'>('profile');
@@ -56,114 +174,17 @@ const ToolsModal: React.FC<ToolsModalProps> = ({ lineage, onClose, profile, setP
     }
   };
 
-  // EXTENDED FONTS LIST (Google Fonts mainly)
-  const defaultFonts = [
-      { id: 'wizard', name: 'Wizard Serif', family: '"EB Garamond", serif' },
-      { id: 'muggle', name: 'Muggle Mono', family: '"JetBrains Mono", monospace' },
-      { id: 'sans', name: 'Modern Sans', family: '"Inter", sans-serif' },
-  ];
-
-  const extraFonts = [
-      { id: 'playfair', name: 'Playfair Display', family: '"Playfair Display", serif' },
-      { id: 'orbitron', name: 'Orbitron Cyber', family: '"Orbitron", sans-serif' },
-      { id: 'montserrat', name: 'Montserrat Clean', family: '"Montserrat", sans-serif' },
-      { id: 'courier', name: 'Courier Prime', family: '"Courier Prime", monospace' },
-      { id: 'cursive', name: 'Dancing Script', family: '"Dancing Script", cursive' },
-      { id: 'tech', name: 'Audiowide Tech', family: '"Audiowide", sans-serif' },
-      { id: 'retro', name: 'Righteous Retro', family: '"Righteous", cursive' },
-      { id: 'cinzel', name: 'Cinzel Cinematic', family: '"Cinzel", serif' },
-      { id: 'oswald', name: 'Oswald Bold', family: '"Oswald", sans-serif' },
-      { id: 'lato', name: 'Lato Neutral', family: '"Lato", sans-serif' },
-      { id: 'raleway', name: 'Raleway Elegant', family: '"Raleway", sans-serif' },
-      { id: 'lobster', name: 'Lobster Fun', family: '"Lobster", cursive' },
-      { id: 'abril', name: 'Abril Fatface', family: '"Abril Fatface", cursive' },
-      { id: 'shadows', name: 'Shadows Into Light', family: '"Shadows Into Light", cursive' },
-      { id: 'pacifico', name: 'Pacifico Brush', family: '"Pacifico", cursive' },
-      { id: 'exo', name: 'Exo 2 Sci-Fi', family: '"Exo 2", sans-serif' },
-      { id: 'ubuntu', name: 'Ubuntu Tech', family: '"Ubuntu", sans-serif' },
-      { id: 'vt323', name: 'VT323 Pixel', family: '"VT323", monospace' },
-      { id: 'press', name: 'Press Start 2P', family: '"Press Start 2P", cursive' },
-      { id: 'monoton', name: 'Monoton Lines', family: '"Monoton", cursive' },
-  ];
-
-  const themeColors = [
-      { id: '', name: 'Default Lineage Color' },
-      { id: '#f43f5e', name: 'Crimson Red' }, 
-      { id: '#d97706', name: 'Amber Gold' }, 
-      { id: '#84cc16', name: 'Lime Venom' }, 
-      { id: '#06b6d4', name: 'Cyan Neon' }, 
-      { id: '#6366f1', name: 'Indigo Spirit' }, 
-      { id: '#a855f7', name: 'Purple Haze' }, 
-      { id: '#ec4899', name: 'Pink Punk' }, 
-      { id: '#ffffff', name: 'Spectral White' },
-  ];
-
-  // Helper to dynamically load a Google Font preview if needed
-  const loadFontPreview = (fontName: string) => {
-      const link = document.createElement('link');
-      link.href = `https://fonts.googleapis.com/css2?family=${fontName.replace(/ /g, '+')}&display=swap`;
-      link.rel = 'stylesheet';
-      document.head.appendChild(link);
-  };
-
-  const FontPanel = () => (
-      <div className={`fixed inset-0 z-[90] flex items-center justify-center bg-black/90 backdrop-blur-xl p-4 animate-[fade-in_0.2s]`}>
-          <div className={`w-full max-w-3xl h-[80vh] flex flex-col rounded-xl border shadow-2xl relative
-             ${isWizard ? 'bg-[#0a0f0a] border-emerald-600' : 'bg-[#0f0a15] border-fuchsia-600'}
-          `}>
-              <div className="p-4 border-b flex justify-between items-center shrink-0 border-white/10">
-                  <h3 className="text-xl font-bold text-white flex items-center gap-2"><Type size={20}/> Font Treasury</h3>
-                  <button onClick={() => setShowFontPanel(false)} className="p-2 hover:bg-white/10 rounded-full text-white"><X size={24}/></button>
-              </div>
-              
-              <div className="p-4 flex gap-2 border-b border-white/10 bg-black/20">
-                  <input placeholder="Enter Custom Google Font Name (e.g. 'Roboto Slab')" className="flex-1 bg-black/40 border border-white/10 rounded px-3 py-2 text-white outline-none" id="custom-font-input" />
-                  <button 
-                    onClick={() => {
-                        const input = document.getElementById('custom-font-input') as HTMLInputElement;
-                        if(input.value) {
-                            loadFontPreview(input.value);
-                            setEditProfile({...editProfile, preferredFont: input.value as any});
-                            setShowFontPanel(false);
-                        }
-                    }}
-                    className="px-4 py-2 bg-white/10 rounded hover:bg-white/20 text-white text-xs font-bold"
-                  >
-                      LOAD
-                  </button>
-              </div>
-
-              <div className="flex-1 overflow-y-auto p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {[...defaultFonts, ...extraFonts].map(font => {
-                      const isSelected = editProfile.preferredFont === font.id;
-                      return (
-                          <button
-                              key={font.id}
-                              onClick={() => { setEditProfile({...editProfile, preferredFont: font.id as any}); setShowFontPanel(false); }}
-                              className={`p-4 rounded border text-left flex flex-col gap-2 transition-all hover:scale-[1.02]
-                                  ${isSelected 
-                                      ? (isWizard ? 'bg-emerald-900/40 border-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.2)]' : 'bg-fuchsia-900/40 border-fuchsia-500 text-white shadow-[0_0_15px_rgba(217,70,239,0.2)]') 
-                                      : 'bg-white/5 border-white/10 text-zinc-400 hover:bg-white/10 hover:text-white'}
-                              `}
-                          >
-                              <div className="flex justify-between items-center w-full">
-                                  <span className="text-xs font-bold uppercase tracking-wider opacity-50">{font.name}</span>
-                                  {isSelected && <Eye size={14} className={isWizard ? 'text-emerald-400' : 'text-fuchsia-400'}/>}
-                              </div>
-                              <div className="text-2xl truncate" style={{ fontFamily: font.family }}>
-                                  The quick brown fox jumps...
-                              </div>
-                          </button>
-                      );
-                  })}
-              </div>
-          </div>
-      </div>
-  );
-
   return (
     <>
-    {showFontPanel && <FontPanel />}
+    {showFontPanel && (
+        <FontPanel 
+            isWizard={isWizard} 
+            onClose={() => setShowFontPanel(false)} 
+            onSelect={(fontId) => setEditProfile({...editProfile, preferredFont: fontId as any})}
+            currentFont={editProfile.preferredFont}
+        />
+    )}
+    
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-[fade-in-up_0.2s_ease-out]">
       <div className={`w-full max-w-4xl h-[90dvh] md:h-auto md:max-h-[85vh] rounded-xl border shadow-2xl flex flex-col overflow-hidden relative
          ${isWizard ? 'bg-[#0a0f0a] border-emerald-600' : 'bg-[#0f0a15] border-fuchsia-600'}

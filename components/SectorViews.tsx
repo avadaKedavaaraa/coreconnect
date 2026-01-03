@@ -1,8 +1,6 @@
-
-
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Lineage, type CarouselItem, type LectureRule, GlobalConfig } from '../types';
-import { Book, FileText, Video, Calendar, Search, Filter, X, Trash2, LayoutGrid, List, FolderOpen, ArrowLeft, Edit2, Plus, FolderPlus, Loader2, Image as ImageIcon, Send, Link as LinkIcon, Repeat, ExternalLink, Hourglass, MonitorOff, Clock, Bell, Layers, Code, Link } from 'lucide-react';
+import { Book, FileText, Video, Calendar, Search, Filter, X, Trash2, LayoutGrid, List, FolderOpen, ArrowLeft, Edit2, Plus, FolderPlus, Loader2, Image as ImageIcon, Send, Link as LinkIcon, Repeat, ExternalLink, Hourglass, MonitorOff, Clock, Bell, Layers, Code, Link, Check } from 'lucide-react';
 import CalendarWidget from './CalendarWidget';
 import DOMPurify from 'dompurify';
 
@@ -17,13 +15,14 @@ interface SectorViewProps {
   onBack?: () => void;
   onAddItem?: (sectorId: string) => void; 
   onQuickCreate?: (item: CarouselItem) => void; 
+  onUpdateSubject?: (oldName: string, newName: string, newImage?: string) => Promise<void>;
   schedules?: LectureRule[];
   quickInputOnly?: boolean; 
   config?: GlobalConfig;
 }
 
 const SectorView: React.FC<SectorViewProps> = ({ 
-    items, lineage, sectorId, onViewItem, isAdmin, onDelete, onEdit, onBack, onAddItem, onQuickCreate, schedules, quickInputOnly, config 
+    items, lineage, sectorId, onViewItem, isAdmin, onDelete, onEdit, onBack, onAddItem, onQuickCreate, onUpdateSubject, schedules, quickInputOnly, config 
 }) => {
   const isWizard = lineage === Lineage.WIZARD;
   
@@ -38,8 +37,9 @@ const SectorView: React.FC<SectorViewProps> = ({
   const [quickPostText, setQuickPostText] = useState('');
   const [isPosting, setIsPosting] = useState(false);
 
-  // Subject Creation State
+  // Subject Creation/Editing State
   const [isCreatingSubject, setIsCreatingSubject] = useState(false);
+  const [editingSubject, setEditingSubject] = useState<{originalName: string, name: string, image: string} | null>(null);
   const [newSubjectName, setNewSubjectName] = useState('');
   const [newSubjectImage, setNewSubjectImage] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -192,6 +192,19 @@ const SectorView: React.FC<SectorViewProps> = ({
       } catch (e) { console.error(e); alert("Failed to create subject."); } finally { setIsProcessing(false); }
   };
 
+  const handleSaveSubjectEdit = async () => {
+      if (!editingSubject || !onUpdateSubject) return;
+      setIsProcessing(true);
+      try {
+          await onUpdateSubject(editingSubject.originalName, editingSubject.name, editingSubject.image);
+          setEditingSubject(null);
+      } catch(e) {
+          alert('Failed to update subject');
+      } finally {
+          setIsProcessing(false);
+      }
+  };
+
   const handleDeleteSubject = async (e: React.MouseEvent, subject: string) => {
       e.stopPropagation();
       if (!onDelete) return;
@@ -211,6 +224,41 @@ const SectorView: React.FC<SectorViewProps> = ({
           default: return <FileText size={20} />;
       }
   };
+
+  // --- EDIT SUBJECT MODAL ---
+  const EditSubjectModal = () => (
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className={`w-full max-w-md p-6 rounded-xl border shadow-2xl space-y-4
+             ${isWizard ? 'bg-[#0a0f0a] border-emerald-600' : 'bg-[#0f0a15] border-fuchsia-600'}
+          `}>
+              <h3 className={`text-xl font-bold ${isWizard ? 'text-emerald-100' : 'text-fuchsia-100'}`}>Edit Subject</h3>
+              <input 
+                  value={editingSubject?.name || ''}
+                  onChange={(e) => setEditingSubject(prev => prev ? {...prev, name: e.target.value} : null)}
+                  placeholder="Subject Name"
+                  className={`w-full p-3 rounded border bg-black/40 outline-none ${isWizard ? 'border-emerald-800 text-emerald-100' : 'border-fuchsia-800 text-fuchsia-100'}`}
+              />
+              <input 
+                  value={editingSubject?.image || ''}
+                  onChange={(e) => setEditingSubject(prev => prev ? {...prev, image: e.target.value} : null)}
+                  placeholder="Cover Image URL"
+                  className={`w-full p-3 rounded border bg-black/40 outline-none ${isWizard ? 'border-emerald-800 text-emerald-100' : 'border-fuchsia-800 text-fuchsia-100'}`}
+              />
+              {editingSubject?.image && <img src={editingSubject.image} className="w-full h-32 object-cover rounded border border-white/10" />}
+              
+              <div className="flex gap-2 justify-end">
+                  <button onClick={() => setEditingSubject(null)} className="px-4 py-2 rounded text-white/50 hover:text-white">Cancel</button>
+                  <button 
+                    onClick={handleSaveSubjectEdit} 
+                    disabled={isProcessing}
+                    className={`px-6 py-2 rounded font-bold flex items-center gap-2 ${isWizard ? 'bg-emerald-600 text-black' : 'bg-fuchsia-600 text-black'}`}
+                  >
+                      {isProcessing ? <Loader2 className="animate-spin"/> : <Check size={18}/>} Save Changes
+                  </button>
+              </div>
+          </div>
+      </div>
+  );
 
   if (quickInputOnly) {
      return (
@@ -239,6 +287,7 @@ const SectorView: React.FC<SectorViewProps> = ({
 
   return (
     <div className={`w-full max-w-7xl mx-auto px-4 sm:px-6 pb-20 animate-[fade-in-up_0.3s_ease-out] ${isWizard ? 'scrollbar-wizard' : 'scrollbar-muggle'}`}>
+      {editingSubject && <EditSubjectModal />}
       
       {/* Top Navigation Bar */}
       <div className="flex items-center gap-4 mb-4 justify-between">
@@ -300,7 +349,7 @@ const SectorView: React.FC<SectorViewProps> = ({
       `}>
          <div className="flex flex-col md:flex-row gap-4 w-full lg:w-auto flex-1">
             <div className="relative flex-[2] min-w-[200px]">
-              <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${isWizard ? 'text-emerald-500' : 'text-fuchsia-500'}`} />
+              <Search className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${isWizard ? 'text-emerald-500' : 'text-fuchsia-500'} pointer-events-none`} />
               <input 
                 type="text" 
                 placeholder={isWizard ? "Search the archives..." : "Filter database..."}
@@ -368,43 +417,58 @@ const SectorView: React.FC<SectorViewProps> = ({
              const coverImage = coverItem?.image;
 
              return (
-              <button
-                key={idx}
-                onClick={() => handleSubjectClick(subject)}
-                className={`h-40 relative overflow-hidden rounded-2xl border p-6 flex flex-col justify-end gap-2 text-left transition-all duration-500 hover:scale-[1.02] group
-                  ${isWizard 
-                    ? 'bg-black/60 border-emerald-900/50 hover:border-emerald-500/50 shadow-[0_0_20px_rgba(16,185,129,0.05)]' 
-                    : 'bg-black/60 border-fuchsia-900/50 hover:border-fuchsia-500/50 shadow-[0_0_20px_rgba(217,70,239,0.05)]'}
-                `}
-              >
-                {/* Background Image Logic with Blur */}
-                {coverImage ? (
-                    <>
-                        <div className="absolute inset-0 bg-cover bg-center blur-md opacity-40 group-hover:opacity-60 transition-opacity duration-700 transform scale-110" style={{ backgroundImage: `url(${coverImage})` }}></div>
-                        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-black/30"></div>
-                    </>
-                ) : (
-                    <Book size={100} className={`absolute -right-4 -top-4 opacity-5 transition-transform duration-700 group-hover:rotate-12 group-hover:scale-110 ${isWizard ? 'text-emerald-500' : 'text-fuchsia-500'}`} />
-                )}
-                
-                {isAdmin && onDelete && (
-                    <div 
-                        onClick={(e) => handleDeleteSubject(e, subject)}
-                        className="absolute top-2 right-2 p-2 rounded-full bg-red-900/80 text-white opacity-0 group-hover:opacity-100 transition-opacity z-20 hover:bg-red-700"
-                        title="Delete entire subject & all items"
-                    >
-                        <Trash2 size={16} />
+              <div key={idx} className="relative group">
+                  <button
+                    onClick={() => handleSubjectClick(subject)}
+                    className={`w-full h-40 relative overflow-hidden rounded-2xl border p-6 flex flex-col justify-end gap-2 text-left transition-all duration-500 hover:scale-[1.02]
+                      ${isWizard 
+                        ? 'bg-black/60 border-emerald-900/50 hover:border-emerald-500/50 shadow-[0_0_20px_rgba(16,185,129,0.05)]' 
+                        : 'bg-black/60 border-fuchsia-900/50 hover:border-fuchsia-500/50 shadow-[0_0_20px_rgba(217,70,239,0.05)]'}
+                    `}
+                  >
+                    {/* Background Image Logic with Blur */}
+                    {coverImage ? (
+                        <>
+                            <div className="absolute inset-0 bg-cover bg-center blur-md opacity-40 group-hover:opacity-60 transition-opacity duration-700 transform scale-110" style={{ backgroundImage: `url(${coverImage})` }}></div>
+                            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-black/30"></div>
+                        </>
+                    ) : (
+                        <Book size={100} className={`absolute -right-4 -top-4 opacity-5 transition-transform duration-700 group-hover:rotate-12 group-hover:scale-110 ${isWizard ? 'text-emerald-500' : 'text-fuchsia-500'}`} />
+                    )}
+                    
+                    <span className={`relative z-10 text-2xl font-bold leading-none drop-shadow-lg ${isWizard ? 'font-wizardTitle text-emerald-100' : 'font-muggle text-fuchsia-100'}`}>
+                      {subject}
+                    </span>
+                    <div className={`relative z-10 flex items-center gap-2 text-xs opacity-80 group-hover:opacity-100 transition-opacity drop-shadow-md ${isWizard ? 'font-wizard text-emerald-200' : 'font-muggle text-fuchsia-200'}`}>
+                       <div className={`h-px w-8 ${isWizard ? 'bg-emerald-500' : 'bg-fuchsia-500'}`}></div>
+                       {count} {isWizard ? 'Scrolls' : 'Files'}
                     </div>
-                )}
+                  </button>
 
-                <span className={`relative z-10 text-2xl font-bold leading-none drop-shadow-lg ${isWizard ? 'font-wizardTitle text-emerald-100' : 'font-muggle text-fuchsia-100'}`}>
-                  {subject}
-                </span>
-                <div className={`relative z-10 flex items-center gap-2 text-xs opacity-80 group-hover:opacity-100 transition-opacity drop-shadow-md ${isWizard ? 'font-wizard text-emerald-200' : 'font-muggle text-fuchsia-200'}`}>
-                   <div className={`h-px w-8 ${isWizard ? 'bg-emerald-500' : 'bg-fuchsia-500'}`}></div>
-                   {count} {isWizard ? 'Scrolls' : 'Files'}
-                </div>
-              </button>
+                  {/* Admin Overlay for Subject Actions */}
+                  {isAdmin && (
+                      <div className="absolute top-2 right-2 flex gap-1 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
+                          {onUpdateSubject && (
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); setEditingSubject({originalName: subject, name: subject, image: coverImage || ''}); }}
+                                className="p-2 rounded-full bg-blue-600/80 text-white hover:bg-blue-500"
+                                title="Edit Subject Details"
+                              >
+                                  <Edit2 size={16} />
+                              </button>
+                          )}
+                          {onDelete && (
+                              <button 
+                                  onClick={(e) => handleDeleteSubject(e, subject)}
+                                  className="p-2 rounded-full bg-red-900/80 text-white hover:bg-red-700"
+                                  title="Delete entire subject & all items"
+                              >
+                                  <Trash2 size={16} />
+                              </button>
+                          )}
+                      </div>
+                  )}
+              </div>
             );
           })}
           
@@ -608,9 +672,25 @@ const SectorView: React.FC<SectorViewProps> = ({
                         </div>
                     )}
 
-                    <div className={`shrink-0 rounded-full flex items-center justify-center z-10 ${viewMode === 'list' ? 'w-12 h-12' : 'w-12 h-12 mb-2'} ${isWizard ? 'bg-emerald-900/30 text-emerald-400' : 'bg-fuchsia-900/30 text-fuchsia-400'}`}>
-                       {getTypeIcon(item.type)}
-                    </div>
+                    {/* Image Preview for Masonry items */}
+                    {item.image && viewMode === 'masonry' && (
+                        <div className="w-full h-32 overflow-hidden rounded-lg relative">
+                            <img src={item.image} alt={item.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
+                            <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors"></div>
+                        </div>
+                    )}
+
+                    {viewMode === 'list' && item.image && (
+                        <div className="w-16 h-16 shrink-0 overflow-hidden rounded-lg">
+                            <img src={item.image} alt={item.title} className="w-full h-full object-cover" />
+                        </div>
+                    )}
+
+                    {!item.image && (
+                        <div className={`shrink-0 rounded-full flex items-center justify-center z-10 ${viewMode === 'list' ? 'w-12 h-12' : 'w-12 h-12 mb-2'} ${isWizard ? 'bg-emerald-900/30 text-emerald-400' : 'bg-fuchsia-900/30 text-fuchsia-400'}`}>
+                           {getTypeIcon(item.type)}
+                        </div>
+                    )}
                     
                     <div className="flex-1 min-w-0">
                        <div className="flex items-center gap-2 mb-1">

@@ -359,6 +359,44 @@ const App: React.FC = () => {
     if(ok) setDbItems(prev => prev.filter(i => i.id !== id));
   };
 
+  // SUBJECT UPDATE LOGIC
+  const handleUpdateSubject = async (oldName: string, newName: string, newImage?: string) => {
+      if (!isAdmin) return;
+      
+      const subjectItems = dbItems.filter(i => (i.subject || 'General') === oldName);
+      if (subjectItems.length === 0) return;
+
+      // 1. Prepare updates for renaming
+      const updates = subjectItems.map(item => ({...item, subject: newName}));
+
+      // 2. Handle Image update
+      if (newImage) {
+          // Find the "cover item" (first one with image)
+          const coverIndex = updates.findIndex(i => i.image && i.image.length > 0);
+          
+          if (coverIndex !== -1) {
+              // Update existing cover item's image
+              updates[coverIndex].image = newImage;
+          } else if (updates.length > 0) {
+              // No image exists in any item, assign to the first one to act as cover
+              updates[0].image = newImage;
+          }
+      }
+
+      // 3. Batch Process
+      // We process sequentially to avoid overloading rate limits or connections
+      for (const item of updates) {
+          await safeFetch(`${API_URL}/api/admin/items/${item.id}`, {
+              method: 'PUT', 
+              headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrfToken }, 
+              body: JSON.stringify(item)
+          });
+      }
+      
+      // 4. Refresh
+      fetchDbItems();
+  };
+
   const handleViewItem = (item: CarouselItem) => setViewingItem(item);
   const handleEditItemRequest = (item: CarouselItem) => {
     setEditingItem(item);
@@ -458,6 +496,7 @@ const App: React.FC = () => {
                     onBack={activeSectorId === 'announcements' ? () => setAnnouncementViewMode('carousel') : undefined}
                     onAddItem={(sector) => { setEditingItem(null); setActiveSectorId(sector); setAdminInitialTab('creator'); setAdminPanelOpen(true); }}
                     onQuickCreate={handleCreateItem}
+                    onUpdateSubject={handleUpdateSubject}
                     schedules={globalConfig.schedules} 
                     config={globalConfig}
                   />
