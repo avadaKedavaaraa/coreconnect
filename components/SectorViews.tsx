@@ -52,14 +52,17 @@ const SectorView: React.FC<SectorViewProps> = ({
   const displayItems = useMemo(() => {
       let combined = [...items];
 
+      // Fix: Safely handle schedules existence
+      const safeSchedules = schedules || [];
+
       // If we are in "lectures" and have schedules
-      if (sectorId === 'lectures' && schedules && schedules.length > 0) {
+      if (sectorId === 'lectures' && safeSchedules.length > 0) {
           const today = new Date();
           const dayName = today.toLocaleDateString('en-US', { weekday: 'long' });
           const todayStr = today.toISOString().split('T')[0].replace(/-/g, '.');
 
           // Find rules for Today
-          const todaysRules = schedules.filter(rule => 
+          const todaysRules = safeSchedules.filter(rule => 
               rule.isActive && rule.dayOfWeek === dayName && 
               (!rule.endDate || new Date(rule.endDate) >= today)
           );
@@ -174,9 +177,19 @@ const SectorView: React.FC<SectorViewProps> = ({
       if (!newSubjectName.trim() || !onQuickCreate) return;
       setIsProcessing(true);
       const today = new Date().toISOString().split('T')[0].replace(/-/g, '.');
+      // Create a genesis item for this subject to initialize it in the DB
       const genesisItem: CarouselItem = {
-          id: crypto.randomUUID(), title: `Welcome to ${newSubjectName}`, content: `This folder has been created for ${newSubjectName} resources.`, date: today,
-          type: 'announcement', sector: sectorId, subject: newSubjectName, image: newSubjectImage || undefined, author: 'System', isUnread: true, likes: 0
+          id: crypto.randomUUID(), 
+          title: `Welcome to ${newSubjectName}`, 
+          content: `This folder has been created for ${newSubjectName} resources.`, 
+          date: today,
+          type: 'announcement', 
+          sector: sectorId, 
+          subject: newSubjectName, 
+          image: newSubjectImage || undefined, // Background image applied to genesis item acts as cover
+          author: 'System', 
+          isUnread: true, 
+          likes: 0
       };
       try {
           await onQuickCreate(genesisItem);
