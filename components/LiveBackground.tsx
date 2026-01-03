@@ -11,7 +11,6 @@ const LiveBackground: React.FC<LiveBackgroundProps> = ({ lineage }) => {
   const isWizard = lineage === Lineage.WIZARD;
 
   useEffect(() => {
-    // 1. Capture ref to local variable to handle null checks for TS
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -37,8 +36,6 @@ const LiveBackground: React.FC<LiveBackgroundProps> = ({ lineage }) => {
       vy: number;
       size: number;
       color: string;
-      
-      // We pass canvas dimensions into constructor to avoid closure reference issues
       canvasWidth: number;
       canvasHeight: number;
 
@@ -120,8 +117,8 @@ const LiveBackground: React.FC<LiveBackgroundProps> = ({ lineage }) => {
       particles = [];
       const count = isWizard ? 120 : 180; 
       
-      for (let i = 0; i < count; i++) {
-        if (canvas) {
+      if (canvas) {
+        for (let i = 0; i < count; i++) {
             particles.push(new Particle(canvas.width, canvas.height));
         }
       }
@@ -148,9 +145,6 @@ const LiveBackground: React.FC<LiveBackgroundProps> = ({ lineage }) => {
                 ctx.lineTo(mouse.x, mouse.y);
                 ctx.stroke();
             }
-            
-            // Connect Neighbors
-            /* Performance Optimization: limit checks or use spatial hash in production */
         }
       });
 
@@ -158,8 +152,8 @@ const LiveBackground: React.FC<LiveBackgroundProps> = ({ lineage }) => {
     }
 
     const handleMouseMove = (e: MouseEvent) => {
-        mouse.x = e.x;
-        mouse.y = e.y;
+        mouse.x = e.clientX;
+        mouse.y = e.clientY;
     };
 
     window.addEventListener('resize', resize);
@@ -173,7 +167,7 @@ const LiveBackground: React.FC<LiveBackgroundProps> = ({ lineage }) => {
       window.removeEventListener('mousemove', handleMouseMove);
       cancelAnimationFrame(animationFrameId);
     };
-  }, [lineage]); // Re-run effect when lineage changes
+  }, [lineage]);
 
   return (
     <canvas 

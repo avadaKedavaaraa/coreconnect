@@ -139,7 +139,8 @@ const IdentityGate: React.FC<IdentityGateProps> = ({ onSelect, config }) => {
             className="absolute inset-0 bg-cover bg-center transition-all duration-1000"
             style={{ 
                 backgroundImage: `url('${wizardBg}')`, 
-                opacity: selected === Lineage.WIZARD ? 1 : 0.6, // Ensure full visibility when selected
+                // Ensure opacity is high enough to see the image, dim only when not selected
+                opacity: selected === Lineage.WIZARD ? 1 : 0.6, 
                 filter: selected === Lineage.WIZARD ? 'none' : 'brightness(0.5)'
             }}
         ></div>
