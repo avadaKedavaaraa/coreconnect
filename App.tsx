@@ -11,6 +11,7 @@ import { supabase } from './lib/supabase';
 const SectorView = lazy(() => import('./components/SectorViews'));
 const ToolsModal = lazy(() => import('./components/ToolsModal'));
 const ItemViewer = lazy(() => import('./components/ItemViewer'));
+const PDFViewer = lazy(() => import('./components/PDFViewer'));
 const CommandPalette = lazy(() => import('./components/CommandPalette'));
 const CommandCenter = lazy(() => import('./components/CommandCenter'));
 const AdminPanel = lazy(() => import('./components/AdminPanel'));
@@ -410,6 +411,16 @@ const App: React.FC = () => {
     setPermissions(perms);
   };
 
+  // PDF Detection
+  const isPDF = (item: CarouselItem | null) => {
+      if (!item) return false;
+      const url = item.fileUrl?.toLowerCase() || '';
+      const isDrive = url.includes('drive.google.com');
+      const isPdfExtension = url.endsWith('.pdf');
+      // Treat generic "file" type with drive link as PDF compatible
+      return (item.type === 'file' || item.type === 'link') && (isPdfExtension || isDrive);
+  };
+
   if (!configLoaded) return <LoadingSpinner lineage={null} color="#ffffff" />;
 
   if (!lineage) return <IdentityGate onSelect={handleLineageSelect} config={globalConfig} />;
@@ -537,7 +548,14 @@ const App: React.FC = () => {
                 onUpdateConfig={saveGlobalConfig} 
                 onClearData={() => { localStorage.clear(); window.location.reload(); }} 
             />
-            {viewingItem && <ItemViewer item={viewingItem} lineage={lineage} onClose={() => setViewingItem(null)} />}
+            {/* Conditional Rendering for Viewer Type */}
+            {viewingItem && (
+                isPDF(viewingItem) ? (
+                    <PDFViewer item={viewingItem} lineage={lineage} onClose={() => setViewingItem(null)} />
+                ) : (
+                    <ItemViewer item={viewingItem} lineage={lineage} onClose={() => setViewingItem(null)} />
+                )
+            )}
             <CommandPalette lineage={lineage} isOpen={cmdOpen} onClose={() => setCmdOpen(false)} onNavigate={setActiveSectorId} />
         </Suspense>
       </main>

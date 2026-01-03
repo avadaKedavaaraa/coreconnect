@@ -62,6 +62,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
       style: { titleColor: '#ffffff', contentColor: '#e4e4e7', fontFamily: 'sans', isGradient: false }
   });
   const [isEditingItem, setIsEditingItem] = useState(false);
+  const [isCustomSubject, setIsCustomSubject] = useState(false); // Toggle for new subject input
   const contentRef = useRef<HTMLTextAreaElement>(null);
   
   // Scheduler Tab State
@@ -133,6 +134,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
           style: { titleColor: '#ffffff', contentColor: '#e4e4e7', fontFamily: 'sans', isGradient: false }
       });
       setIsEditingItem(false);
+      setIsCustomSubject(false);
   };
 
   // --- API HANDLERS ---
@@ -569,6 +571,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                 {/* DATABASE TAB */}
                 {activeTab === 'database' && (
                     <div className="space-y-6">
+                        {/* Search & Filters */}
                         <div className="flex gap-4">
                             <div className="flex-1 relative">
                                 <Search className="absolute left-3 top-3 text-white/50" size={18} />
@@ -663,7 +666,37 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                     {sectors.map(s => <option key={s.id} value={s.id} className="bg-black">{isWizard ? s.wizardName : s.muggleName}</option>)}
                                 </select>
                                 <input type="date" value={itemForm.date} onChange={e => setItemForm({...itemForm, date: e.target.value})} className="p-3 bg-white/5 border border-white/10 rounded text-white outline-none" />
-                                <div className="relative"><input list="subjects-list" value={itemForm.subject} onChange={e => setItemForm({...itemForm, subject: e.target.value})} placeholder="Subject" className="w-full p-3 bg-white/5 border border-white/10 rounded text-white outline-none" /><datalist id="subjects-list">{uniqueSubjects.map(s => <option key={s} value={s} />)}</datalist></div>
+                                
+                                {/* Subject Selector - Enhanced */}
+                                <div className="relative">
+                                    <select 
+                                        value={isCustomSubject ? '__NEW__' : itemForm.subject}
+                                        onChange={(e) => {
+                                            if (e.target.value === '__NEW__') {
+                                                setIsCustomSubject(true);
+                                                setItemForm({...itemForm, subject: ''});
+                                            } else {
+                                                setIsCustomSubject(false);
+                                                setItemForm({...itemForm, subject: e.target.value});
+                                            }
+                                        }}
+                                        className="w-full p-3 bg-white/5 border border-white/10 rounded text-white outline-none appearance-none"
+                                    >
+                                        <option value="" className="bg-black">-- Select Subject --</option>
+                                        {uniqueSubjects.map(s => <option key={s} value={s} className="bg-black">{s}</option>)}
+                                        <option value="__NEW__" className="bg-blue-900 font-bold">+ Create New Subject</option>
+                                    </select>
+                                </div>
+                                {isCustomSubject && (
+                                    <input 
+                                        type="text"
+                                        autoFocus
+                                        value={itemForm.subject}
+                                        onChange={(e) => setItemForm({...itemForm, subject: e.target.value})}
+                                        placeholder="Enter New Subject Name..."
+                                        className="col-span-2 p-3 bg-blue-900/20 border border-blue-500/50 rounded text-blue-200 outline-none placeholder:text-blue-200/50 animate-[fade-in_0.2s]"
+                                    />
+                                )}
                             </div>
                             
                             <div className="p-4 rounded border border-white/10 bg-white/5">
@@ -742,7 +775,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                     </h2>
                                     <div 
                                         className="text-sm font-sans leading-relaxed"
-                                        style={{ color: itemForm.style?.contentColor }}
+                                        // Ensure text color defaults to readable light grey if missing or black in DB
+                                        style={{ color: (itemForm.style?.contentColor && itemForm.style.contentColor !== '#000000') ? itemForm.style.contentColor : '#e4e4e7' }}
                                         dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(itemForm.content || "Content preview...", { ADD_TAGS: ['style'] }) }}
                                     ></div>
                                 </div>
