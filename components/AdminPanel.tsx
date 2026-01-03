@@ -37,7 +37,7 @@ interface AdminPanelProps {
   onUpdateItem?: (item: CarouselItem) => void;
   onDeleteItem?: (id: string) => void;
   onUpdateSectors?: (sectors: Sector[]) => void;
-  onUpdateConfig?: (config: GlobalConfig) => void;
+  onUpdateConfig?: (config: GlobalConfig) => Promise<void>; // Updated signature to Promise
   onClearData: () => void;
 }
 
@@ -54,6 +54,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isSavingConfig, setIsSavingConfig] = useState(false); // New state for config save
 
   // Content Editing State
   const [itemSearch, setItemSearch] = useState('');
@@ -370,8 +371,20 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
       } catch (e: any) { alert("Error: " + e.message); } finally { setIsUploading(false); }
   };
 
-  const handleSaveConfig = () => {
-    if (onUpdateConfig) { onUpdateConfig(editedConfig); alert("Config Saved! Re-logging might be required for all changes to appear."); }
+  const handleSaveConfig = async () => {
+    if (onUpdateConfig) { 
+        setIsSavingConfig(true);
+        try {
+            await onUpdateConfig(editedConfig); 
+            // Give a little visual delay so user sees "Saving..."
+            setTimeout(() => {
+                alert("Config Saved! Re-logging might be required for all changes to appear.");
+                setIsSavingConfig(false);
+            }, 500);
+        } catch(e) {
+            setIsSavingConfig(false);
+        }
+    }
   };
 
   // User Management Handlers
@@ -1127,21 +1140,29 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
                 {/* CONFIG TAB */}
                 {activeTab === 'config' && (
-                    <div className="max-w-3xl mx-auto space-y-6">
+                    <div className="max-w-3xl mx-auto space-y-6 pb-20">
                         <div className="p-6 border border-white/10 rounded bg-white/5 space-y-4">
                             <h3 className="font-bold flex items-center gap-2"><Settings size={18}/> Global Identity</h3>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="text-xs opacity-50 mb-1 block">Wizard Title</label>
-                                    <input value={editedConfig.wizardTitle} onChange={e => setEditedConfig({...editedConfig, wizardTitle: e.target.value})} className="w-full p-2 bg-black border border-white/10 rounded" />
+                                    <input value={editedConfig.wizardTitle} onChange={e => setEditedConfig({...editedConfig, wizardTitle: e.target.value})} className="w-full p-2 bg-black border border-white/10 rounded outline-none" />
                                 </div>
                                 <div>
                                     <label className="text-xs opacity-50 mb-1 block">Muggle Title</label>
-                                    <input value={editedConfig.muggleTitle} onChange={e => setEditedConfig({...editedConfig, muggleTitle: e.target.value})} className="w-full p-2 bg-black border border-white/10 rounded" />
+                                    <input value={editedConfig.muggleTitle} onChange={e => setEditedConfig({...editedConfig, muggleTitle: e.target.value})} className="w-full p-2 bg-black border border-white/10 rounded outline-none" />
+                                </div>
+                                <div>
+                                    <label className="text-xs opacity-50 mb-1 block">Wizard Gate Text</label>
+                                    <input value={editedConfig.wizardGateText} onChange={e => setEditedConfig({...editedConfig, wizardGateText: e.target.value})} className="w-full p-2 bg-black border border-white/10 rounded outline-none" />
+                                </div>
+                                <div>
+                                    <label className="text-xs opacity-50 mb-1 block">Muggle Gate Text</label>
+                                    <input value={editedConfig.muggleGateText} onChange={e => setEditedConfig({...editedConfig, muggleGateText: e.target.value})} className="w-full p-2 bg-black border border-white/10 rounded outline-none" />
                                 </div>
                                 <div className="col-span-2">
                                     <label className="text-xs opacity-50 mb-1 block">Telegram Link</label>
-                                    <input value={editedConfig.telegramLink || ''} onChange={e => setEditedConfig({...editedConfig, telegramLink: e.target.value})} placeholder="https://t.me/..." className="w-full p-2 bg-black border border-white/10 rounded" />
+                                    <input value={editedConfig.telegramLink || ''} onChange={e => setEditedConfig({...editedConfig, telegramLink: e.target.value})} placeholder="https://t.me/..." className="w-full p-2 bg-black border border-white/10 rounded outline-none" />
                                 </div>
                             </div>
                         </div>
@@ -1153,7 +1174,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                 <div>
                                     <label className="text-xs opacity-50 mb-1 block">Wizard Mode Logo</label>
                                     <div className="flex gap-2">
-                                        <input value={editedConfig.wizardLogoUrl || ''} onChange={e => setEditedConfig({...editedConfig, wizardLogoUrl: e.target.value})} placeholder="URL..." className="flex-1 p-2 bg-black border border-white/10 rounded" />
+                                        <input value={editedConfig.wizardLogoUrl || ''} onChange={e => setEditedConfig({...editedConfig, wizardLogoUrl: e.target.value})} placeholder="URL..." className="flex-1 p-2 bg-black border border-white/10 rounded outline-none" />
                                         <label className="p-2 bg-white/10 rounded cursor-pointer hover:bg-white/20"><Upload size={14}/><input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'wizardLogoUrl')}/></label>
                                     </div>
                                     {editedConfig.wizardLogoUrl && <img src={editedConfig.wizardLogoUrl} alt="Preview" className="h-10 mt-2 object-contain" />}
@@ -1161,7 +1182,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                 <div>
                                     <label className="text-xs opacity-50 mb-1 block">Muggle Mode Logo</label>
                                     <div className="flex gap-2">
-                                        <input value={editedConfig.muggleLogoUrl || ''} onChange={e => setEditedConfig({...editedConfig, muggleLogoUrl: e.target.value})} placeholder="URL..." className="flex-1 p-2 bg-black border border-white/10 rounded" />
+                                        <input value={editedConfig.muggleLogoUrl || ''} onChange={e => setEditedConfig({...editedConfig, muggleLogoUrl: e.target.value})} placeholder="URL..." className="flex-1 p-2 bg-black border border-white/10 rounded outline-none" />
                                         <label className="p-2 bg-white/10 rounded cursor-pointer hover:bg-white/20"><Upload size={14}/><input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'muggleLogoUrl')}/></label>
                                     </div>
                                     {editedConfig.muggleLogoUrl && <img src={editedConfig.muggleLogoUrl} alt="Preview" className="h-10 mt-2 object-contain" />}
@@ -1175,20 +1196,20 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                 <div>
                                     <label className="text-xs opacity-50 mb-1 block">Wizard Background URL</label>
                                     <div className="flex gap-2">
-                                        <input value={editedConfig.wizardImage} onChange={e => setEditedConfig({...editedConfig, wizardImage: e.target.value})} className="flex-1 p-2 bg-black border border-white/10 rounded" />
+                                        <input value={editedConfig.wizardImage} onChange={e => setEditedConfig({...editedConfig, wizardImage: e.target.value})} className="flex-1 p-2 bg-black border border-white/10 rounded outline-none" />
                                         <label className="p-2 bg-white/10 rounded cursor-pointer hover:bg-white/20"><Upload size={14}/><input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'wizardImage')}/></label>
                                     </div>
                                 </div>
                                 <div>
                                     <label className="text-xs opacity-50 mb-1 block">Muggle Background URL</label>
                                     <div className="flex gap-2">
-                                        <input value={editedConfig.muggleImage} onChange={e => setEditedConfig({...editedConfig, muggleImage: e.target.value})} className="flex-1 p-2 bg-black border border-white/10 rounded" />
+                                        <input value={editedConfig.muggleImage} onChange={e => setEditedConfig({...editedConfig, muggleImage: e.target.value})} className="flex-1 p-2 bg-black border border-white/10 rounded outline-none" />
                                         <label className="p-2 bg-white/10 rounded cursor-pointer hover:bg-white/20"><Upload size={14}/><input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'muggleImage')}/></label>
                                     </div>
                                 </div>
                                 <div>
                                     <label className="text-xs opacity-50 mb-1 block">Cursor Style</label>
-                                    <select value={editedConfig.cursorStyle || 'classic'} onChange={e => setEditedConfig({...editedConfig, cursorStyle: e.target.value as any})} className="w-full p-2 bg-black border border-white/10 rounded">
+                                    <select value={editedConfig.cursorStyle || 'classic'} onChange={e => setEditedConfig({...editedConfig, cursorStyle: e.target.value as any})} className="w-full p-2 bg-black border border-white/10 rounded outline-none">
                                         <option value="classic">Classic (Quill / Crosshair)</option>
                                         <option value="minimal">Minimal (Dot / Square)</option>
                                         <option value="blade">Blade (Sharp)</option>
@@ -1198,9 +1219,18 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                             </div>
                         </div>
                         
-                        <div className="flex justify-end gap-4">
-                            <button onClick={onClearData} className="px-6 py-3 border border-red-500 text-red-500 rounded font-bold hover:bg-red-900/10">RESET LOCAL</button>
-                            <button onClick={handleSaveConfig} className="px-6 py-3 bg-blue-600 rounded font-bold hover:bg-blue-500 shadow-lg">SAVE CONFIGURATION</button>
+                        <div className="flex justify-end gap-4 sticky bottom-0 bg-black/80 backdrop-blur p-4 border-t border-white/10 -mx-4 -mb-4 sm:mx-0 sm:mb-0 sm:rounded-b-xl z-10">
+                            <button onClick={onClearData} className="px-6 py-3 border border-red-500 text-red-500 rounded font-bold hover:bg-red-900/10 transition-colors">RESET LOCAL</button>
+                            <button 
+                                onClick={handleSaveConfig} 
+                                disabled={isSavingConfig}
+                                className={`px-6 py-3 rounded font-bold shadow-lg flex items-center gap-2 transition-all
+                                    ${isSavingConfig ? 'bg-blue-800 text-white/50 cursor-wait' : 'bg-blue-600 hover:bg-blue-500 hover:scale-105'}
+                                `}
+                            >
+                                {isSavingConfig ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
+                                {isSavingConfig ? 'SAVING...' : 'SAVE CONFIGURATION'}
+                            </button>
                         </div>
                     </div>
                 )}
@@ -1211,9 +1241,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                         {editedSectors.map((sector, idx) => (
                             <div key={sector.id} className="p-4 border border-white/10 rounded bg-white/5 flex flex-col md:flex-row gap-4 items-start md:items-center">
                                 <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-2 w-full">
-                                    <input value={sector.wizardName} onChange={(e) => handleUpdateSector(idx, 'wizardName', e.target.value)} className="p-2 bg-black border border-white/10 rounded" placeholder="Wizard Name" />
-                                    <input value={sector.muggleName} onChange={(e) => handleUpdateSector(idx, 'muggleName', e.target.value)} className="p-2 bg-black border border-white/10 rounded" placeholder="Muggle Name" />
-                                    <input value={sector.description} onChange={(e) => handleUpdateSector(idx, 'description', e.target.value)} className="p-2 bg-black border border-white/10 rounded" placeholder="Description" />
+                                    <input value={sector.wizardName} onChange={(e) => handleUpdateSector(idx, 'wizardName', e.target.value)} className="p-2 bg-black border border-white/10 rounded outline-none" placeholder="Wizard Name" />
+                                    <input value={sector.muggleName} onChange={(e) => handleUpdateSector(idx, 'muggleName', e.target.value)} className="p-2 bg-black border border-white/10 rounded outline-none" placeholder="Muggle Name" />
+                                    <input value={sector.description} onChange={(e) => handleUpdateSector(idx, 'description', e.target.value)} className="p-2 bg-black border border-white/10 rounded outline-none" placeholder="Description" />
                                 </div>
                                 <div className="text-xs opacity-50 font-mono">{sector.id}</div>
                             </div>

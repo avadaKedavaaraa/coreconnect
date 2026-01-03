@@ -92,7 +92,7 @@ const App: React.FC = () => {
   const [dbItems, setDbItems] = useState<CarouselItem[]>([]);
   const [sectors, setSectors] = useState<Sector[]>(SECTORS);
   const [globalConfig, setGlobalConfig] = useState<GlobalConfig>(DEFAULT_CONFIG);
-  const [configLoaded, setConfigLoaded] = useState(false); // NEW: Waits for config before showing Gate
+  const [configLoaded, setConfigLoaded] = useState(false); 
   const [isOffline, setIsOffline] = useState(false);
   const [announcementViewMode, setAnnouncementViewMode] = useState<'carousel' | 'list'>('carousel');
   const [isAdmin, setIsAdmin] = useState(false);
@@ -117,7 +117,7 @@ const App: React.FC = () => {
           lastActive: new Date().toISOString(),
           brightness: 100,
           contrast: 100,
-          themeColor: '#f43f5e' // Default Crimson Red
+          themeColor: '#f43f5e' 
       };
   });
 
@@ -139,7 +139,6 @@ const App: React.FC = () => {
   // Heartbeat & Persistence (Regular Interval)
   useEffect(() => {
       localStorage.setItem('core_connect_profile', JSON.stringify(profile));
-      // Trigger every 30s
       if (profile.totalTimeSpent > 0 && profile.totalTimeSpent % 30 === 0) {
           triggerHeartbeat();
       }
@@ -206,28 +205,27 @@ const App: React.FC = () => {
 
   // Load Config
   useEffect(() => {
-    // 1. Try Local Storage for instant load (if exists)
     const savedSectors = localStorage.getItem('core_connect_sectors');
     if (savedSectors) setSectors(JSON.parse(savedSectors));
     
-    // Don't trust local storage for global config images if we want fresh updates for new users
-    // But we use it as a fallback
     const savedConfig = localStorage.getItem('core_connect_global_config_v2');
     if (savedConfig) setGlobalConfig({ ...DEFAULT_CONFIG, ...JSON.parse(savedConfig) });
 
     const fetchConfig = async () => {
-      // Force fresh fetch by appending timestamp query
+      // Force fresh fetch by appending timestamp query to bypass cache
       const { ok, data } = await safeFetch(`${API_URL}/api/config?t=${Date.now()}`);
       if (ok && data) {
           setGlobalConfig(prev => {
-             // Prioritize server data
              const newData = {...prev, ...data};
              localStorage.setItem('core_connect_global_config_v2', JSON.stringify(newData));
              return newData;
           });
           setIsOffline(false);
+      } else {
+         console.warn("Using offline/cached config.");
+         setIsOffline(true);
       }
-      setConfigLoaded(true); // Allow Gate to render now
+      setConfigLoaded(true);
     };
     
     const fetchSectors = async () => {
@@ -253,15 +251,30 @@ const App: React.FC = () => {
     }
   };
 
-  const saveGlobalConfig = async (newConfig: GlobalConfig) => {
-    setGlobalConfig(newConfig);
-    localStorage.setItem('core_connect_global_config_v2', JSON.stringify(newConfig));
-    if (isAdmin && csrfToken) {
-      await safeFetch(`${API_URL}/api/admin/config`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrfToken },
-          body: JSON.stringify(newConfig)
-      });
-    }
+  const saveGlobalConfig = async (newConfig: GlobalConfig): Promise<void> => {
+    return new Promise(async (resolve, reject) => {
+      // 1. Update UI Immediately (Optimistic)
+      setGlobalConfig(newConfig);
+      localStorage.setItem('core_connect_global_config_v2', JSON.stringify(newConfig));
+      
+      // 2. Sync to Server
+      if (isAdmin && csrfToken) {
+        const { ok, data } = await safeFetch(`${API_URL}/api/admin/config`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrfToken },
+            body: JSON.stringify(newConfig)
+        });
+        
+        if (!ok) {
+            alert(`CRITICAL: Config Saved LOCALLY but failed to sync to SERVER.\nError: ${data?.error || 'Unknown'}`);
+            reject(new Error(data?.error));
+        } else {
+            resolve();
+        }
+      } else {
+          // If not logged in, just resolve (local update only)
+          resolve();
+      }
+    });
   };
 
   // Auth Check on Mount
@@ -332,7 +345,6 @@ const App: React.FC = () => {
           displayName: name || prev.displayName, 
           visitCount: prev.visitCount + 1 
       }));
-      // IMMEDIATE HEARTBEAT ON ENTRY
       setTimeout(triggerHeartbeat, 100); 
       if (profile.defaultSector) setActiveSectorId(profile.defaultSector);
   };
@@ -378,7 +390,6 @@ const App: React.FC = () => {
     setPermissions(perms);
   };
 
-  // Block rendering Gate until config is loaded from server
   if (!configLoaded) return <LoadingSpinner lineage={null} color="#ffffff" />;
 
   if (!lineage) return <IdentityGate onSelect={handleLineageSelect} config={globalConfig} />;
@@ -454,7 +465,6 @@ const App: React.FC = () => {
                  </button>
               </div>
             ) : activeSectorId === 'system_info' ? (
-                /* NEW SYSTEM INFO SECTOR */
                 <Suspense fallback={<LoadingSpinner lineage={lineage} color={profile.themeColor}/>}>
                     <SystemInfoView lineage={lineage} isAdmin={isAdmin} />
                 </Suspense>
