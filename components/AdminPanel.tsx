@@ -332,7 +332,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   };
 
   // --- OTHER HANDLERS ---
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, field: 'image' | 'fileUrl' | 'wizardLogoUrl' | 'muggleLogoUrl') => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, field: 'image' | 'fileUrl' | 'wizardLogoUrl' | 'muggleLogoUrl' | 'wizardImage' | 'muggleImage') => {
     const file = e.target.files?.[0];
     if (!file || file.size > 10 * 1024 * 1024) return alert("File too large (>10MB)");
     setIsUploading(true);
@@ -347,7 +347,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
             });
             const data = await res.json();
             if (res.ok && data.url) {
-                if (field === 'wizardLogoUrl' || field === 'muggleLogoUrl') {
+                if (field === 'wizardLogoUrl' || field === 'muggleLogoUrl' || field === 'wizardImage' || field === 'muggleImage') {
                     setEditedConfig(prev => ({ ...prev, [field]: data.url }));
                 } else {
                     setItemForm(prev => ({ ...prev, [field]: data.url }));
@@ -371,7 +371,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   };
 
   const handleSaveConfig = () => {
-    if (onUpdateConfig) { onUpdateConfig(editedConfig); alert("Config Saved!"); }
+    if (onUpdateConfig) { onUpdateConfig(editedConfig); alert("Config Saved! Re-logging might be required for all changes to appear."); }
   };
 
   // User Management Handlers
@@ -1174,11 +1174,17 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                             <div className="grid gap-4">
                                 <div>
                                     <label className="text-xs opacity-50 mb-1 block">Wizard Background URL</label>
-                                    <input value={editedConfig.wizardImage} onChange={e => setEditedConfig({...editedConfig, wizardImage: e.target.value})} className="w-full p-2 bg-black border border-white/10 rounded" />
+                                    <div className="flex gap-2">
+                                        <input value={editedConfig.wizardImage} onChange={e => setEditedConfig({...editedConfig, wizardImage: e.target.value})} className="flex-1 p-2 bg-black border border-white/10 rounded" />
+                                        <label className="p-2 bg-white/10 rounded cursor-pointer hover:bg-white/20"><Upload size={14}/><input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'wizardImage')}/></label>
+                                    </div>
                                 </div>
                                 <div>
                                     <label className="text-xs opacity-50 mb-1 block">Muggle Background URL</label>
-                                    <input value={editedConfig.muggleImage} onChange={e => setEditedConfig({...editedConfig, muggleImage: e.target.value})} className="w-full p-2 bg-black border border-white/10 rounded" />
+                                    <div className="flex gap-2">
+                                        <input value={editedConfig.muggleImage} onChange={e => setEditedConfig({...editedConfig, muggleImage: e.target.value})} className="flex-1 p-2 bg-black border border-white/10 rounded" />
+                                        <label className="p-2 bg-white/10 rounded cursor-pointer hover:bg-white/20"><Upload size={14}/><input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'muggleImage')}/></label>
+                                    </div>
                                 </div>
                                 <div>
                                     <label className="text-xs opacity-50 mb-1 block">Cursor Style</label>

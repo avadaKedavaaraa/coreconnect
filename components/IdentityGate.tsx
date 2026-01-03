@@ -30,7 +30,8 @@ const IdentityGate: React.FC<IdentityGateProps> = ({ onSelect, config }) => {
     }
   }, []);
 
-  // Use Config images directly. The parent component (App.tsx) fetches these globally.
+  // Use Config images directly. These will update automatically when `config` prop changes.
+  // Using fallbacks just in case the config is temporarily empty.
   const wizardBg = config.wizardImage || 'https://images.unsplash.com/photo-1598153346810-860daa0d6cad?q=80&w=2070&auto=format&fit=crop';
   const muggleBg = config.muggleImage || 'https://images.unsplash.com/photo-1480714378408-67cf0d13bc1b?q=80&w=2070&auto=format&fit=crop';
 

@@ -25,7 +25,12 @@ export const API_URL = (getEnvVar('VITE_API_URL') || '').replace(/\/$/, '');
 
 async function safeFetch(url: string, options: RequestInit = {}) {
     try {
-        const defaultOptions: RequestInit = { ...options, credentials: 'include' };
+        // Prevent caching for all API requests to ensure fresh config
+        const defaultOptions: RequestInit = { 
+            ...options, 
+            credentials: 'include',
+            headers: { ...options.headers, 'Cache-Control': 'no-cache' }
+        };
         const res = await fetch(url, defaultOptions);
         const text = await res.text();
         try {
@@ -202,9 +207,11 @@ const App: React.FC = () => {
     if (savedConfig) setGlobalConfig({ ...DEFAULT_CONFIG, ...JSON.parse(savedConfig) });
 
     const fetchConfig = async () => {
-      const { ok, data } = await safeFetch(`${API_URL}/api/config`);
+      // Force fresh fetch by appending timestamp query
+      const { ok, data } = await safeFetch(`${API_URL}/api/config?t=${Date.now()}`);
       if (ok && data) {
           setGlobalConfig(prev => {
+             // Prioritize server data, fallback to previous if key missing
              const newData = {...prev, ...data};
              localStorage.setItem('core_connect_global_config_v2', JSON.stringify(newData));
              return newData;
@@ -214,7 +221,7 @@ const App: React.FC = () => {
     };
     
     const fetchSectors = async () => {
-        const { ok, data } = await safeFetch(`${API_URL}/api/sectors`);
+        const { ok, data } = await safeFetch(`${API_URL}/api/sectors?t=${Date.now()}`);
         if (ok && data && Array.isArray(data) && data.length > 0) {
             setSectors(data);
             localStorage.setItem('core_connect_sectors', JSON.stringify(data));
