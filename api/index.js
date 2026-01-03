@@ -65,6 +65,8 @@ app.use((req, res, next) => {
 // --- SUPABASE CLIENT ---
 const supabaseUrl = process.env.VITE_SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+// Use the service key as the auth secret, or fallback to a hardcoded string (dev only)
+const AUTH_SECRET = process.env.SUPABASE_SERVICE_ROLE_KEY || 'fallback_secret_key_change_in_prod';
 
 const mockSupabase = {
     from: () => ({
@@ -99,7 +101,42 @@ if (process.env.API_KEY) {
   }
 }
 
-const sessions = new Map();
+// --- STATELESS AUTH HELPERS ---
+// We use HMAC SHA256 to sign session data into the cookie itself.
+// This persists across Serverless function invocations.
+
+const createSignature = (data) => {
+    const hmac = crypto.createHmac('sha256', AUTH_SECRET);
+    hmac.update(data);
+    return hmac.digest('hex');
+};
+
+const encodeSession = (payload) => {
+    const data = Buffer.from(JSON.stringify(payload)).toString('base64');
+    const signature = createSignature(data);
+    return `${data}.${signature}`;
+};
+
+const decodeSession = (token) => {
+    try {
+        if (!token) return null;
+        const parts = token.split('.');
+        if (parts.length !== 2) return null;
+        
+        const [data, signature] = parts;
+        const expectedSignature = createSignature(data);
+        
+        const bufA = Buffer.from(signature);
+        const bufB = Buffer.from(expectedSignature);
+
+        if (bufA.length === bufB.length && crypto.timingSafeEqual(bufA, bufB)) {
+             return JSON.parse(Buffer.from(data, 'base64').toString('utf-8'));
+        }
+        return null;
+    } catch(e) {
+        return null;
+    }
+};
 
 // --- LAZY INIT HELPERS ---
 const ensureAdminExists = async () => {
@@ -131,19 +168,19 @@ async function logAction(username, action, details, req) {
 }
 
 const requireAuth = (req, res, next) => {
-    const sessionId = req.cookies.session_id;
-    const session = sessions.get(sessionId);
+    const sessionToken = req.cookies.session_id;
+    const session = decodeSession(sessionToken);
     
     if (!session || Date.now() > session.expiresAt) {
         return res.status(401).json({ error: "Unauthorized" });
     }
 
     const clientCsrfToken = req.headers['x-csrf-token'];
+    // For modifying requests, CSRF must match the one inside the signed cookie
     if (req.method !== 'GET' && (!clientCsrfToken || clientCsrfToken !== session.csrfToken)) {
         return res.status(403).json({ error: "Invalid Token" });
     }
     
-    session.expiresAt = Date.now() + 900000;
     req.user = session;
     next();
 };
@@ -183,7 +220,7 @@ router.post('/visitor/heartbeat', async (req, res) => {
     }
 });
 
-// GET CONFIG: Get the lowest ID row
+// GET CONFIG
 router.get('/config', async (req, res) => {
     try {
       const { data, error } = await supabase.from('global_config').select('config').order('id', { ascending: true }).limit(1).maybeSingle();
@@ -194,18 +231,15 @@ router.get('/config', async (req, res) => {
     }
 });
 
-// GET SECTORS: Get the second lowest ID row, or fallback
+// GET SECTORS
 router.get('/sectors', async (req, res) => {
     try {
-      // Fetch the first 2 rows. Assume row 2 is sectors if it exists.
       const { data, error } = await supabase.from('global_config').select('config').order('id', { ascending: true }).limit(2);
-      
       if (error) throw error;
       
       if (data && data.length > 1) {
           res.json(data[1].config || []);
       } else {
-          // Fallback if only 1 row exists or table is empty
           res.json([]);
       }
     } catch(e) { 
@@ -281,11 +315,27 @@ router.post('/login', async (req, res) => {
         return res.status(401).json({ error: "Invalid credentials (Bad password)" });
     }
 
-    const sessionId = crypto.randomBytes(32).toString('hex');
+    // STATELESS SESSION GENERATION
     const csrfToken = crypto.randomBytes(32).toString('hex');
-    sessions.set(sessionId, { username, csrfToken, permissions: user.permissions, expiresAt: Date.now() + 900000 });
+    const expiresAt = Date.now() + 86400000; // 24 hours
+    
+    const sessionPayload = {
+        username,
+        csrfToken,
+        permissions: user.permissions,
+        expiresAt
+    };
+    
+    const token = encodeSession(sessionPayload);
 
-    res.cookie('session_id', sessionId, { httpOnly: true, sameSite: 'none', secure: true, maxAge: 900000, partitioned: true });
+    res.cookie('session_id', token, { 
+        httpOnly: true, 
+        sameSite: 'none', 
+        secure: true, 
+        maxAge: 86400000, 
+        partitioned: true 
+    });
+    
     await logAction(username, 'LOGIN', 'User logged in', req);
     res.json({ success: true, csrfToken, permissions: user.permissions });
   } catch(e) { 
@@ -295,8 +345,9 @@ router.post('/login', async (req, res) => {
 });
 
 router.get('/me', (req, res) => {
-  const sessionId = req.cookies.session_id;
-  const session = sessions.get(sessionId);
+  const sessionToken = req.cookies.session_id;
+  const session = decodeSession(sessionToken);
+
   if (!session || Date.now() > session.expiresAt) return res.status(401).json({ error: "Session Expired" });
   res.json({ authenticated: true, csrfToken: session.csrfToken, username: session.username, permissions: session.permissions });
 });
@@ -338,11 +389,27 @@ router.post('/admin/upload', requireAuth, uploadMiddleware.single('file'), async
 router.post('/admin/items', requireAuth, async (req, res) => {
     if(!req.user.permissions.canEdit) return res.status(403).json({error: "Forbidden"});
     try {
-      const { data, error } = await supabase.from('items').insert({ ...req.body, id: undefined }).select().single();
+      // We manually remove ID if it's undefined or if DB handles it, but since we use UUIDs from client sometimes:
+      // If client provides ID, we should try to use it if Supabase policy allows. 
+      // Safest is to strip it if we want DB to auto-gen, OR allow it if we generated it via crypto.randomUUID on client.
+      // The previous code did { ...req.body, id: undefined }. This effectively STRIPPED the client ID.
+      // But SectorViews.tsx relies on crypto.randomUUID().
+      // Let's allow ID if provided, otherwise undefined.
+      
+      const payload = { ...req.body };
+      // If the body has an ID and it looks like a UUID, keep it. 
+      // Supabase 'items' table usually has `id uuid default gen_random_uuid() primary key`.
+      // We can insert a specific UUID if we want.
+      
+      const { data, error } = await supabase.from('items').insert(payload).select().single();
+      
       if (error) throw error;
       await logAction(req.user.username, 'CREATE_ITEM', `Created item`, req);
       res.json({ success: true, item: data });
-    } catch(e) { res.status(500).json({ error: e.message }); }
+    } catch(e) { 
+        console.error("Create Item Error:", e);
+        res.status(500).json({ error: e.message }); 
+    }
 });
 
 router.put('/admin/items/:id', requireAuth, async (req, res) => {
@@ -363,19 +430,16 @@ router.delete('/admin/items/:id', requireAuth, async (req, res) => {
     } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-// Admin Config: FIX for "cannot insert non-DEFAULT value into column id"
+// Admin Config
 router.post('/admin/config', requireAuth, async (req, res) => {
     if(!req.user.permissions.canEdit) return res.status(403).json({error: "Forbidden"});
     try {
-      // 1. Fetch rows ordered by ID
       const { data: rows } = await supabase.from('global_config').select('id').order('id', { ascending: true }).limit(1);
       
       if (rows && rows.length > 0) {
-          // 2. Update the FIRST row found (assumed to be Config)
           const { error } = await supabase.from('global_config').update({ config: req.body }).eq('id', rows[0].id);
           if (error) throw error;
       } else {
-          // 3. Insert new row (Database generates ID automatically)
           const { error } = await supabase.from('global_config').insert({ config: req.body });
           if (error) throw error;
       }
@@ -384,20 +448,16 @@ router.post('/admin/config', requireAuth, async (req, res) => {
     } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-// Admin Sectors: FIX for "cannot insert non-DEFAULT value into column id"
+// Admin Sectors
 router.post('/admin/sectors', requireAuth, async (req, res) => {
     if(!req.user.permissions.canEdit) return res.status(403).json({error: "Forbidden"});
     try {
-      // 1. Fetch rows ordered by ID
       const { data: rows } = await supabase.from('global_config').select('id').order('id', { ascending: true }).limit(2);
       
       if (rows && rows.length > 1) {
-          // 2. Update the SECOND row found (assumed to be Sectors)
           const { error } = await supabase.from('global_config').update({ config: req.body }).eq('id', rows[1].id);
           if (error) throw error;
       } else {
-          // 3. Insert new row (Database generates ID automatically)
-          // Note: If only 1 row exists, this becomes the 2nd row (Sectors)
           const { error } = await supabase.from('global_config').insert({ config: req.body });
           if (error) throw error;
       }
@@ -470,9 +530,8 @@ router.post('/admin/import', requireAuth, async (req, res) => {
         const { data } = req.body;
         if (data.items?.length) await supabase.from('items').upsert(data.items);
         if (data.global_config?.length) {
-             // Basic import logic - does not force IDs to prevent errors
              for (const cfg of data.global_config) {
-                 const { id, ...rest } = cfg; // Strip ID
+                 const { id, ...rest } = cfg; 
                  await supabase.from('global_config').insert(rest);
              }
         }

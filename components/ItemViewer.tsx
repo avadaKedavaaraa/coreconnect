@@ -12,7 +12,7 @@ interface ItemViewerProps {
 
 const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
   const isWizard = lineage === Lineage.WIZARD;
-  const isFile = item.type === 'file' || item.type === 'video';
+  const isFile = item.type === 'file' || item.type === 'video' || item.type === 'link'; // Expanded to allow Link types to attempt preview
   
   const isValidUrl = (url?: string) => {
     if (!url) return false;
@@ -43,9 +43,10 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
       return id ? `https://drive.google.com/file/d/${id}/preview` : url;
   };
 
-  const isPdfOrDoc = (item.type === 'file' && (
-      (safeUrl && safeUrl.match(/\.pdf$/i)) || isGoogleDrive
-  ));
+  const isPdfOrDoc = (
+      (item.type === 'file' || item.type === 'link') && 
+      ((safeUrl && safeUrl.match(/\.pdf$/i)) || isGoogleDrive)
+  );
 
   const embedUrl = isGoogleDrive ? getDriveEmbed(safeUrl) : safeUrl;
 
@@ -123,25 +124,27 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
         {/* Content Area */}
         <div className={`flex-1 overflow-y-auto relative ${isWizard ? 'scrollbar-wizard' : 'scrollbar-muggle'}`}>
             
-            {/* If Media (File/Video) */}
-            {isFile && safeUrl ? (
+            {/* If Media (File/Video/Link-Preview) */}
+            {isPdfOrDoc || isVideo ? (
                 <div className="w-full h-full min-h-[400px] bg-black/50 flex flex-col items-center justify-center p-4">
                     {isVideo ? (
                         <video src={safeUrl} controls className="max-w-full max-h-full rounded-lg shadow-2xl" />
-                    ) : isPdfOrDoc ? (
+                    ) : (
                         <iframe 
                             src={embedUrl} 
                             className="w-full h-full border-0 rounded-lg bg-white shadow-2xl" 
                             title="Document Viewer"
                             allow="autoplay" 
                         />
-                    ) : (
-                        <div className="text-center">
-                            <a href={safeUrl} target="_blank" rel="noreferrer" className={`px-8 py-4 rounded-full font-bold flex items-center gap-2 transition-transform hover:scale-105 ${isWizard ? 'bg-emerald-600 text-black' : 'bg-fuchsia-600 text-black'}`}>
-                                <ExternalLink size={20}/> Open Document
-                            </a>
-                        </div>
                     )}
+                </div>
+            ) : isFile && safeUrl ? (
+                <div className="w-full h-full min-h-[400px] bg-black/50 flex flex-col items-center justify-center p-4">
+                     <div className="text-center">
+                        <a href={safeUrl} target="_blank" rel="noreferrer" className={`px-8 py-4 rounded-full font-bold flex items-center gap-2 transition-transform hover:scale-105 ${isWizard ? 'bg-emerald-600 text-black' : 'bg-fuchsia-600 text-black'}`}>
+                            <ExternalLink size={20}/> Open Document
+                        </a>
+                    </div>
                 </div>
             ) : (
                 /* Text Content - Stylized as a high-end message */
@@ -171,7 +174,7 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                 <span className="flex items-center gap-1"><CornerDownRight size={14}/> {item.sector?.toUpperCase()}</span>
                 {item.subject && <span className="flex items-center gap-1"># {item.subject.toUpperCase()}</span>}
             </div>
-            {isFile && safeUrl && (
+            {safeUrl && (
                 <a href={safeUrl} target="_blank" rel="noreferrer" className="hover:underline flex items-center gap-1">
                     <Share2 size={14}/> OPEN SOURCE
                 </a>
