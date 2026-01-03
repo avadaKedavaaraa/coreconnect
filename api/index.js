@@ -9,7 +9,6 @@ import { createClient } from '@supabase/supabase-js';
 import { GoogleGenAI } from '@google/genai';
 import xss from 'xss';
 import { promisify } from 'util';
-import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import hpp from 'hpp';
 import { fileURLToPath } from 'url';
@@ -25,6 +24,7 @@ const PORT = process.env.PORT || 3000;
 app.set('trust proxy', 1);
 app.disable('x-powered-by');
 
+// Relaxed Helmet for Netlify
 app.use(helmet({
   contentSecurityPolicy: false,
   crossOriginResourcePolicy: { policy: "cross-origin" }
@@ -32,26 +32,22 @@ app.use(helmet({
 
 app.use(hpp());
 
-// Permissive CORS for troubleshooting
+// Permissive CORS to allow frontend access
 app.use(cors({
-  origin: true,
+  origin: true, // Allow all origins in this setup to prevent CORS 502s
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'x-csrf-token', 'Authorization']
 }));
 
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 3000, // Increased limit for admin actions
-  standardHeaders: true,
-  legacyHeaders: false,
-});
+// NOTE: Rate limiting removed for Serverless (Netlify) compatibility
+// In-memory rate limits don't work well in ephemeral lambda functions and can cause 502s.
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(cookieParser());
-app.use(limiter);
 
+// Sanitization Middleware
 app.use((req, res, next) => {
     const sanitize = (obj) => {
         for (const key in obj) {
@@ -71,7 +67,6 @@ app.use((req, res, next) => {
 const supabaseUrl = process.env.VITE_SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
 
-// Fallback mock to prevent 502 Crash on Cold Start if keys are missing in Netlify Env
 const mockSupabase = {
     from: () => ({
         select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({data: null}), single: () => Promise.resolve({data: null}) }) }),
@@ -92,7 +87,6 @@ if (supabaseUrl && supabaseKey) {
         supabase = mockSupabase;
     }
 } else {
-    console.warn("⚠️ Supabase Credentials Missing - Using Mock Client. Set VITE_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in Netlify.");
     supabase = mockSupabase;
 }
 
@@ -108,13 +102,12 @@ if (process.env.API_KEY) {
 
 const sessions = new Map();
 
-(async function init() {
+// Initialize Admin (Lazy)
+const ensureAdmin = async () => {
+    if (!supabaseUrl || !supabaseKey) return;
     try {
-        if (!supabaseUrl || !supabaseKey) return;
-        // Ensure Admin exists
         const { data, error } = await supabase.from('admin_users').select('username').eq('username', 'admin').maybeSingle();
         if (!data && !error) {
-            console.log("Initializing Root Admin...");
             const salt = crypto.randomBytes(16).toString('hex');
             const hash = (await scryptAsync(process.env.ADMIN_PASSWORD || 'admin123', salt, 64)).toString('hex');
             await supabase.from('admin_users').insert({
@@ -124,8 +117,10 @@ const sessions = new Map();
                 permissions: { canEdit: true, canDelete: true, canManageUsers: true, isGod: true }
             });
         }
-    } catch (e) { console.error("Init Error:", e.message); }
-})();
+    } catch (e) { console.error("Admin Init Error:", e.message); }
+};
+// Run once, don't await to avoid blocking cold start
+ensureAdmin();
 
 async function logAction(username, action, details, req) {
     const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
@@ -180,11 +175,12 @@ router.post('/visitor/heartbeat', async (req, res) => {
 
         if (error) {
             console.error("Supabase Error:", error);
-            return res.status(500).json({ error: error.message });
+            // Don't 500 on heartbeat failure, just warn
+            return res.json({ status: 'logged_warn' });
         }
         res.json({ status: 'logged' });
     } catch (e) {
-        res.status(500).json({ error: e.message }); 
+        res.json({ status: 'logged_error' }); 
     }
 });
 
@@ -210,7 +206,7 @@ router.get('/sectors', async (req, res) => {
 
 router.post('/ai/chat', async (req, res) => {
     try {
-      if (!aiClient) return res.status(503).json({ error: "Oracle Disconnected" });
+      if (!aiClient) return res.status(503).json({ error: "Oracle Disconnected (Check API Key)" });
       const { message, lineage, history, context } = req.body;
       const safeMessage = xss(message).substring(0, 1000); 
       
@@ -236,6 +232,7 @@ router.post('/ai/chat', async (req, res) => {
       });
       res.json({ text: response.text });
     } catch (error) {
+        console.error("AI Error:", error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -438,6 +435,12 @@ router.post('/admin/import', requireAuth, async (req, res) => {
 });
 
 app.use('/api', router);
+
+// Global Error Handler for Serverless
+app.use((err, req, res, next) => {
+    console.error("Global API Error:", err);
+    res.status(500).json({ error: "Internal Server Error", message: err.message });
+});
 
 // --- SERVER STARTUP (CONDITIONAL) ---
 // Only listen on port if running locally (not in Netlify Lambda)

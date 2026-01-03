@@ -27,21 +27,24 @@ export const consultTheOracle = async (
       })
     });
 
-    // OPTION C: Read as text first to debug and prevent crash
     const text = await res.text();
 
     try {
         const data = JSON.parse(text);
-        
         if (!res.ok) {
-            throw new Error(data.error || "Connection Severed");
+            throw new Error(data.error || `Server Error: ${res.status}`);
         }
-        
         return data.text;
     } catch (e) {
-        // This catches "Unexpected end of JSON input"
-        console.error("Oracle API returned non-JSON:", text.substring(0, 100));
-        throw new Error("The Oracle is temporarily silent (Invalid Response).");
+        // If parsing fails, it's likely a 502/500 HTML page from Netlify/Nginx
+        console.error("Oracle API Parsing Error. Raw response:", text.substring(0, 200));
+        if (text.includes("Bad Gateway") || text.includes("502")) {
+             throw new Error("The Oracle's connection is severed (502 Bad Gateway). Please try again later.");
+        }
+        if (text.includes("timeout")) {
+             throw new Error("The Oracle is deep in thought... too deep (Timeout).");
+        }
+        throw new Error("The Oracle returned an unintelligible response.");
     }
 
   } catch (error: any) {
@@ -51,7 +54,7 @@ export const consultTheOracle = async (
     if (lineage === Lineage.WIZARD) {
       return `The mists are too thick... I cannot see the answer right now. (${errorMessage})`;
     } else {
-      return `ERROR: 503 SERVICE_UNAVAILABLE. DETAILS: ${errorMessage}`;
+      return `ERROR: SERVICE_UNAVAILABLE. DETAILS: ${errorMessage}`;
     }
   }
 };

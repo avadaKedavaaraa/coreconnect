@@ -111,7 +111,6 @@ const SectorView: React.FC<SectorViewProps> = ({
   }, [displayItems, search, dateFilter, subjectFilter]);
 
   // --- SPECIAL HANDLING FOR LECTURES ---
-  // If sector is 'lectures', default viewMode is 'list' (Timeline) and folder navigation is skipped
   const isLectureMode = sectorId === 'lectures';
 
   // --- EFFECTS ---
@@ -125,7 +124,6 @@ const SectorView: React.FC<SectorViewProps> = ({
     setSearch('');
     setDateFilter('');
     setSubjectFilter('');
-    // Force list view for lectures, otherwise folders
     setViewMode(isLectureMode ? 'list' : 'folders');
   }, [sectorId, isLectureMode]);
 
@@ -147,19 +145,18 @@ const SectorView: React.FC<SectorViewProps> = ({
     if (viewMode !== 'folders' && !isLectureMode) setViewMode('folders');
   };
 
-  // --- LAZY QUICK POST ---
   const handleQuickPost = async () => {
       if (!quickPostText.trim() || !onQuickCreate) return;
       setIsPosting(true);
       try {
           await onQuickCreate({
               id: crypto.randomUUID(),
-              title: quickPostText.substring(0, 30) + (quickPostText.length > 30 ? '...' : ''), // Auto title
+              title: quickPostText.substring(0, 30) + (quickPostText.length > 30 ? '...' : ''),
               content: quickPostText,
               date: new Date().toISOString().split('T')[0].replace(/-/g, '.'),
               type: 'announcement',
               sector: sectorId,
-              subject: subjectFilter || 'General', // Auto-tag if filtered
+              subject: subjectFilter || 'General',
               author: 'Admin',
               isUnread: true,
               likes: 0
@@ -172,12 +169,10 @@ const SectorView: React.FC<SectorViewProps> = ({
       }
   };
   
-  // --- SUBJECT MANAGEMENT HANDLERS ---
   const handleCreateSubject = async () => {
       if (!newSubjectName.trim() || !onQuickCreate) return;
       setIsProcessing(true);
       const today = new Date().toISOString().split('T')[0].replace(/-/g, '.');
-      // Create a genesis item for this subject to initialize it in the DB
       const genesisItem: CarouselItem = {
           id: crypto.randomUUID(), 
           title: `Welcome to ${newSubjectName}`, 
@@ -186,7 +181,7 @@ const SectorView: React.FC<SectorViewProps> = ({
           type: 'announcement', 
           sector: sectorId, 
           subject: newSubjectName, 
-          image: newSubjectImage || undefined, // Background image applied to genesis item acts as cover
+          image: newSubjectImage || undefined, 
           author: 'System', 
           isUnread: true, 
           likes: 0
@@ -206,7 +201,6 @@ const SectorView: React.FC<SectorViewProps> = ({
       for (const item of itemsToDelete) { onDelete(item.id); }
   };
 
-  // Helper for icons based on type
   const getTypeIcon = (type: string) => {
       switch(type) {
           case 'video': return <Video size={20} />;
@@ -252,19 +246,18 @@ const SectorView: React.FC<SectorViewProps> = ({
               {onBack && (
                 <button 
                     onClick={onBack}
-                    className={`flex items-center gap-2 text-sm font-bold uppercase tracking-wider transition-colors
-                        ${isWizard ? 'text-emerald-400 hover:text-emerald-300' : 'text-fuchsia-400 hover:text-fuchsia-300'}
+                    className={`flex items-center gap-2 text-sm font-bold uppercase tracking-wider transition-colors border-b-2 border-transparent
+                        ${isWizard ? 'text-emerald-400 hover:text-emerald-200 hover:border-emerald-500' : 'text-fuchsia-400 hover:text-fuchsia-200 hover:border-fuchsia-500'}
                     `}
                 >
                     <ArrowLeft size={16} /> Exit Sector
                 </button>
               )}
-              {/* Back to Folders (Only if NOT lecture mode) */}
               {!onBack && subjectFilter && viewMode !== 'folders' && !isLectureMode && (
                  <button 
                     onClick={clearFilters}
-                    className={`flex items-center gap-2 text-sm font-bold uppercase tracking-wider transition-colors
-                        ${isWizard ? 'text-emerald-400 hover:text-emerald-300' : 'text-fuchsia-400 hover:text-fuchsia-300'}
+                    className={`flex items-center gap-2 text-sm font-bold uppercase tracking-wider transition-colors border-b-2 border-transparent
+                        ${isWizard ? 'text-emerald-400 hover:text-emerald-200 hover:border-emerald-500' : 'text-fuchsia-400 hover:text-fuchsia-200 hover:border-fuchsia-500'}
                     `}
                  >
                     <FolderOpen size={16} /> Back to Folders
@@ -278,18 +271,30 @@ const SectorView: React.FC<SectorViewProps> = ({
                     onClick={() => onAddItem(sectorId)}
                     className={`flex items-center gap-2 px-4 py-2 rounded-full font-bold shadow-lg transition-all hover:scale-105 active:scale-95
                        ${isWizard 
-                         ? 'bg-emerald-600 text-black hover:bg-emerald-500' 
-                         : 'bg-fuchsia-600 text-black hover:bg-fuchsia-500'}
+                         ? 'bg-emerald-600 text-black hover:bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.3)]' 
+                         : 'bg-fuchsia-600 text-black hover:bg-fuchsia-500 shadow-[0_0_15px_rgba(217,70,239,0.3)]'}
                     `}
                  >
                     <Plus size={18} />
-                    <span className="hidden sm:inline">Advanced Add</span>
+                    <span className="hidden sm:inline">Add Content</span>
                  </button>
               )}
           </div>
       </div>
 
-      {/* FILTER BAR - Mobile Responsive */}
+      {/* Title - Context Aware */}
+      {!onBack && !isLectureMode && subjectFilter && (
+          <div className="mb-6 text-center animate-[fade-in_0.5s]">
+              <h2 className={`text-4xl font-bold tracking-widest uppercase drop-shadow-[0_0_10px_currentColor]
+                  ${isWizard ? 'font-wizardTitle text-emerald-100' : 'font-muggle text-fuchsia-100'}
+              `}>
+                  {subjectFilter}
+              </h2>
+              <div className={`h-1 w-24 mx-auto mt-2 rounded-full ${isWizard ? 'bg-emerald-500' : 'bg-fuchsia-500'}`}></div>
+          </div>
+      )}
+
+      {/* FILTER BAR */}
       <div className={`mb-8 p-4 rounded-xl border backdrop-blur-md flex flex-col lg:flex-row gap-4 items-stretch lg:items-center justify-between sticky top-0 z-30 shadow-xl transition-all
         ${isWizard ? 'bg-emerald-900/20 border-emerald-500/30' : 'bg-fuchsia-900/20 border-fuchsia-500/30'}
       `}>
@@ -382,7 +387,6 @@ const SectorView: React.FC<SectorViewProps> = ({
                     <Book size={100} className={`absolute -right-4 -top-4 opacity-5 transition-transform duration-700 group-hover:rotate-12 group-hover:scale-110 ${isWizard ? 'text-emerald-500' : 'text-fuchsia-500'}`} />
                 )}
                 
-                {/* Delete Button (Only visible on hover for Admin) */}
                 {isAdmin && onDelete && (
                     <div 
                         onClick={(e) => handleDeleteSubject(e, subject)}
@@ -404,7 +408,6 @@ const SectorView: React.FC<SectorViewProps> = ({
             );
           })}
           
-          {/* ADD NEW FOLDER CARD (ADMIN ONLY) */}
           {isAdmin && onQuickCreate && (
               <div
                 className={`h-40 relative overflow-hidden rounded-2xl border-2 border-dashed flex flex-col items-center justify-center gap-2 transition-all duration-300
@@ -489,7 +492,6 @@ const SectorView: React.FC<SectorViewProps> = ({
              ) : (
                  <div className="text-center py-20 opacity-40">
                     <Search size={48} className="mx-auto mb-4" />
-                    {/* COMING SOON MESSAGE */}
                     <div className={`text-2xl font-bold mb-2 ${isWizard ? 'font-wizardTitle text-emerald-300' : 'font-muggle text-fuchsia-300'}`}>
                         COMING SOON!
                     </div>
