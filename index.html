@@ -1,0 +1,220 @@
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <link id="dynamic-favicon" rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>✨</text></svg>" />
+    <title>CoreConnect</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=EB+Garamond:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600&family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Orbitron:wght@400;700&family=Montserrat:wght@400;600&family=Courier+Prime&family=Dancing+Script:wght@600&family=Righteous&family=Audiowide&display=swap" rel="stylesheet">
+    
+    <!-- Configure Tailwind BEFORE loading the script to prevent race conditions -->
+    <script>
+      window.tailwind = {
+        config: {
+          theme: {
+            extend: {
+              colors: {
+                wizard: {
+                  bg: '#050a05',
+                  primary: '#10b981', // Emerald 500
+                  accent: '#047857', // Emerald 700
+                  text: '#d1fae5', // Emerald 100
+                },
+                muggle: {
+                  bg: '#09050f',
+                  primary: '#d946ef', // Fuchsia 500
+                  accent: '#86198f', // Fuchsia 700
+                  text: '#f5d0fe', // Fuchsia 100
+                }
+              },
+              fontFamily: {
+                wizard: ['"EB Garamond"', 'serif'],
+                wizardTitle: ['"Cinzel"', 'serif'],
+                muggle: ['"JetBrains Mono"', 'monospace'],
+                sans: ['"Inter"', 'sans-serif'],
+                playfair: ['"Playfair Display"', 'serif'],
+                orbitron: ['"Orbitron"', 'sans-serif'],
+                montserrat: ['"Montserrat"', 'sans-serif'],
+                courier: ['"Courier Prime"', 'monospace'],
+                cursive: ['"Dancing Script"', 'cursive'],
+                tech: ['"Audiowide"', 'sans-serif'],
+                retro: ['"Righteous"', 'cursive'],
+              },
+              animation: {
+                'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                'float': 'float 6s ease-in-out infinite',
+                'firefly': 'firefly 10s infinite alternate',
+                'matrix': 'matrix 2s linear infinite',
+                'spin-slow': 'spin 10s linear infinite',
+                'reverse-spin': 'spin 15s linear infinite reverse',
+              },
+              keyframes: {
+                float: {
+                  '0%, 100%': { transform: 'translateY(0)' },
+                  '50%': { transform: 'translateY(-20px)' },
+                },
+                firefly: {
+                  '0%': { transform: 'translate(0, 0) scale(1)', opacity: 0.5 },
+                  '50%': { opacity: 1 },
+                  '100%': { transform: 'translate(100px, -100px) scale(0.5)', opacity: 0.5 }
+                },
+                matrix: {
+                  '0%': { opacity: 0, transform: 'translateY(-10px)' },
+                  '20%': { opacity: 1 },
+                  '100%': { opacity: 0, transform: 'translateY(20px)' }
+                }
+              }
+            }
+          }
+        }
+      }
+    </script>
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <style>
+      html, body {
+        margin: 0;
+        overflow: hidden; /* App handles scrolling */
+        background-color: #000; /* Fallback for slow load */
+        touch-action: pan-y; /* Allow vertical scroll, handle horizontal in JS */
+        -webkit-tap-highlight-color: transparent;
+      }
+      
+      /* --- CURSOR STYLES --- */
+      
+      /* 1. Classic (Default) */
+      .cursor-classic-wizard {
+        cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="%2310b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72Z"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/></svg>') 0 24, auto;
+      }
+      .cursor-classic-muggle {
+        cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="%23d946ef" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>') 12 12, crosshair;
+      }
+
+      /* 2. Minimal (Dot) */
+      .cursor-minimal-wizard {
+        cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 12 12"><circle cx="6" cy="6" r="4" fill="%2310b981" stroke="white" stroke-width="1"/></svg>') 6 6, pointer;
+      }
+      .cursor-minimal-muggle {
+        cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 12 12"><rect x="2" y="2" width="8" height="8" fill="%23d946ef" stroke="white" stroke-width="1"/></svg>') 6 6, pointer;
+      }
+
+      /* 3. Blade (Sharp) */
+      .cursor-blade-wizard {
+        cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><path d="M2,2 L14,8 L8,14 Z" fill="%2310b981" stroke="white" stroke-width="1"/></svg>') 2 2, default;
+      }
+      .cursor-blade-muggle {
+        cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><path d="M0,0 L12,0 L6,10 L0,0" fill="%23d946ef" stroke="white" stroke-width="1"/></svg>') 6 5, default;
+      }
+
+      /* 4. Enchanted (Glow) */
+      .cursor-enchanted-wizard {
+        cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="8" fill="none" stroke="%2310b981" stroke-width="2" stroke-dasharray="2,2"/><circle cx="16" cy="16" r="2" fill="white"/></svg>') 16 16, pointer;
+      }
+      .cursor-enchanted-muggle {
+        cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><rect x="8" y="8" width="16" height="16" fill="none" stroke="%23d946ef" stroke-width="2"/><line x1="16" y1="4" x2="16" y2="28" stroke="%23d946ef"/><line x1="4" y1="16" x2="28" y2="16" stroke="%23d946ef"/></svg>') 16 16, crosshair;
+      }
+
+      /* --- UTILS --- */
+      .perspective-container {
+        perspective: 1200px;
+      }
+      .preserve-3d {
+        transform-style: preserve-3d;
+      }
+      
+      /* Scrollbar */
+      ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      ::-webkit-scrollbar-track {
+        background: rgba(0, 0, 0, 0.1); 
+      }
+      ::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.2); 
+        border-radius: 3px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: rgba(255, 255, 255, 0.4);
+      }
+
+      /* Textures */
+      .parchment-grain {
+        background-image: url("https://www.transparenttextures.com/patterns/aged-paper.png");
+        opacity: 0.15;
+        pointer-events: none;
+      }
+      
+      .crt-scanlines {
+        background: linear-gradient(
+          to bottom,
+          rgba(255,255,255,0),
+          rgba(255,255,255,0) 50%,
+          rgba(0,0,0,0.2) 50%,
+          rgba(0,0,0,0.2)
+        );
+        background-size: 100% 4px;
+        pointer-events: none;
+        animation: scanline 10s linear infinite;
+        opacity: 0.3;
+      }
+
+      @keyframes scanline {
+        0% { background-position: 0 0; }
+        100% { background-position: 0 100%; }
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@^19.2.3",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
+    "vite": "https://esm.sh/vite@^7.3.0",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@^2.89.0",
+    "dompurify": "https://esm.sh/dompurify@^3.3.1",
+    "@google/genai": "https://esm.sh/@google/genai@latest",
+    "cookie-parser": "https://esm.sh/cookie-parser@^1.4.7",
+    "crypto": "https://esm.sh/crypto@^1.0.1",
+    "cors": "https://esm.sh/cors@^2.8.5",
+    "dotenv": "https://esm.sh/dotenv@^17.2.3",
+    "helmet": "https://esm.sh/helmet@^8.1.0",
+    "util": "https://esm.sh/util@^0.12.5",
+    "express-rate-limit": "https://esm.sh/express-rate-limit@^8.2.1",
+    "xss": "https://esm.sh/xss@^1.0.15",
+    "multer": "https://esm.sh/multer@^2.0.2",
+    "hpp": "https://esm.sh/hpp@^0.2.3",
+    "express": "https://esm.sh/express@^5.2.1",
+    "serverless-http": "https://esm.sh/serverless-http@^4.0.0",
+    "fs": "https://esm.sh/fs@^0.0.1-security",
+    "path": "https://esm.sh/path@^0.12.7",
+    "url": "https://esm.sh/url@^0.11.4",
+    "web-push": "https://esm.sh/web-push@^3.6.7",
+    "@capacitor/cli": "https://esm.sh/@capacitor/cli@^8.0.0"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./index.tsx"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').then(registration => {
+            console.log('ServiceWorker registration successful');
+          }, err => {
+            console.log('ServiceWorker registration failed: ', err);
+          });
+        });
+      }
+    </script>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>
