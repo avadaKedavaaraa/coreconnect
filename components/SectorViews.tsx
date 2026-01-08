@@ -4,7 +4,7 @@ import { Lineage, type CarouselItem, type LectureRule, GlobalConfig, Sector } fr
 import { Book, FileText, Video, Calendar, Search, Filter, X, Trash2, LayoutGrid, List, FolderOpen, ArrowLeft, Edit2, Plus, FolderPlus, Loader2, Image as ImageIcon, Send, Link as LinkIcon, Repeat, ExternalLink, Hourglass, MonitorOff, Bell, Layers, Code, Pin, PinOff, SortAsc, SortDesc, GripVertical, Save, Check } from 'lucide-react';
 import CalendarWidget from './CalendarWidget';
 import DOMPurify from 'dompurify';
-import { trackActivity } from '../App';
+
 
 interface SectorViewProps {
   items: CarouselItem[];
