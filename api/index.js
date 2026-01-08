@@ -23,58 +23,32 @@ const app = express();
 const IS_PROD = process.env.NODE_ENV === 'production';
 const PORT = process.env.PORT || 3000;
 
-// --- MOCK DATABASE (IN-MEMORY FALLBACK) ---
-// This ensures the app runs even without Supabase credentials
-const USE_MOCK_DB = !process.env.VITE_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_URL.includes('placeholder');
+// --- SUPABASE SETUP ---
+const supabaseUrl = process.env.VITE_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-if (USE_MOCK_DB) {
-    console.warn("⚠️  SUPABASE CREDENTIALS MISSING OR INVALID.");
-    console.warn("🚀  RUNNING IN MOCK/MEMORY MODE. Data will reset on server restart.");
+if (!supabaseUrl || !supabaseServiceKey) {
+    console.error("❌ CRITICAL: Supabase URL or Service Role Key is missing.");
+    console.error("Please ensure VITE_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are set in your .env file.");
 }
 
-const MockDB = {
-    items: [
-        {
-            id: '1',
-            title: 'Welcome to CoreConnect',
-            content: 'The system is running in local memory mode. Connect Supabase to persist data.',
-            date: new Date().toISOString().split('T')[0].replace(/-/g, '.'),
-            type: 'announcement',
-            sector: 'announcements',
-            subject: 'System',
-            author: 'Admin',
-            isUnread: true,
-            order_index: 0
-        }
-    ],
-    config: {
-        wizardTitle: 'Wizard OS', muggleTitle: 'Core OS', 
-        wizardLogoText: 'W', muggleLogoText: 'C',
-        wizardGateText: 'Enter the Void', muggleGateText: 'Init System',
-        schedules: []
-    },
-    sectors: [
-        { id: 'announcements', wizardName: 'Daily Prophet', muggleName: 'Announcements', wizardIcon: 'Scroll', muggleIcon: 'Megaphone', description: 'Main news feed.', sortOrder: 'newest' },
-        { id: 'lectures', wizardName: 'Owl Post Schedule', muggleName: 'Lecture Schedule', wizardIcon: 'Feather', muggleIcon: 'BellRing', description: 'Class timings.', sortOrder: 'newest' },
-        { id: 'resources', wizardName: 'Room of Requirement', muggleName: 'Resources', wizardIcon: 'DoorOpen', muggleIcon: 'Library', description: 'Helpful links.', sortOrder: 'newest' }
-    ],
-    users: [],
-    logs: [],
-    visitors: []
-};
+const supabase = createClient(
+  supabaseUrl || '', // Fallback to empty string to prevent crash on init, attempts will fail with specific error
+  supabaseServiceKey || '',
+  { auth: { autoRefreshToken: false, persistSession: false } }
+);
 
-// --- SECURITY CHECKS ---
-// Generate keys if not in env (For development convenience)
+// --- NOTIFICATION SETUP ---
+// Generate ephemeral keys if not in env (Note: Subscriptions reset on server restart without persistent keys)
 let vapidKeys = {
     publicKey: process.env.VAPID_PUBLIC_KEY,
     privateKey: process.env.VAPID_PRIVATE_KEY
 };
 
 if (!vapidKeys.publicKey || !vapidKeys.privateKey) {
-    console.log("⚠️  VAPID Keys missing in .env. Generating ephemeral keys for this session.");
+    console.warn("⚠️  VAPID Keys missing in .env. Using ephemeral keys (Notifications will break on restart).");
     vapidKeys = webpush.generateVAPIDKeys();
-    console.log("👉 Public Key:", vapidKeys.publicKey);
-    // console.log("👉 Private Key:", vapidKeys.privateKey);
+    console.log("👉 Generated Public Key:", vapidKeys.publicKey);
 }
 
 webpush.setVapidDetails(
@@ -133,159 +107,47 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(cookieParser());
 app.use(limiter);
 
-// --- SUPABASE CLIENT ---
-const supabase = createClient(
-  process.env.VITE_SUPABASE_URL || 'https://placeholder.supabase.co',
-  process.env.SUPABASE_SERVICE_ROLE_KEY || 'placeholder',
-  { auth: { autoRefreshToken: false, persistSession: false } }
-);
-
-// --- PUSH SUBSCRIPTION STORE ---
-const memorySubscriptions = new Set();
-
-async function saveSubscription(sub) {
-    if (USE_MOCK_DB) {
-        memorySubscriptions.add(JSON.stringify(sub));
-        return;
-    }
-    try {
-        const { error } = await supabase.from('push_subscriptions').insert({ subscription: sub });
-        if (error && error.code !== '23505') throw error;
-    } catch (e) {
-        // Fallback
-        memorySubscriptions.add(JSON.stringify(sub));
-    }
-}
-
-async function getAllSubscriptions() {
-    if (USE_MOCK_DB) {
-        return Array.from(memorySubscriptions).map(s => JSON.parse(s));
-    }
-    try {
-        const { data } = await supabase.from('push_subscriptions').select('subscription');
-        const dbSubs = data ? data.map(r => r.subscription) : [];
-        const memSubs = Array.from(memorySubscriptions).map(s => JSON.parse(s));
-        return [...dbSubs, ...memSubs];
-    } catch (e) {
-        return Array.from(memorySubscriptions).map(s => JSON.parse(s));
-    }
-}
-
-async function sendNotificationToAll(payload) {
-    const subscriptions = await getAllSubscriptions();
-    console.log(`📣 Sending notification to ${subscriptions.length} subscribers...`);
-    
-    subscriptions.forEach(subscription => {
-        webpush.sendNotification(subscription, JSON.stringify(payload))
-            .catch(err => {
-                if (err.statusCode === 410 || err.statusCode === 404) {
-                    if (!USE_MOCK_DB) {
-                        supabase.from('push_subscriptions').delete().match({ subscription: subscription }).then();
-                    }
-                    memorySubscriptions.delete(JSON.stringify(subscription));
-                } else {
-                    console.error("Push Error:", err.statusCode);
-                }
-            });
-    });
-}
-
-// --- SESSION MANAGEMENT ---
-const memorySessions = new Map();
-
-// --- SESSION HELPERS ---
-async function createSession(data) {
-    const sessionId = crypto.randomBytes(32).toString('hex');
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); 
-    
-    if (USE_MOCK_DB) {
-        memorySessions.set(sessionId, { ...data, expiresAt: expiresAt.getTime() });
-        return sessionId;
-    }
-
-    try {
-        const { error } = await supabase.from('admin_sessions').insert({
-            session_id: sessionId,
-            data: data,
-            expires_at: expiresAt.toISOString()
-        });
-        if (error) throw error;
-        return sessionId;
-    } catch (e) {
-        memorySessions.set(sessionId, { ...data, expiresAt: expiresAt.getTime() });
-        return sessionId;
-    }
-}
-
-async function getSession(sessionId) {
-    if (!sessionId) return null;
-    
-    // Check Memory First (always valid for fallback)
-    const memSession = memorySessions.get(sessionId);
-    if (memSession && Date.now() < memSession.expiresAt) return memSession;
-
-    if (USE_MOCK_DB) return null;
-
-    try {
-        const { data } = await supabase.from('admin_sessions').select('*').eq('session_id', sessionId).gt('expires_at', new Date().toISOString()).single();
-        if (data) return data.data;
-    } catch (e) {}
-    
-    return null;
-}
-
-async function deleteSession(sessionId) {
-    if (!USE_MOCK_DB) {
-        try { await supabase.from('admin_sessions').delete().eq('session_id', sessionId); } catch(e) {}
-    }
-    memorySessions.delete(sessionId);
-}
-
 // --- GEMINI CLIENT ---
 let aiClient = null;
 if (process.env.API_KEY) {
   try {
     aiClient = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  } catch (e) {}
+  } catch (e) {
+      console.warn("AI Init failed:", e.message);
+  }
 }
 
-// Initialize Admin User
-async function initAdmin() {
-    if (!process.env.ADMIN_PASSWORD) return;
-    
-    const salt = crypto.randomBytes(16).toString('hex');
-    const hash = (await scryptAsync(process.env.ADMIN_PASSWORD, salt, 64)).toString('hex');
-    const adminUser = {
-        username: 'admin',
-        salt,
-        password_hash: hash,
-        permissions: { canEdit: true, canDelete: true, canManageUsers: true, canViewLogs: true, isGod: true }
-    };
-
-    if (USE_MOCK_DB) {
-        MockDB.users.push(adminUser);
-        return;
-    }
-
-    try {
-        const { data, error } = await supabase.from('admin_users').select('username').eq('username', 'admin').maybeSingle();
-        if (!data && (!error || error.code === 'PGRST116')) {
-            await supabase.from('admin_users').insert(adminUser);
-        }
-    } catch (e) {}
-}
-initAdmin();
-
+// --- LOGGING HELPER ---
 async function logAction(username, action, details, req) {
     const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
     const safeDetails = xss(details).substring(0, 500);
-    const log = { username, action, details: safeDetails, ip, timestamp: new Date().toISOString() };
-    
-    if (USE_MOCK_DB) {
-        MockDB.logs.unshift(log);
-        if (MockDB.logs.length > 200) MockDB.logs.pop();
-    } else {
-        try { await supabase.from('audit_logs').insert(log); } catch(e) {}
+    try {
+        await supabase.from('audit_logs').insert({ 
+            username, 
+            action, 
+            details: safeDetails, 
+            ip: Array.isArray(ip) ? ip[0] : ip 
+        });
+    } catch(e) {
+        console.error("Failed to write audit log:", e.message);
+    }
+}
+
+// --- AUTH MIDDLEWARE ---
+async function getSession(sessionId) {
+    if (!sessionId) return null;
+    try {
+        const { data, error } = await supabase.from('admin_sessions')
+            .select('*')
+            .eq('session_id', sessionId)
+            .gt('expires_at', new Date().toISOString())
+            .single();
+            
+        if (error || !data) return null;
+        return data.data;
+    } catch (e) {
+        console.error("Session lookup error:", e.message);
+        return null;
     }
 }
 
@@ -308,7 +170,7 @@ const hasPermission = (user, permission) => {
 
 const router = express.Router();
 
-router.get('/health', (req, res) => res.json({ status: 'active', platform: 'netlify', mock: USE_MOCK_DB }));
+router.get('/health', (req, res) => res.json({ status: 'active', platform: 'netlify' }));
 
 // --- NOTIFICATION ROUTES ---
 router.get('/notifications/vapid-key', (req, res) => {
@@ -316,33 +178,28 @@ router.get('/notifications/vapid-key', (req, res) => {
 });
 
 router.post('/notifications/subscribe', async (req, res) => {
-    const subscription = req.body;
-    await saveSubscription(subscription);
-    res.status(201).json({ success: true });
+    try {
+        const subscription = req.body;
+        // Use upsert or insert with ignore duplicates
+        const { error } = await supabase.from('push_subscriptions').upsert({ subscription }, { onConflict: 'subscription' });
+        
+        if (error) {
+            console.error("DB Subscription Error:", error);
+            // If table doesn't exist or other DB error, don't crash, just warn
+            return res.status(500).json({ error: "Database error saving subscription" });
+        }
+        
+        res.status(201).json({ success: true });
+    } catch (e) {
+        console.error("Subscribe Error:", e);
+        res.status(500).json({ error: e.message });
+    }
 });
 
 router.post('/visitor/heartbeat', async (req, res) => {
     const { visitorId, displayName, timeSpent, visitCount, type, resourceId, title } = req.body;
     if (!visitorId) return res.status(400).json({ error: 'Invalid ID' });
     
-    if (USE_MOCK_DB) {
-        const existing = MockDB.visitors.find(v => v.visitor_id === visitorId);
-        if (existing) {
-            existing.total_time_spent = Number(timeSpent) || existing.total_time_spent;
-            existing.visit_count = Number(visitCount) || existing.visit_count;
-            existing.last_active = new Date().toISOString();
-        } else {
-            MockDB.visitors.push({
-                visitor_id: visitorId,
-                display_name: xss(displayName || 'Guest'),
-                total_time_spent: Number(timeSpent) || 0,
-                visit_count: Number(visitCount) || 1,
-                last_active: new Date().toISOString()
-            });
-        }
-        return res.json({ status: 'logged (mock)' });
-    }
-
     try {
         const { error: logError } = await supabase.from('visitor_logs').upsert({
             visitor_id: xss(visitorId),
@@ -373,29 +230,35 @@ router.post('/visitor/heartbeat', async (req, res) => {
 });
 
 router.get('/config', async (req, res) => {
-    if (USE_MOCK_DB) return res.json(MockDB.config);
     try {
-      const { data } = await supabase.from('global_config').select('config').eq('id', 1).maybeSingle();
+      const { data, error } = await supabase.from('global_config').select('config').eq('id', 1).maybeSingle();
+      if (error) throw error;
       res.json(data?.config || {});
-    } catch(e) { res.status(500).json({ error: "Failed" }); }
+    } catch(e) { 
+        console.error("Fetch Config Error:", e.message);
+        res.status(500).json({ error: "Failed to fetch config" }); 
+    }
 });
 
 router.get('/sectors', async (req, res) => {
-    if (USE_MOCK_DB) return res.json(MockDB.sectors);
     try {
-      const { data } = await supabase.from('global_config').select('config').eq('id', 2).maybeSingle();
+      const { data, error } = await supabase.from('global_config').select('config').eq('id', 2).maybeSingle();
+      if (error) throw error;
       res.json(data?.config || []);
-    } catch(e) { res.status(500).json({ error: "Failed" }); }
+    } catch(e) { 
+        console.error("Fetch Sectors Error:", e.message);
+        res.status(500).json({ error: "Failed to fetch sectors" }); 
+    }
 });
 
 router.get('/items', async (req, res) => {
-    if (USE_MOCK_DB) return res.json(MockDB.items);
     try {
-      const { data } = await supabase.from('items').select('*').order('order_index', { ascending: true }).order('date', { ascending: false });
-      if (!data) return res.json([]); 
-      res.json(data);
+      const { data, error } = await supabase.from('items').select('*').order('order_index', { ascending: true }).order('date', { ascending: false });
+      if (error) throw error;
+      res.json(data || []);
     } catch(e) { 
-        res.json([]); 
+        console.error("Fetch Items Error:", e.message);
+        res.json([]); // Return empty array on fail to not break UI
     }
 });
 
@@ -415,18 +278,6 @@ router.post('/admin/items', requireAuth, async (req, res) => {
           order_index: 0
       };
       
-      if (USE_MOCK_DB) {
-          MockDB.items.unshift(itemPayload);
-          await logAction(req.user.username, 'CREATE_ITEM', `Created item ${itemPayload.title} (Mock)`, req);
-          sendNotificationToAll({
-              title: `New Post: ${itemPayload.title}`,
-              body: `Sector: ${itemPayload.sector}`,
-              icon: '/favicon.ico',
-              data: { url: `/?item=${itemPayload.id}` } 
-          });
-          return res.json({ success: true, item: itemPayload });
-      }
-
       const { data: item, error } = await supabase.from('items').insert(itemPayload).select().single();
       if (error) throw error;
 
@@ -442,12 +293,27 @@ router.post('/admin/items', requireAuth, async (req, res) => {
       await logAction(req.user.username, 'CREATE_ITEM', `Created item ${item.title}`, req);
       
       // --- TRIGGER WEB PUSH ---
-      sendNotificationToAll({
-          title: `New Post: ${item.title}`,
-          body: `Sector: ${item.sector || 'Archives'} | Subject: ${item.subject || 'General'}`,
-          icon: '/favicon.ico',
-          data: { url: `/?item=${item.id}` } 
-      });
+      try {
+          const { data: subs } = await supabase.from('push_subscriptions').select('subscription');
+          if (subs && subs.length > 0) {
+              const payload = JSON.stringify({
+                  title: `New Post: ${item.title}`,
+                  body: `Sector: ${item.sector || 'Archives'} | Subject: ${item.subject || 'General'}`,
+                  icon: '/favicon.ico',
+                  data: { url: `/?item=${item.id}` } 
+              });
+              
+              subs.forEach(({ subscription }) => {
+                  webpush.sendNotification(subscription, payload).catch(err => {
+                      if (err.statusCode === 410 || err.statusCode === 404) {
+                          supabase.from('push_subscriptions').delete().match({ subscription }).then();
+                      }
+                  });
+              });
+          }
+      } catch (pushError) {
+          console.error("Push Notification Error:", pushError);
+      }
 
       res.json({ success: true, item: item });
     } catch(e) { 
@@ -479,7 +345,7 @@ router.post('/ai/chat', async (req, res) => {
       });
       const botText = response.text;
 
-      if (visitorId && !USE_MOCK_DB) {
+      if (visitorId) {
           supabase.from('visitor_chats').insert({
               visitor_id: xss(visitorId),
               user_query: safeMessage.substring(0, 500),
@@ -514,7 +380,6 @@ const uploadMiddleware = multer({ storage: multer.memoryStorage(), limits: { fil
 
 router.post('/admin/upload', requireAuth, uploadMiddleware.single('file'), async (req, res) => {
   if(!hasPermission(req.user, 'canEdit')) return res.status(403).json({error: "Forbidden"});
-  if (USE_MOCK_DB) return res.json({ url: "https://via.placeholder.com/300?text=Mock+Upload" });
 
   try {
     if (!req.file) return res.status(400).json({error: "No file"});
@@ -531,14 +396,9 @@ router.post('/login', loginLimiter, async (req, res) => {
   try {
     const { username, password } = req.body;
     
-    let user;
-    if (USE_MOCK_DB) {
-        user = MockDB.users.find(u => u.username === username);
-    } else {
-        const { data } = await supabase.from('admin_users').select('*').eq('username', username).maybeSingle();
-        user = data;
-    }
-
+    const { data: user, error } = await supabase.from('admin_users').select('*').eq('username', username).maybeSingle();
+    
+    if (error) throw error;
     if (!user) return res.status(401).json({ error: "Invalid credentials" });
 
     const derivedKey = await scryptAsync(password, user.salt, 64);
@@ -550,7 +410,10 @@ router.post('/login', loginLimiter, async (req, res) => {
     res.cookie('session_id', sessionId, { httpOnly: true, sameSite: 'lax', secure: IS_PROD, maxAge: 24 * 60 * 60 * 1000 });
     await logAction(username, 'LOGIN', 'User logged in', req);
     res.json({ success: true, csrfToken, permissions: user.permissions });
-  } catch(e) { res.status(500).json({ error: "System Error" }); }
+  } catch(e) { 
+      console.error("Login Error:", e.message);
+      res.status(500).json({ error: "System Error or DB Connection Failed" }); 
+  }
 });
 
 router.get('/me', async (req, res) => {
@@ -562,7 +425,9 @@ router.get('/me', async (req, res) => {
 
 router.post('/logout', async (req, res) => {
     const sessionId = req.cookies.session_id;
-    if (sessionId) await deleteSession(sessionId);
+    try {
+        if (sessionId) await supabase.from('admin_sessions').delete().eq('session_id', sessionId);
+    } catch(e) {}
     res.clearCookie('session_id');
     res.json({ success: true });
 });
@@ -571,14 +436,6 @@ router.post('/admin/reorder', requireAuth, async (req, res) => {
     if(!hasPermission(req.user, 'canEdit')) return res.status(403).json({error: "Forbidden"});
     try {
         const { updates } = req.body;
-        if (USE_MOCK_DB) {
-            updates.forEach(u => {
-                const item = MockDB.items.find(i => i.id === u.id);
-                if(item) item.order_index = u.order_index;
-            });
-            return res.json({ success: true });
-        }
-
         for (const update of updates) {
             await supabase.from('items').update({ order_index: update.order_index }).eq('id', update.id);
         }
@@ -590,15 +447,6 @@ router.put('/admin/items/:id', requireAuth, async (req, res) => {
     if(!hasPermission(req.user, 'canEdit')) return res.status(403).json({error: "Forbidden"});
     try {
       const { isUnread, isLiked, likes, created_at, ...cleanBody } = req.body;
-      
-      if (USE_MOCK_DB) {
-          const idx = MockDB.items.findIndex(i => i.id === req.params.id);
-          if (idx !== -1) {
-              MockDB.items[idx] = { ...MockDB.items[idx], ...cleanBody };
-          }
-          return res.json({ success: true });
-      }
-
       const { error } = await supabase.from('items').update(cleanBody).eq('id', req.params.id);
       if (error) throw error;
       res.json({ success: true });
@@ -608,10 +456,6 @@ router.put('/admin/items/:id', requireAuth, async (req, res) => {
 router.delete('/admin/items/:id', requireAuth, async (req, res) => {
     if(!hasPermission(req.user, 'canDelete')) return res.status(403).json({error: "Forbidden"});
     try {
-      if (USE_MOCK_DB) {
-          MockDB.items = MockDB.items.filter(i => i.id !== req.params.id);
-          return res.json({ success: true });
-      }
       const { error } = await supabase.from('items').delete().eq('id', req.params.id);
       if (error) throw error;
       res.json({ success: true });
@@ -621,10 +465,6 @@ router.delete('/admin/items/:id', requireAuth, async (req, res) => {
 router.post('/admin/config', requireAuth, async (req, res) => {
     if(!hasPermission(req.user, 'canEdit')) return res.status(403).json({error: "Forbidden"});
     try {
-      if (USE_MOCK_DB) {
-          MockDB.config = req.body;
-          return res.json({ success: true });
-      }
       const { error } = await supabase.from('global_config').upsert({ id: 1, config: req.body });
       if (error) throw error;
       res.json({ success: true });
@@ -634,10 +474,6 @@ router.post('/admin/config', requireAuth, async (req, res) => {
 router.post('/admin/sectors', requireAuth, async (req, res) => {
     if(!hasPermission(req.user, 'canEdit')) return res.status(403).json({error: "Forbidden"});
     try {
-      if (USE_MOCK_DB) {
-          MockDB.sectors = req.body;
-          return res.json({ success: true });
-      }
       const { error } = await supabase.from('global_config').upsert({ id: 2, config: req.body });
       if (error) throw error;
       res.json({ success: true });
@@ -646,7 +482,6 @@ router.post('/admin/sectors', requireAuth, async (req, res) => {
 
 router.get('/admin/logs', requireAuth, async (req, res) => {
     if(!hasPermission(req.user, 'canViewLogs')) return res.status(403).json({error: "Forbidden"});
-    if(USE_MOCK_DB) return res.json(MockDB.logs);
     try {
         const { data } = await supabase.from('audit_logs').select('*').order('timestamp', { ascending: false }).limit(200);
         res.json(data || []);
@@ -655,7 +490,6 @@ router.get('/admin/logs', requireAuth, async (req, res) => {
 
 router.get('/admin/visitors', requireAuth, async (req, res) => {
     if(!hasPermission(req.user, 'canViewLogs')) return res.status(403).json({error: "Forbidden"});
-    if(USE_MOCK_DB) return res.json(MockDB.visitors);
     try {
         const { data } = await supabase.from('visitor_logs').select('*').order('last_active', { ascending: false }).limit(100);
         res.json(data || []);
@@ -664,7 +498,6 @@ router.get('/admin/visitors', requireAuth, async (req, res) => {
 
 router.get('/admin/visitor-details/:id', requireAuth, async (req, res) => {
     if(!hasPermission(req.user, 'canViewLogs')) return res.status(403).json({error: "Forbidden"});
-    if(USE_MOCK_DB) return res.json({ activity: [], chats: [] });
     try {
         const { id } = req.params;
         const [activityRes, chatsRes] = await Promise.all([
@@ -681,7 +514,6 @@ router.get('/admin/visitor-details/:id', requireAuth, async (req, res) => {
 
 router.get('/admin/users', requireAuth, async (req, res) => {
     if (!hasPermission(req.user, 'canManageUsers')) return res.status(403).json({error: "Forbidden"});
-    if(USE_MOCK_DB) return res.json(MockDB.users.map(u => ({ username: u.username, permissions: u.permissions })));
     try {
         const { data } = await supabase.from('admin_users').select('username, permissions, last_active');
         res.json(data);
@@ -696,11 +528,6 @@ router.post('/admin/users/add', requireAuth, async (req, res) => {
         const salt = crypto.randomBytes(16).toString('hex');
         const hash = (await scryptAsync(password, salt, 64)).toString('hex');
         
-        if (USE_MOCK_DB) {
-            MockDB.users.push({ username: safeUsername, salt, password_hash: hash, permissions });
-            return res.json({ success: true });
-        }
-
         const { error } = await supabase.from('admin_users').insert({ username: safeUsername, salt, password_hash: hash, permissions });
         if (error) throw error;
         await logAction(req.user.username, 'ADD_USER', `Added user ${safeUsername}`, req);
@@ -714,11 +541,6 @@ router.post('/admin/users/delete', requireAuth, async (req, res) => {
         const { targetUser } = req.body;
         if (targetUser === 'admin') return res.status(400).json({ error: "Cannot delete root admin" });
         
-        if (USE_MOCK_DB) {
-            MockDB.users = MockDB.users.filter(u => u.username !== targetUser);
-            return res.json({ success: true });
-        }
-
         const { error } = await supabase.from('admin_users').delete().eq('username', targetUser);
         if (error) throw error;
         await logAction(req.user.username, 'DEL_USER', `Deleted user ${targetUser}`, req);
@@ -731,14 +553,8 @@ router.post('/admin/change-password', requireAuth, async (req, res) => {
         const { currentPassword, newPassword } = req.body;
         const { username } = req.user;
         
-        let user;
-        if (USE_MOCK_DB) user = MockDB.users.find(u => u.username === username);
-        else {
-            const { data } = await supabase.from('admin_users').select('*').eq('username', username).single();
-            user = data;
-        }
-
-        if (!user) return res.status(404).json({ error: "User not found" });
+        const { data: user, error } = await supabase.from('admin_users').select('*').eq('username', username).single();
+        if (error || !user) return res.status(404).json({ error: "User not found" });
 
         const derivedKey = await scryptAsync(currentPassword, user.salt, 64);
         if (!crypto.timingSafeEqual(Buffer.from(user.password_hash, 'hex'), derivedKey)) {
@@ -748,12 +564,7 @@ router.post('/admin/change-password', requireAuth, async (req, res) => {
         const newSalt = crypto.randomBytes(16).toString('hex');
         const newHash = (await scryptAsync(newPassword, newSalt, 64)).toString('hex');
         
-        if (USE_MOCK_DB) {
-            user.salt = newSalt;
-            user.password_hash = newHash;
-        } else {
-            await supabase.from('admin_users').update({ salt: newSalt, password_hash: newHash }).eq('username', username);
-        }
+        await supabase.from('admin_users').update({ salt: newSalt, password_hash: newHash }).eq('username', username);
         res.json({ success: true });
     } catch (e) { res.status(500).json({ error: "Update failed" }); }
 });
@@ -761,7 +572,7 @@ router.post('/admin/change-password', requireAuth, async (req, res) => {
 app.use('/api', router);
 
 if (process.argv[1] && process.argv[1].endsWith('index.js')) {
-    app.listen(PORT, () => console.log(`✅ Server running on port ${PORT} [MockMode: ${USE_MOCK_DB}]`));
+    app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
 }
 
 export default app;
