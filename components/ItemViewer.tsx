@@ -7,7 +7,7 @@ import {
   Monitor, Smartphone, PenTool, Save, Trash2, AlignJustify, Loader2, Share2, CornerDownRight, Calendar, User, Tag, ArrowRight
 } from 'lucide-react';
 import DOMPurify from 'dompurify';
-import { trackActivity } from '../App';
+import { trackActivity } from '../services/tracking';
 
 interface ItemViewerProps {
   item: CarouselItem;
