@@ -12,7 +12,6 @@ import { promisify } from 'util';
 import helmet from 'helmet';
 import hpp from 'hpp';
 import rateLimit from 'express-rate-limit';
-import webpush from 'web-push';
 
 // Load env vars
 dotenv.config();
@@ -36,25 +35,6 @@ const supabase = createClient(
   supabaseUrl || '', // Fallback to empty string to prevent crash on init, attempts will fail with specific error
   supabaseServiceKey || '',
   { auth: { autoRefreshToken: false, persistSession: false } }
-);
-
-// --- NOTIFICATION SETUP ---
-// Generate ephemeral keys if not in env (Note: Subscriptions reset on server restart without persistent keys)
-let vapidKeys = {
-    publicKey: process.env.VAPID_PUBLIC_KEY,
-    privateKey: process.env.VAPID_PRIVATE_KEY
-};
-
-if (!vapidKeys.publicKey || !vapidKeys.privateKey) {
-    console.warn("⚠️  VAPID Keys missing in .env. Using ephemeral keys (Notifications will break on restart).");
-    vapidKeys = webpush.generateVAPIDKeys();
-    console.log("👉 Generated Public Key:", vapidKeys.publicKey);
-}
-
-webpush.setVapidDetails(
-  'mailto:admin@coreconnect.com', 
-  vapidKeys.publicKey,
-  vapidKeys.privateKey
 );
 
 app.set('trust proxy', 1);
@@ -172,30 +152,7 @@ const router = express.Router();
 
 router.get('/health', (req, res) => res.json({ status: 'active', platform: 'netlify' }));
 
-// --- NOTIFICATION ROUTES ---
-router.get('/notifications/vapid-key', (req, res) => {
-    res.json({ publicKey: vapidKeys.publicKey });
-});
-
-router.post('/notifications/subscribe', async (req, res) => {
-    try {
-        const subscription = req.body;
-        // Use upsert or insert with ignore duplicates
-        const { error } = await supabase.from('push_subscriptions').upsert({ subscription }, { onConflict: 'subscription' });
-        
-        if (error) {
-            console.error("DB Subscription Error:", error);
-            // If table doesn't exist or other DB error, don't crash, just warn
-            return res.status(500).json({ error: "Database error saving subscription" });
-        }
-        
-        res.status(201).json({ success: true });
-    } catch (e) {
-        console.error("Subscribe Error:", e);
-        res.status(500).json({ error: e.message });
-    }
-});
-
+// --- VISITOR & HEARTBEAT ---
 router.post('/visitor/heartbeat', async (req, res) => {
     const { visitorId, displayName, timeSpent, visitCount, type, resourceId, title } = req.body;
     if (!visitorId) return res.status(400).json({ error: 'Invalid ID' });
@@ -229,6 +186,7 @@ router.post('/visitor/heartbeat', async (req, res) => {
     }
 });
 
+// --- PUBLIC DATA ROUTES ---
 router.get('/config', async (req, res) => {
     try {
       const { data, error } = await supabase.from('global_config').select('config').eq('id', 1).maybeSingle();
@@ -262,6 +220,7 @@ router.get('/items', async (req, res) => {
     }
 });
 
+// --- ADMIN ROUTES ---
 router.post('/admin/items', requireAuth, async (req, res) => {
     if(!hasPermission(req.user, 'canEdit')) return res.status(403).json({error: "Forbidden"});
     try {
@@ -292,29 +251,6 @@ router.post('/admin/items', requireAuth, async (req, res) => {
 
       await logAction(req.user.username, 'CREATE_ITEM', `Created item ${item.title}`, req);
       
-      // --- TRIGGER WEB PUSH ---
-      try {
-          const { data: subs } = await supabase.from('push_subscriptions').select('subscription');
-          if (subs && subs.length > 0) {
-              const payload = JSON.stringify({
-                  title: `New Post: ${item.title}`,
-                  body: `Sector: ${item.sector || 'Archives'} | Subject: ${item.subject || 'General'}`,
-                  icon: '/favicon.ico',
-                  data: { url: `/?item=${item.id}` } 
-              });
-              
-              subs.forEach(({ subscription }) => {
-                  webpush.sendNotification(subscription, payload).catch(err => {
-                      if (err.statusCode === 410 || err.statusCode === 404) {
-                          supabase.from('push_subscriptions').delete().match({ subscription }).then();
-                      }
-                  });
-              });
-          }
-      } catch (pushError) {
-          console.error("Push Notification Error:", pushError);
-      }
-
       res.json({ success: true, item: item });
     } catch(e) { 
         res.status(500).json({ error: "Creation failed: " + e.message }); 
@@ -406,6 +342,23 @@ router.post('/login', loginLimiter, async (req, res) => {
 
     const csrfToken = crypto.randomBytes(32).toString('hex');
     const sessionId = await createSession({ username, csrfToken, permissions: user.permissions });
+
+    // --- SESSION HELPERS DEFINED ABOVE ---
+    async function createSession(data) {
+        const sessionId = crypto.randomBytes(32).toString('hex');
+        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); 
+        try {
+            const { error } = await supabase.from('admin_sessions').insert({
+                session_id: sessionId,
+                data: data,
+                expires_at: expiresAt.toISOString()
+            });
+            if (error) throw error;
+            return sessionId;
+        } catch (e) {
+            throw e;
+        }
+    }
 
     res.cookie('session_id', sessionId, { httpOnly: true, sameSite: 'lax', secure: IS_PROD, maxAge: 24 * 60 * 60 * 1000 });
     await logAction(username, 'LOGIN', 'User logged in', req);

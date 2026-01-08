@@ -18,7 +18,6 @@ import PDFViewer from './components/PDFViewer';
 import ItemViewer from './components/ItemViewer';
 import CommandPalette from './components/CommandPalette';
 import LiveBackground from './components/LiveBackground';
-import NotificationRequest from './components/NotificationRequest';
 import { Menu, LayoutList, Briefcase, AlertTriangle } from 'lucide-react';
 import { MY_FILES } from './telegramData';
 import { API_URL } from './lib/config';
@@ -238,7 +237,6 @@ function App() {
   const [toolsOpen, setToolsOpen] = useState(false);
   const [commandCenterOpen, setCommandCenterOpen] = useState(false);
   const [cmdOpen, setCmdOpen] = useState(false);
-  const [showNotifRequest, setShowNotifRequest] = useState(false); 
   
   const [viewingItem, setViewingItem] = useState<CarouselItem | null>(null);
   const [announcementViewMode, setAnnouncementViewMode] = useState<'carousel' | 'list'>('carousel');
@@ -413,11 +411,6 @@ function App() {
       const newProfile = { ...profile, displayName: finalName, id: visitorId };
       setProfile(newProfile);
       localStorage.setItem('core_connect_profile', JSON.stringify(newProfile));
-
-      const notifPref = localStorage.getItem('core_connect_notifications');
-      if (!notifPref) {
-          setTimeout(() => setShowNotifRequest(true), 2000); 
-      }
 
       trackActivity(newProfile.id, 'LOGIN', '', '', 0);
   };
@@ -700,15 +693,6 @@ function App() {
 
         {/* MODALS */}
         <Suspense fallback={null}>
-            {showNotifRequest && (
-                <NotificationRequest 
-                    lineage={lineage} 
-                    onClose={() => setShowNotifRequest(false)} 
-                    onEnable={() => {}}
-                    onDisable={() => {}}
-                />
-            )}
-
             {showOfflineAlert && (
                 <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-[fade-in_0.3s]">
                     <div className={`relative max-w-sm w-full p-6 rounded-xl border-2 shadow-2xl text-center ${isWizard ? 'bg-[#0a0f0a] border-red-500' : 'bg-[#0f0a15] border-red-500'}`}>
