@@ -22,20 +22,10 @@ const app = express();
 const IS_PROD = process.env.NODE_ENV === 'production';
 const PORT = process.env.PORT || 3000;
 
-// --- SUPABASE SETUP ---
-const supabaseUrl = process.env.VITE_SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-if (!supabaseUrl || !supabaseServiceKey) {
-    console.error("❌ CRITICAL: Supabase URL or Service Role Key is missing.");
-    console.error("Please ensure VITE_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are set in your .env file.");
+// --- SECURITY CHECKS ---
+if (!process.env.VITE_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    console.warn("⚠️ Supabase credentials missing. Database features will fail.");
 }
-
-const supabase = createClient(
-  supabaseUrl || '', // Fallback to empty string to prevent crash on init, attempts will fail with specific error
-  supabaseServiceKey || '',
-  { auth: { autoRefreshToken: false, persistSession: false } }
-);
 
 app.set('trust proxy', 1);
 app.disable('x-powered-by');
@@ -87,48 +77,83 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(cookieParser());
 app.use(limiter);
 
+// --- SUPABASE CLIENT ---
+const supabase = createClient(
+  process.env.VITE_SUPABASE_URL || 'https://placeholder.supabase.co',
+  process.env.SUPABASE_SERVICE_ROLE_KEY || 'placeholder',
+  { auth: { autoRefreshToken: false, persistSession: false } }
+);
+
+// --- SESSION MANAGEMENT ---
+const memorySessions = new Map();
+
+// --- SESSION HELPERS ---
+async function createSession(data) {
+    const sessionId = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); 
+    try {
+        const { error } = await supabase.from('admin_sessions').insert({
+            session_id: sessionId,
+            data: data,
+            expires_at: expiresAt.toISOString()
+        });
+        if (error) throw error;
+        return sessionId;
+    } catch (e) {
+        memorySessions.set(sessionId, { ...data, expiresAt: expiresAt.getTime() });
+        return sessionId;
+    }
+}
+
+async function getSession(sessionId) {
+    if (!sessionId) return null;
+    try {
+        const { data } = await supabase.from('admin_sessions').select('*').eq('session_id', sessionId).gt('expires_at', new Date().toISOString()).single();
+        if (data) return data.data;
+    } catch (e) {}
+    const memSession = memorySessions.get(sessionId);
+    if (memSession && Date.now() < memSession.expiresAt) return memSession;
+    return null;
+}
+
+async function deleteSession(sessionId) {
+    try { await supabase.from('admin_sessions').delete().eq('session_id', sessionId); } catch(e) {}
+    memorySessions.delete(sessionId);
+}
+
 // --- GEMINI CLIENT ---
 let aiClient = null;
 if (process.env.API_KEY) {
   try {
     aiClient = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  } catch (e) {
-      console.warn("AI Init failed:", e.message);
-  }
+  } catch (e) {}
 }
 
-// --- LOGGING HELPER ---
+// Initialize Admin User
+async function initAdmin() {
+    if (!process.env.ADMIN_PASSWORD) return;
+    try {
+        const { data, error } = await supabase.from('admin_users').select('username').eq('username', 'admin').maybeSingle();
+        if (!data && (!error || error.code === 'PGRST116')) {
+            const salt = crypto.randomBytes(16).toString('hex');
+            const hash = (await scryptAsync(process.env.ADMIN_PASSWORD, salt, 64)).toString('hex');
+            await supabase.from('admin_users').insert({
+                username: 'admin',
+                salt,
+                password_hash: hash,
+                permissions: { canEdit: true, canDelete: true, canManageUsers: true, canViewLogs: true, isGod: true }
+            });
+        }
+    } catch (e) {}
+}
+initAdmin();
+
 async function logAction(username, action, details, req) {
     const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
     const safeDetails = xss(details).substring(0, 500);
     try {
-        await supabase.from('audit_logs').insert({ 
-            username, 
-            action, 
-            details: safeDetails, 
-            ip: Array.isArray(ip) ? ip[0] : ip 
-        });
-    } catch(e) {
-        console.error("Failed to write audit log:", e.message);
-    }
-}
-
-// --- AUTH MIDDLEWARE ---
-async function getSession(sessionId) {
-    if (!sessionId) return null;
-    try {
-        const { data, error } = await supabase.from('admin_sessions')
-            .select('*')
-            .eq('session_id', sessionId)
-            .gt('expires_at', new Date().toISOString())
-            .single();
-            
-        if (error || !data) return null;
-        return data.data;
-    } catch (e) {
-        console.error("Session lookup error:", e.message);
-        return null;
-    }
+        await supabase.from('audit_logs').insert({ username, action, details: safeDetails, ip });
+    } catch(e) {}
 }
 
 const requireAuth = async (req, res, next) => {
@@ -152,11 +177,23 @@ const router = express.Router();
 
 router.get('/health', (req, res) => res.json({ status: 'active', platform: 'netlify' }));
 
-// --- VISITOR & HEARTBEAT ---
+// --- SYSTEM DIAGNOSTICS FOR ADMIN ---
+router.get('/admin/status', requireAuth, async (req, res) => {
+    // Check DB
+    let dbStatus = 'disconnected';
+    try {
+        const { data, error } = await supabase.from('global_config').select('count').limit(1);
+        if (!error) dbStatus = 'connected';
+    } catch(e) {}
+
+    res.json({
+        db: dbStatus
+    });
+});
+
 router.post('/visitor/heartbeat', async (req, res) => {
     const { visitorId, displayName, timeSpent, visitCount, type, resourceId, title } = req.body;
     if (!visitorId) return res.status(400).json({ error: 'Invalid ID' });
-    
     try {
         const { error: logError } = await supabase.from('visitor_logs').upsert({
             visitor_id: xss(visitorId),
@@ -186,41 +223,30 @@ router.post('/visitor/heartbeat', async (req, res) => {
     }
 });
 
-// --- PUBLIC DATA ROUTES ---
 router.get('/config', async (req, res) => {
     try {
-      const { data, error } = await supabase.from('global_config').select('config').eq('id', 1).maybeSingle();
-      if (error) throw error;
+      const { data } = await supabase.from('global_config').select('config').eq('id', 1).maybeSingle();
       res.json(data?.config || {});
-    } catch(e) { 
-        console.error("Fetch Config Error:", e.message);
-        res.status(500).json({ error: "Failed to fetch config" }); 
-    }
+    } catch(e) { res.status(500).json({ error: "Failed" }); }
 });
 
 router.get('/sectors', async (req, res) => {
     try {
-      const { data, error } = await supabase.from('global_config').select('config').eq('id', 2).maybeSingle();
-      if (error) throw error;
+      const { data } = await supabase.from('global_config').select('config').eq('id', 2).maybeSingle();
       res.json(data?.config || []);
-    } catch(e) { 
-        console.error("Fetch Sectors Error:", e.message);
-        res.status(500).json({ error: "Failed to fetch sectors" }); 
-    }
+    } catch(e) { res.status(500).json({ error: "Failed" }); }
 });
 
 router.get('/items', async (req, res) => {
     try {
-      const { data, error } = await supabase.from('items').select('*').order('order_index', { ascending: true }).order('date', { ascending: false });
-      if (error) throw error;
-      res.json(data || []);
+      const { data } = await supabase.from('items').select('*').order('order_index', { ascending: true }).order('date', { ascending: false });
+      if (!data) return res.json([]); 
+      res.json(data);
     } catch(e) { 
-        console.error("Fetch Items Error:", e.message);
-        res.json([]); // Return empty array on fail to not break UI
+        res.json([]); 
     }
 });
 
-// --- ADMIN ROUTES ---
 router.post('/admin/items', requireAuth, async (req, res) => {
     if(!hasPermission(req.user, 'canEdit')) return res.status(403).json({error: "Forbidden"});
     try {
@@ -316,7 +342,6 @@ const uploadMiddleware = multer({ storage: multer.memoryStorage(), limits: { fil
 
 router.post('/admin/upload', requireAuth, uploadMiddleware.single('file'), async (req, res) => {
   if(!hasPermission(req.user, 'canEdit')) return res.status(403).json({error: "Forbidden"});
-
   try {
     if (!req.file) return res.status(400).json({error: "No file"});
     const ext = req.file.originalname.split('.').pop().toLowerCase();
@@ -331,10 +356,7 @@ router.post('/admin/upload', requireAuth, uploadMiddleware.single('file'), async
 router.post('/login', loginLimiter, async (req, res) => {
   try {
     const { username, password } = req.body;
-    
-    const { data: user, error } = await supabase.from('admin_users').select('*').eq('username', username).maybeSingle();
-    
-    if (error) throw error;
+    const { data: user } = await supabase.from('admin_users').select('*').eq('username', username).maybeSingle();
     if (!user) return res.status(401).json({ error: "Invalid credentials" });
 
     const derivedKey = await scryptAsync(password, user.salt, 64);
@@ -343,30 +365,10 @@ router.post('/login', loginLimiter, async (req, res) => {
     const csrfToken = crypto.randomBytes(32).toString('hex');
     const sessionId = await createSession({ username, csrfToken, permissions: user.permissions });
 
-    // --- SESSION HELPERS DEFINED ABOVE ---
-    async function createSession(data) {
-        const sessionId = crypto.randomBytes(32).toString('hex');
-        const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); 
-        try {
-            const { error } = await supabase.from('admin_sessions').insert({
-                session_id: sessionId,
-                data: data,
-                expires_at: expiresAt.toISOString()
-            });
-            if (error) throw error;
-            return sessionId;
-        } catch (e) {
-            throw e;
-        }
-    }
-
     res.cookie('session_id', sessionId, { httpOnly: true, sameSite: 'lax', secure: IS_PROD, maxAge: 24 * 60 * 60 * 1000 });
     await logAction(username, 'LOGIN', 'User logged in', req);
     res.json({ success: true, csrfToken, permissions: user.permissions });
-  } catch(e) { 
-      console.error("Login Error:", e.message);
-      res.status(500).json({ error: "System Error or DB Connection Failed" }); 
-  }
+  } catch(e) { res.status(500).json({ error: "System Error" }); }
 });
 
 router.get('/me', async (req, res) => {
@@ -378,9 +380,7 @@ router.get('/me', async (req, res) => {
 
 router.post('/logout', async (req, res) => {
     const sessionId = req.cookies.session_id;
-    try {
-        if (sessionId) await supabase.from('admin_sessions').delete().eq('session_id', sessionId);
-    } catch(e) {}
+    if (sessionId) await deleteSession(sessionId);
     res.clearCookie('session_id');
     res.json({ success: true });
 });
@@ -480,7 +480,6 @@ router.post('/admin/users/add', requireAuth, async (req, res) => {
         const safeUsername = xss(username);
         const salt = crypto.randomBytes(16).toString('hex');
         const hash = (await scryptAsync(password, salt, 64)).toString('hex');
-        
         const { error } = await supabase.from('admin_users').insert({ username: safeUsername, salt, password_hash: hash, permissions });
         if (error) throw error;
         await logAction(req.user.username, 'ADD_USER', `Added user ${safeUsername}`, req);
@@ -493,7 +492,6 @@ router.post('/admin/users/delete', requireAuth, async (req, res) => {
     try {
         const { targetUser } = req.body;
         if (targetUser === 'admin') return res.status(400).json({ error: "Cannot delete root admin" });
-        
         const { error } = await supabase.from('admin_users').delete().eq('username', targetUser);
         if (error) throw error;
         await logAction(req.user.username, 'DEL_USER', `Deleted user ${targetUser}`, req);
@@ -505,7 +503,6 @@ router.post('/admin/change-password', requireAuth, async (req, res) => {
     try {
         const { currentPassword, newPassword } = req.body;
         const { username } = req.user;
-        
         const { data: user, error } = await supabase.from('admin_users').select('*').eq('username', username).single();
         if (error || !user) return res.status(404).json({ error: "User not found" });
 
@@ -516,10 +513,64 @@ router.post('/admin/change-password', requireAuth, async (req, res) => {
 
         const newSalt = crypto.randomBytes(16).toString('hex');
         const newHash = (await scryptAsync(newPassword, newSalt, 64)).toString('hex');
-        
         await supabase.from('admin_users').update({ salt: newSalt, password_hash: newHash }).eq('username', username);
         res.json({ success: true });
     } catch (e) { res.status(500).json({ error: "Update failed" }); }
+});
+
+router.post('/admin/import', requireAuth, async (req, res) => {
+    if (!hasPermission(req.user, 'canEdit')) return res.status(403).json({error: "Forbidden"});
+    try {
+        const { data } = req.body;
+        if (data.items) await supabase.from('items').upsert(data.items.map(({ isUnread, isLiked, likes, ...rest }) => rest));
+        if (data.global_config) await supabase.from('global_config').upsert(data.global_config);
+        if (data.sectors) await supabase.from('global_config').upsert(data.sectors);
+        if (data.drive_registry) await supabase.from('drive_registry').upsert(data.drive_registry);
+        await logAction(req.user.username, 'IMPORT', 'Restored backup', req);
+        res.json({ success: true });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+router.post('/admin/drive-scan', requireAuth, async (req, res) => {
+    if(!hasPermission(req.user, 'canEdit')) return res.status(403).json({error: "Forbidden"});
+    const apiKey = process.env.GOOGLE_DRIVE_KEY;
+    if (!apiKey) return res.status(400).json({ error: "Missing Drive API Key." });
+
+    try {
+        const { folderLink, sector, subject } = req.body;
+        let folderId = '';
+        if (folderLink.includes('/folders/')) {
+            folderId = folderLink.split('/folders/')[1].split('?')[0];
+        } else if (folderLink.includes('id=')) {
+            folderId = new URLSearchParams(folderLink.split('?')[1]).get('id');
+        }
+        if (!folderId) return res.status(400).json({ error: "Invalid Link" });
+
+        const driveRes = await fetch(`https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents+and+mimeType='application/pdf'&key=${apiKey}&fields=files(id,name,webViewLink)`);
+        const driveData = await driveRes.json();
+        if (!driveRes.ok) throw new Error(driveData.error?.message || "Drive API Failed");
+
+        const files = driveData.files || [];
+        const newItems = files.map(file => ({
+            id: crypto.randomUUID(),
+            title: file.name.replace('.pdf', ''),
+            content: `Imported from Google Drive.`,
+            date: new Date().toISOString().split('T')[0].replace(/-/g, '.'),
+            type: 'file',
+            sector: sector || 'resources',
+            subject: subject || 'Drive Import',
+            fileUrl: file.webViewLink,
+            author: 'System Import',
+            isUnread: true,
+            order_index: 0
+        }));
+
+        if (newItems.length > 0) {
+             const { error } = await supabase.from('items').insert(newItems);
+             if (error) throw error;
+        }
+        res.json({ success: true, count: newItems.length, items: newItems });
+    } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 app.use('/api', router);
