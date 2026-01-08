@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, Suspense, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useEffect, Suspense, useMemo, useCallback } from 'react';
 import { 
   Lineage, Sector, GlobalConfig, CarouselItem, UserProfile, AdminPermissions, 
   SECTORS as DEFAULT_SECTORS, LectureRule, FONT_LIBRARY 

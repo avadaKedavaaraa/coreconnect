@@ -26,6 +26,8 @@ export const NotificationService = {
       
       // Get VAPID Key from server
       const response = await fetch(`${API_URL}/api/notifications/vapid-key`);
+      if (!response.ok) throw new Error('VAPID fetch failed');
+      
       const { publicKey } = await response.json();
       
       const convertedVapidKey = urlBase64ToUint8Array(publicKey);
