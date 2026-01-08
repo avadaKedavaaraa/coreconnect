@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Lineage, Sector, CarouselItem, AdminPermissions, GlobalConfig, LectureRule, VisitorLog, AdminUser, AuditLog, FONT_LIBRARY } from '../types';
-import { API_URL } from '../App';
+import { API_URL } from '../lib/config';
 import { 
   X, Unlock, Lock, Loader2, Database, PenTool, CalendarDays, HardDrive, 
   BrainCircuit, ScanFace, Users, Activity, Settings, LayoutTemplate, Search, 
