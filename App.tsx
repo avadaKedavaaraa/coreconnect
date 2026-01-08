@@ -8,7 +8,7 @@ import IdentityGate from './components/IdentityGate';
 import Carousel from './components/Carousel';
 import Sidebar from './components/Sidebar';
 import HUD from './components/HUD';
-import SectorView from './components/SectorViews';
+import { SectorView } from './components/SectorViews';
 import SystemInfoView from './components/SystemInfoView';
 import ToolsModal from './components/ToolsModal';
 import CommandCenter from './components/CommandCenter';
@@ -18,51 +18,11 @@ import PDFViewer from './components/PDFViewer';
 import ItemViewer from './components/ItemViewer';
 import CommandPalette from './components/CommandPalette';
 import LiveBackground from './components/LiveBackground';
+import NotificationRequest from './components/NotificationRequest';
 import { Menu, LayoutList, Briefcase, AlertTriangle } from 'lucide-react';
 import { MY_FILES } from './telegramData';
-
-const getEnv = (key: string) => {
-  try {
-    // @ts-ignore
-    return (import.meta as any).env?.[key];
-  } catch {
-    return undefined;
-  }
-};
-
-export const API_URL = (getEnv('VITE_API_URL') || '').replace(/\/$/, '');
-
-export const trackActivity = async (visitorId: string, type: string, resourceId: string, title: string, duration: number = 0) => {
-    let displayName = 'Guest';
-    let visitCount = 1;
-    let totalTime = 0;
-
-    try {
-        const stored = localStorage.getItem('core_connect_profile');
-        if (stored) {
-            const p = JSON.parse(stored);
-            if (p.displayName) displayName = p.displayName;
-            if (p.visitCount) visitCount = p.visitCount;
-            if (p.totalTimeSpent) totalTime = p.totalTimeSpent;
-        }
-    } catch(e) {}
-
-    try {
-        await fetch(`${API_URL}/api/visitor/heartbeat`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                visitorId, 
-                displayName, 
-                type, 
-                resourceId, 
-                title, 
-                timeSpent: totalTime + duration, 
-                visitCount 
-            })
-        });
-    } catch (e) { console.error("Tracking Error", e); }
-};
+import { API_URL } from './lib/config';
+import { trackActivity } from './services/tracking';
 
 const safeFetch = async (url: string, options: RequestInit = {}) => {
   try {
@@ -278,6 +238,7 @@ function App() {
   const [toolsOpen, setToolsOpen] = useState(false);
   const [commandCenterOpen, setCommandCenterOpen] = useState(false);
   const [cmdOpen, setCmdOpen] = useState(false);
+  const [showNotifRequest, setShowNotifRequest] = useState(false); 
   
   const [viewingItem, setViewingItem] = useState<CarouselItem | null>(null);
   const [announcementViewMode, setAnnouncementViewMode] = useState<'carousel' | 'list'>('carousel');
@@ -318,18 +279,14 @@ function App() {
                  setDbItems(allItems);
              }
          } else {
-             // Fetch failed - likely offline or keys missing
              throw new Error("Failed to fetch items");
          }
-         setIsOffline(false); // Recovery
+         setIsOffline(false); 
          
      } catch(e) { 
-         // Console log only to avoid user alarm
          console.warn("Data refresh failed - Switching to Local Mode");
          if (!isOffline) {
              setIsOffline(true);
-             // Only show the intrusive alert if we have ABSOLUTELY NO data to show
-             // Since we have local files, this will usually stay false
              if (dbItems.length === 0) {
                  setShowOfflineAlert(true);
              }
@@ -341,7 +298,6 @@ function App() {
   useEffect(() => {
      const loadData = async () => {
          try {
-             // Load Profile from LocalStorage
              const savedProfile = localStorage.getItem('core_connect_profile');
              let currentProfile = profile;
              
@@ -349,7 +305,6 @@ function App() {
                  currentProfile = JSON.parse(savedProfile);
                  setProfile(currentProfile);
              } else {
-                 // Generate ID for new user IMMEDIATELY
                  const newId = crypto.randomUUID();
                  const newProfile = { ...profile, id: newId };
                  setProfile(newProfile);
@@ -357,15 +312,8 @@ function App() {
                  currentProfile = newProfile;
              }
 
-             // Start Heartbeat for stats
-             fetch(`${API_URL}/api/visitor/heartbeat`, {
-                 method: 'POST',
-                 headers: { 'Content-Type': 'application/json' },
-                 body: JSON.stringify({ 
-                     visitorId: currentProfile.id, 
-                     displayName: currentProfile.displayName 
-                 })
-             }).catch(() => {});
+             // Start Heartbeat
+             trackActivity(currentProfile.id, 'HEARTBEAT', '', '', 0);
 
              await fetchData();
              try {
@@ -388,7 +336,6 @@ function App() {
              if (dbItems.length === 0) setShowOfflineAlert(true);
          }
          finally { 
-             // Artificial delay to show full scanning animation (4.5s)
              setTimeout(() => setConfigLoaded(true), 4500); 
          }
      };
@@ -404,16 +351,14 @@ function App() {
      return () => window.removeEventListener('keydown', handleKeyDown);
   }, [fetchData]);
 
-  // Automatic Polling to keep all clients in sync
   useEffect(() => {
       if (adminPanelOpen) return;
       const interval = setInterval(() => {
           fetchData();
-      }, 10000); // 10 seconds
+      }, 10000); 
       return () => clearInterval(interval);
   }, [adminPanelOpen, fetchData]);
 
-  // Track Sector Changes
   useEffect(() => {
       if (profile.id && activeSectorId && profile.id !== 'guest') {
           trackActivity(profile.id, 'ENTER_SECTOR', activeSectorId, activeSectorId, 0);
@@ -459,7 +404,6 @@ function App() {
   const handleLineageSelect = (l: Lineage, name?: string) => {
       setLineage(l);
       
-      // Ensure visitor ID exists (redundant safety check)
       let visitorId = profile.id;
       if (!visitorId || visitorId === 'guest') {
           visitorId = crypto.randomUUID();
@@ -470,17 +414,12 @@ function App() {
       setProfile(newProfile);
       localStorage.setItem('core_connect_profile', JSON.stringify(newProfile));
 
-      // CRITICAL: Immediately send updated identity to server
-      fetch(`${API_URL}/api/visitor/heartbeat`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-              visitorId: newProfile.id, 
-              displayName: newProfile.displayName,
-              visitCount: newProfile.visitCount || 1,
-              timeSpent: newProfile.totalTimeSpent || 0
-          })
-      }).catch(e => console.error("Identity update failed", e));
+      const notifPref = localStorage.getItem('core_connect_notifications');
+      if (!notifPref) {
+          setTimeout(() => setShowNotifRequest(true), 2000); 
+      }
+
+      trackActivity(newProfile.id, 'LOGIN', '', '', 0);
   };
 
   const toggleLineage = () => {
@@ -761,7 +700,15 @@ function App() {
 
         {/* MODALS */}
         <Suspense fallback={null}>
-            {/* OFFLINE ALERT */}
+            {showNotifRequest && (
+                <NotificationRequest 
+                    lineage={lineage} 
+                    onClose={() => setShowNotifRequest(false)} 
+                    onEnable={() => {}}
+                    onDisable={() => {}}
+                />
+            )}
+
             {showOfflineAlert && (
                 <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-[fade-in_0.3s]">
                     <div className={`relative max-w-sm w-full p-6 rounded-xl border-2 shadow-2xl text-center ${isWizard ? 'bg-[#0a0f0a] border-red-500' : 'bg-[#0f0a15] border-red-500'}`}>

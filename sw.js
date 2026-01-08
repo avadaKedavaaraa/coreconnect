@@ -7,43 +7,42 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(self.clients.claim());
 });
 
-// Handle incoming Push signals (Background Notifications)
-self.addEventListener('push', (event) => {
-  const data = event.data ? event.data.json() : {};
-  
-  const title = data.title || 'New Update';
-  const options = {
-    body: data.body || 'New content available in the archives.',
-    icon: data.icon || '/favicon.ico',
-    badge: '/favicon.ico',
-    tag: 'core-connect-update',
-    data: data.data || { url: '/' },
-    vibrate: [200, 100, 200],
-    requireInteraction: true // Keeps notification visible until user interacts
-  };
+self.addEventListener('push', function(event) {
+  if (event.data) {
+    try {
+      const data = event.data.json();
+      const options = {
+        body: data.body,
+        icon: data.icon || '/favicon.ico',
+        badge: '/favicon.ico',
+        vibrate: [100, 50, 100],
+        data: data.data || {}
+      };
 
-  event.waitUntil(
-    self.registration.showNotification(title, options)
-  );
+      event.waitUntil(
+        self.registration.showNotification(data.title, options)
+      );
+    } catch (e) {
+      console.error('Push data parse error', e);
+    }
+  }
 });
 
-self.addEventListener('notificationclick', (event) => {
+self.addEventListener('notificationclick', function(event) {
   event.notification.close();
-
-  // Handle URL opening
-  const urlToOpen = event.notification.data?.url || '/';
+  
+  const urlToOpen = (event.notification.data && event.notification.data.url) || '/';
 
   event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      // If a window is already open, focus it
-      for (const client of clientList) {
-        if (client.url && 'focus' in client) {
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(windowClients => {
+      for (let i = 0; i < windowClients.length; i++) {
+        const client = windowClients[i];
+        if (client.url === urlToOpen && 'focus' in client) {
           return client.focus();
         }
       }
-      // Otherwise open a new window
-      if (self.clients.openWindow) {
-        return self.clients.openWindow(urlToOpen);
+      if (clients.openWindow) {
+        return clients.openWindow(urlToOpen);
       }
     })
   );

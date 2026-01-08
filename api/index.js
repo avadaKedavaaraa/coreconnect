@@ -12,6 +12,7 @@ import { promisify } from 'util';
 import helmet from 'helmet';
 import hpp from 'hpp';
 import rateLimit from 'express-rate-limit';
+import webpush from 'web-push';
 
 // Load env vars
 dotenv.config();
@@ -26,6 +27,26 @@ const PORT = process.env.PORT || 3000;
 if (!process.env.VITE_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
     console.warn("⚠️ Supabase credentials missing. Database features will fail.");
 }
+
+// --- WEB PUSH SETUP ---
+// Generate keys if not in env (For development convenience)
+let vapidKeys = {
+    publicKey: process.env.VAPID_PUBLIC_KEY,
+    privateKey: process.env.VAPID_PRIVATE_KEY
+};
+
+if (!vapidKeys.publicKey || !vapidKeys.privateKey) {
+    console.log("⚠️  VAPID Keys missing in .env. Generating ephemeral keys for this session.");
+    vapidKeys = webpush.generateVAPIDKeys();
+    console.log("👉 Public Key:", vapidKeys.publicKey);
+    console.log("👉 Private Key:", vapidKeys.privateKey);
+}
+
+webpush.setVapidDetails(
+  'mailto:gauravpcpurpose@gmail.com', 
+  vapidKeys.publicKey,
+  vapidKeys.privateKey
+);
 
 app.set('trust proxy', 1);
 app.disable('x-powered-by');
@@ -83,6 +104,52 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY || 'placeholder',
   { auth: { autoRefreshToken: false, persistSession: false } }
 );
+
+// --- PUSH SUBSCRIPTION STORE ---
+const memorySubscriptions = new Set();
+
+async function saveSubscription(sub) {
+    try {
+        const { error } = await supabase.from('push_subscriptions').insert({ subscription: sub });
+        if (error) {
+            // Handle unique violation gracefully or table missing
+            if (error.code === '23505') return; 
+            throw error;
+        }
+    } catch (e) {
+        console.warn("DB Subscription save failed (using memory):", e.message);
+        memorySubscriptions.add(JSON.stringify(sub));
+    }
+}
+
+async function getAllSubscriptions() {
+    try {
+        const { data } = await supabase.from('push_subscriptions').select('subscription');
+        const dbSubs = data ? data.map(r => r.subscription) : [];
+        const memSubs = Array.from(memorySubscriptions).map(s => JSON.parse(s));
+        return [...dbSubs, ...memSubs];
+    } catch (e) {
+        return Array.from(memorySubscriptions).map(s => JSON.parse(s));
+    }
+}
+
+async function sendNotificationToAll(payload) {
+    const subscriptions = await getAllSubscriptions();
+    console.log(`📣 Sending notification to ${subscriptions.length} subscribers...`);
+    
+    subscriptions.forEach(subscription => {
+        webpush.sendNotification(subscription, JSON.stringify(payload))
+            .catch(err => {
+                if (err.statusCode === 410 || err.statusCode === 404) {
+                    // Subscription expired, delete from DB
+                    supabase.from('push_subscriptions').delete().match({ subscription: subscription }).then();
+                    memorySubscriptions.delete(JSON.stringify(subscription));
+                } else {
+                    console.error("Push Error:", err.statusCode);
+                }
+            });
+    });
+}
 
 // --- SESSION MANAGEMENT ---
 const memorySessions = new Map();
@@ -176,6 +243,17 @@ const hasPermission = (user, permission) => {
 const router = express.Router();
 
 router.get('/health', (req, res) => res.json({ status: 'active', platform: 'netlify' }));
+
+// --- NOTIFICATION ROUTES ---
+router.get('/notifications/vapid-key', (req, res) => {
+    res.json({ publicKey: vapidKeys.publicKey });
+});
+
+router.post('/notifications/subscribe', async (req, res) => {
+    const subscription = req.body;
+    await saveSubscription(subscription);
+    res.status(201).json({ success: true });
+});
 
 // --- SYSTEM DIAGNOSTICS FOR ADMIN ---
 router.get('/admin/status', requireAuth, async (req, res) => {
@@ -277,6 +355,14 @@ router.post('/admin/items', requireAuth, async (req, res) => {
 
       await logAction(req.user.username, 'CREATE_ITEM', `Created item ${item.title}`, req);
       
+      // --- TRIGGER WEB PUSH ---
+      sendNotificationToAll({
+          title: `New Post: ${item.title}`,
+          body: `Sector: ${item.sector || 'Archives'} | Subject: ${item.subject || 'General'}`,
+          icon: '/favicon.ico',
+          data: { url: `/?item=${item.id}` } 
+      });
+
       res.json({ success: true, item: item });
     } catch(e) { 
         res.status(500).json({ error: "Creation failed: " + e.message }); 

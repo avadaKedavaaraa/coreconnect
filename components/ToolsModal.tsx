@@ -1,10 +1,11 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Lineage, type UserProfile, SECTORS, GlobalConfig, FONT_LIBRARY } from '../types';
-import { X, Clock, ClipboardList, User, Palette, Save, Type, PaintBucket, LayoutTemplate, Plus, Link as LinkIcon, Eye, Sun, Moon, Accessibility, Activity, RotateCw, Download, Search, CheckSquare, Square } from 'lucide-react';
+import { X, Clock, ClipboardList, User, Palette, Save, Type, PaintBucket, LayoutTemplate, Plus, Link as LinkIcon, Eye, Sun, Moon, Accessibility, Activity, RotateCw, Download, Search, CheckSquare, Square, Bell, BellOff } from 'lucide-react';
 import Pomodoro from './Pomodoro';
 import Kanban from './Kanban';
 import StudentID from './StudentID';
+import { NotificationService } from '../services/NotificationService';
 
 interface ToolsModalProps {
   lineage: Lineage;
@@ -209,11 +210,16 @@ const CheckCircleIcon = ({ isWizard }: { isWizard: boolean }) => (
 const ToolsModal: React.FC<ToolsModalProps> = ({ lineage, onClose, profile, setProfile, config, onToggleLineage }) => {
   const [activeTab, setActiveTab] = useState<'timer' | 'tasks' | 'profile'>('profile');
   const [showFontPanel, setShowFontPanel] = useState(false);
+  const [notifsEnabled, setNotifsEnabled] = useState(false);
   const isWizard = lineage === Lineage.WIZARD;
 
   // Local State for Profile Editing
   const [editProfile, setEditProfile] = useState<UserProfile>(profile);
   const [hasChanges, setHasChanges] = useState(false);
+  
+  useEffect(() => {
+      setNotifsEnabled(Notification.permission === 'granted');
+  }, []);
 
   // Check for changes
   useEffect(() => {
@@ -246,6 +252,18 @@ const ToolsModal: React.FC<ToolsModalProps> = ({ lineage, onClose, profile, setP
         btn.innerText = "SAVED!";
         setTimeout(() => btn.innerText = originalText, 2000);
     }
+  };
+
+  const toggleNotifications = async () => {
+      if (notifsEnabled) {
+          // Unsubscribe
+          await NotificationService.unsubscribeUser();
+          setNotifsEnabled(false);
+      } else {
+          // Subscribe
+          const res = await NotificationService.subscribeUser();
+          if (res.success) setNotifsEnabled(true);
+      }
   };
 
   return (
@@ -343,6 +361,23 @@ const ToolsModal: React.FC<ToolsModalProps> = ({ lineage, onClose, profile, setP
                                SWITCH REALITY ({isWizard ? 'Muggle' : 'Wizard'})
                            </button>
                        )}
+
+                       {/* Notification Toggle */}
+                       <div className={`p-4 rounded-lg border flex items-center justify-between ${isWizard ? 'bg-emerald-950/20 border-emerald-800' : 'bg-fuchsia-950/20 border-fuchsia-800'}`}>
+                           <div>
+                               <div className={`font-bold text-sm flex items-center gap-2 ${isWizard ? 'text-emerald-100' : 'text-fuchsia-100'}`}>
+                                   {notifsEnabled ? <Bell size={16} className="text-yellow-400" /> : <BellOff size={16} />}
+                                   <span>{isWizard ? "Owl Post Deliveries" : "Push Notifications"}</span>
+                               </div>
+                               <p className="text-xs opacity-60 text-white/70">Receive alerts for new archives.</p>
+                           </div>
+                           <button 
+                               onClick={toggleNotifications}
+                               className={`w-12 h-6 rounded-full p-1 transition-colors relative ${notifsEnabled ? (isWizard ? 'bg-emerald-500' : 'bg-fuchsia-500') : 'bg-zinc-700'}`}
+                           >
+                               <div className={`w-4 h-4 rounded-full bg-white transition-transform ${notifsEnabled ? 'translate-x-6' : 'translate-x-0'}`}></div>
+                           </button>
+                       </div>
 
                        {/* Display Name */}
                        <div className="space-y-2">
