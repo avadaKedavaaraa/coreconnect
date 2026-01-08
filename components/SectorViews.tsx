@@ -4,7 +4,7 @@ import { Lineage, type CarouselItem, type LectureRule, GlobalConfig, Sector } fr
 import { Book, FileText, Video, Calendar, Search, Filter, X, Trash2, LayoutGrid, List, FolderOpen, ArrowLeft, Edit2, Plus, FolderPlus, Loader2, Image as ImageIcon, Send, Link as LinkIcon, Repeat, ExternalLink, Hourglass, MonitorOff, Bell, Layers, Code, Pin, PinOff, SortAsc, SortDesc, GripVertical, Save, Check } from 'lucide-react';
 import CalendarWidget from './CalendarWidget';
 import DOMPurify from 'dompurify';
-
+import { trackActivity } from '../services/tracking';
 
 interface SectorViewProps {
   items: CarouselItem[];
@@ -29,7 +29,7 @@ interface SectorViewProps {
 
 const ACADEMIC_SECTORS = ['books', 'notes', 'resources', 'tasks'];
 
-const SectorView: React.FC<SectorViewProps> = ({ 
+export const SectorView: React.FC<SectorViewProps> = ({ 
     items, allItems, lineage, sectorId, onViewItem, isAdmin, onDelete, onEdit, onUpdateItem, onBack, onAddItem, onQuickCreate, onUpdateSubject, onReorder, schedules, quickInputOnly, config, sectors 
 }) => {
   const isWizard = lineage === Lineage.WIZARD;

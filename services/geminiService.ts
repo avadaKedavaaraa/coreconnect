@@ -1,6 +1,6 @@
 
 import { Lineage } from "../types";
-import { API_URL } from "../App";
+import { API_URL } from "../lib/config";
 
 interface ChatHistory {
   role: 'user' | 'model';
