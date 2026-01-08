@@ -1,17 +1,16 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Lineage, CarouselItem, UserProfile } from '../types';
-import { consultTheOracle } from '../services/geminiService';
 import { Send, Sparkles, Terminal, X, Minimize2, Maximize2, Loader2, Bot } from 'lucide-react';
 import DOMPurify from 'dompurify';
-import { API_URL } from '../App';
+import { API_URL } from '../lib/config';
 
 interface OracleInterfaceProps {
   lineage: Lineage;
   isOpen: boolean;
   onClose: () => void;
   items: CarouselItem[];
-  profile?: UserProfile; // Added prop
+  profile?: UserProfile; 
 }
 
 interface Message {

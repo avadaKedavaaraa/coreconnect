@@ -24,9 +24,6 @@ import { MY_FILES } from './telegramData';
 import { API_URL } from './lib/config';
 import { trackActivity } from './services/tracking';
 
-// Export trackActivity for components that might try to import it from App
-export { trackActivity };
-
 const safeFetch = async (url: string, options: RequestInit = {}) => {
   try {
       const res = await fetch(url, { ...options, credentials: 'include' });
