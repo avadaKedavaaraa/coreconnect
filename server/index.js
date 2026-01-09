@@ -268,10 +268,13 @@ router.post('/notifications/subscribe', async (req, res) => {
 });
 
 router.post('/visitor/heartbeat', async (req, res) => {
-    const { visitorId, displayName, timeSpent, visitCount } = req.body;
+    // Extract ALL fields sent by tracking.ts
+    const { visitorId, displayName, type, resourceId, title, timeSpent, visitCount } = req.body;
+    
     if (!visitorId) return res.status(400).json({ error: 'Invalid ID' });
 
     try {
+        // 1. Update the Summary (Existing Logic)
         await supabase.from('visitor_logs').upsert({
             visitor_id: xss(visitorId),
             display_name: xss(displayName || 'Guest').substring(0, 50),
@@ -279,8 +282,23 @@ router.post('/visitor/heartbeat', async (req, res) => {
             visit_count: Number(visitCount) || 1,
             last_active: new Date().toISOString()
         }, { onConflict: 'visitor_id' });
+
+        // 2. NEW: Save the Activity History (If it's a specific action, not just a heartbeat)
+        if (type && type !== 'HEARTBEAT') {
+            await supabase.from('visitor_activity').insert({
+                visitor_id: xss(visitorId),
+                activity_type: xss(type),
+                resource_id: resourceId ? xss(resourceId) : null,
+                resource_title: title ? xss(title) : null,
+                duration_seconds: 0 // Duration is calculated on frontend cumulatively, can be refined
+            });
+        }
+
         res.json({ status: 'logged' });
-    } catch (e) { res.status(500).json({ error: "Server error" }); }
+    } catch (e) { 
+        console.error("Tracking Error:", e);
+        res.status(500).json({ error: "Server error" }); 
+    }
 });
 
 router.get('/config', async (req, res) => {

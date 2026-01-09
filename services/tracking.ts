@@ -1,4 +1,3 @@
-
 import { API_URL } from '../lib/config';
 
 export const trackActivity = async (visitorId: string, type: string, resourceId: string, title: string, duration: number = 0) => {
@@ -17,7 +16,9 @@ export const trackActivity = async (visitorId: string, type: string, resourceId:
     } catch(e) {}
 
     try {
-        if (!API_URL) return; // Skip if no API configured
+        // FIX: Removed the "if (!API_URL) return;" check.
+        // This allows the code to run even if API_URL is empty (relative path), 
+        // which is required for Netlify.
         
         await fetch(`${API_URL}/api/visitor/heartbeat`, {
             method: 'POST',
