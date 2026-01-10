@@ -17,10 +17,10 @@ export interface Sector {
 // Inside types.ts
 export interface ItemStyle {
   titleColor?: string;
-  titleColorEnd?: string; // <--- Make sure this is added
+  titleColorEnd?: string; // <--- MUST BE PRESENT
   contentColor?: string;
   fontFamily?: string;
-  isGradient?: boolean;   // <--- Make sure this is added
+  isGradient?: boolean;   // <--- MUST BE PRESENT
 }
 
 export interface LectureRule {
@@ -44,13 +44,13 @@ export interface CarouselItem {
   style?: ItemStyle;
   subject?: string;
   isUnread?: boolean;
-  isPinned?: boolean; // Added for Pin functionality
+  isPinned?: boolean;     // <--- MUST BE PRESENT
   likes?: number;
   isLiked?: boolean;
   author?: string;
   image?: string;
   fileUrl?: string;
-  order_index?: number; // Added for manual sorting
+  order_index?: number;
 }
 
 export interface Task {
