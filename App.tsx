@@ -419,7 +419,6 @@ function App() {
       // 2. FORCE UPDATE SERVER immediately
       trackActivity(newProfile.id, 'LOGIN', '', '', 0, finalName);
   };
-
   const toggleLineage = () => {
       setLineage(l => l === Lineage.WIZARD ? Lineage.MUGGLE : Lineage.WIZARD);
   };
