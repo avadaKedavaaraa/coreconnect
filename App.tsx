@@ -311,7 +311,7 @@ function App() {
              }
 
              // Start Heartbeat
-             trackActivity(currentProfile.id, 'HEARTBEAT', '', '', 0);
+             trackActivity(currentProfile.id, 'HEARTBEAT', '', '', 0, currentProfile.displayName);
 
              await fetchData();
              try {
@@ -359,9 +359,10 @@ function App() {
 
   useEffect(() => {
       if (profile.id && activeSectorId && profile.id !== 'guest') {
-          trackActivity(profile.id, 'ENTER_SECTOR', activeSectorId, activeSectorId, 0);
+          // Pass profile.displayName to ensure name sync on every page move
+          trackActivity(profile.id, 'ENTER_SECTOR', activeSectorId, activeSectorId, 0, profile.displayName);
       }
-  }, [activeSectorId, profile.id]);
+  }, [activeSectorId, profile.id, profile.displayName]); // Added profile.displayName here
 
   // --- FONT APPLICATION LOGIC ---
   const fontToUse = profile.preferredFont || globalConfig.defaultFont || 'cinzel';
@@ -412,7 +413,8 @@ function App() {
       setProfile(newProfile);
       localStorage.setItem('core_connect_profile', JSON.stringify(newProfile));
 
-      trackActivity(newProfile.id, 'LOGIN', '', '', 0);
+      // SEND NAME IMMEDIATELY TO SERVER
+      trackActivity(newProfile.id, 'LOGIN', '', '', 0, finalName);
   };
 
   const toggleLineage = () => {
@@ -557,7 +559,7 @@ function App() {
   };
 
   const handleViewItem = (item: CarouselItem) => {
-      trackActivity(profile.id, 'VIEW_ITEM', item.id, item.title, 0);
+      trackActivity(profile.id, 'VIEW_ITEM', item.id, item.title, 0, profile.displayName);
       setViewingItem(item);
   };
 

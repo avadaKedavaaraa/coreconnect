@@ -572,7 +572,36 @@ router.post('/admin/drive-scan', requireAuth, async (req, res) => {
         res.json({ success: true, count: newItems.length, items: newItems });
     } catch(e) { res.status(500).json({ error: e.message }); }
 });
+// api/index.js
 
+// ... existing routes ...
+
+// NEW: DELETE VISITOR ROUTE
+router.delete('/admin/visitors/:id', requireAuth, async (req, res) => {
+    // 1. Check Permissions
+    if(!hasPermission(req.user, 'canViewLogs')) return res.status(403).json({error: "Forbidden"});
+    
+    try {
+        const visitorId = req.params.id;
+
+        // 2. Delete main log
+        const { error } = await supabase.from('visitor_logs').delete().eq('visitor_id', visitorId);
+        if (error) throw error;
+
+        // 3. Clean up related data (Optional but recommended)
+        await supabase.from('visitor_activity').delete().eq('visitor_id', visitorId);
+        await supabase.from('visitor_chats').delete().eq('visitor_id', visitorId);
+        
+        // 4. Log the action
+        await logAction(req.user.username, 'DEL_VISITOR', `Deleted visitor data: ${visitorId}`, req);
+
+        res.json({ success: true });
+    } catch(e) { 
+        res.status(500).json({ error: "Delete failed: " + e.message }); 
+    }
+});
+
+// ... app.use('/api', router);
 app.use('/api', router);
 
 if (process.argv[1] && process.argv[1].endsWith('index.js')) {

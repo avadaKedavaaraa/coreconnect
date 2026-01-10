@@ -1172,100 +1172,199 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                 </div>
                             )}
 
-                            {/* VISITORS TAB */}
-                            {activeTab === 'visitors' && (
-                                <div className="space-y-6 h-full flex flex-col">
-                                    {!selectedVisitor ? (
-                                        <div className="bg-white/5 border border-white/10 rounded overflow-hidden flex-1 overflow-y-auto">
-                                            <table className="w-full text-sm text-left">
-                                                <thead className="bg-black/40 text-xs uppercase font-bold text-zinc-400 sticky top-0 backdrop-blur-md">
-                                                    <tr>
-                                                        <th className="p-3">Visitor Name</th>
-                                                        <th className="p-3">Visits</th>
-                                                        <th className="p-3">Time Spent</th>
-                                                        <th className="p-3">Last Active</th>
-                                                        <th className="p-3">ID</th>
-                                                        <th className="p-3"></th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {visitors.map((v, i) => (
-                                                        <tr key={i} className="border-t border-white/5 hover:bg-white/5 group cursor-pointer" onClick={() => handleVisitorSelect(v)}>
-                                                            <td className="p-3 font-bold text-white flex items-center gap-2">
-                                                                <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                                                                {v.display_name}
-                                                            </td>
-                                                            <td className="p-3">{v.visit_count}</td>
-                                                            <td className="p-3">{(v.total_time_spent / 60).toFixed(1)} mins</td>
-                                                            <td className="p-3 opacity-70">{new Date(v.last_active).toLocaleString()}</td>
-                                                            <td className="p-3 font-mono text-xs opacity-50">{v.visitor_id.substring(0, 8)}...</td>
-                                                            <td className="p-3">
-                                                                <span className="text-blue-400 opacity-0 group-hover:opacity-100 text-xs font-bold uppercase transition-opacity">View Dossier</span>
-                                                            </td>
-                                                        </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                            {visitors.length === 0 && <div className="p-8 text-center opacity-50">No visitor logs found.</div>}
-                                        </div>
-                                    ) : (
-                                        <div className="flex flex-col h-full animate-[fade-in-up_0.2s]">
-                                            <div className="flex items-center gap-4 mb-4">
-                                                <button onClick={() => setSelectedVisitor(null)} className="p-2 rounded bg-white/10 hover:bg-white/20 text-xs font-bold flex items-center gap-2">
-                                                    <ArrowDownUp className="rotate-90" size={14} /> BACK
-                                                </button>
-                                                <h3 className="text-xl font-bold">{selectedVisitor.display_name}'s Dossier</h3>
-                                                <span className="px-2 py-1 rounded bg-blue-900/50 text-blue-200 text-xs font-mono">{selectedVisitor.visitor_id}</span>
+{/* ADVANCED VISITORS TAB */}
+{activeTab === 'visitors' && (
+    <div className="space-y-6 h-full flex flex-col">
+        {!selectedVisitor ? (
+            <div className="bg-white/5 border border-white/10 rounded-xl flex flex-col flex-1 overflow-hidden shadow-2xl animate-[fade-in_0.3s]">
+                {/* CONTROL BAR */}
+                <div className="p-4 bg-black/40 border-b border-white/10 flex flex-col md:flex-row gap-4 justify-between items-center backdrop-blur-md z-10">
+                    <div className="flex items-center gap-3 w-full md:w-auto">
+                        <ScanFace className="text-blue-400" size={24} />
+                        <div>
+                            <h3 className="font-bold text-white">Visitor Surveillance</h3>
+                            <p className="text-[10px] text-white/50 uppercase tracking-widest">Real-time Tracking</p>
+                        </div>
+                    </div>
+                    
+                    <div className="flex gap-2 w-full md:w-auto">
+                        {/* SEARCH INPUT */}
+                        <div className="relative flex-1 md:w-64">
+                            <Search className="absolute left-3 top-2.5 text-white/30" size={14} />
+                            <input 
+                                placeholder="Search Name / ID..." 
+                                className="w-full pl-9 pr-4 py-2 bg-white/5 border border-white/10 rounded-lg text-xs text-white outline-none focus:border-blue-500/50 transition-colors"
+                                onChange={(e) => {
+                                    // Instant Search Logic
+                                    const term = e.target.value.toLowerCase();
+                                    const rows = document.querySelectorAll('.visitor-row');
+                                    rows.forEach(row => {
+                                        const text = row.textContent?.toLowerCase() || '';
+                                        (row as HTMLElement).style.display = text.includes(term) ? 'table-row' : 'none';
+                                    });
+                                }}
+                            />
+                        </div>
+                        <button onClick={fetchVisitors} className="p-2 bg-blue-600/20 text-blue-400 border border-blue-500/30 rounded-lg hover:bg-blue-600 hover:text-white transition-all">
+                            <RefreshCw size={16} />
+                        </button>
+                    </div>
+                </div>
+
+                {/* ADVANCED TABLE */}
+                <div className="flex-1 overflow-y-auto custom-scrollbar">
+                    <table className="w-full text-sm text-left border-collapse">
+                        <thead className="bg-white/5 text-xs uppercase font-bold text-zinc-400 sticky top-0 z-10 backdrop-blur-md shadow-sm">
+                            <tr>
+                                <th className="p-4 border-b border-white/10">Identity</th>
+                                <th className="p-4 border-b border-white/10">Engagement</th>
+                                <th className="p-4 border-b border-white/10">Last Signal</th>
+                                <th className="p-4 border-b border-white/10 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {visitors.map((v) => (
+                                <tr key={v.visitor_id} className="visitor-row border-b border-white/5 hover:bg-white/5 group transition-colors">
+                                    <td className="p-4">
+                                        <div className="flex items-center gap-3">
+                                            {/* Avatar Circle */}
+                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg border shadow-lg ${
+                                                v.display_name === 'Guest' 
+                                                ? 'bg-zinc-800 border-zinc-600 text-zinc-400' 
+                                                : 'bg-blue-900/30 border-blue-500 text-blue-400'
+                                            }`}>
+                                                {v.display_name.charAt(0).toUpperCase()}
                                             </div>
-
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-1 min-h-0">
-                                                {/* Activity Log */}
-                                                <div className="bg-white/5 border border-white/10 rounded-xl flex flex-col overflow-hidden">
-                                                    <div className="p-3 bg-black/20 border-b border-white/10 font-bold flex items-center gap-2 text-sm text-blue-300">
-                                                        <Activity size={16} /> Activity History
-                                                    </div>
-                                                    <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                                                        {loadingDetails ? <div className="text-center p-4"><Loader2 className="animate-spin mx-auto" /></div> :
-                                                            visitorDetails?.activity && visitorDetails.activity.length > 0 ? (
-                                                                visitorDetails.activity.map((act, i) => (
-                                                                    <div key={i} className="flex gap-3 text-xs border-b border-white/5 pb-2">
-                                                                        <div className="opacity-50 font-mono whitespace-nowrap">{new Date(act.timestamp).toLocaleTimeString()}</div>
-                                                                        <div>
-                                                                            <div className="font-bold text-white mb-0.5">{act.activity_type.replace('_', ' ')}</div>
-                                                                            <div className="opacity-70">{act.resource_title || act.resource_id}</div>
-                                                                            {act.duration_seconds > 0 && <div className="text-[10px] text-green-400 mt-1">{act.duration_seconds}s duration</div>}
-                                                                        </div>
-                                                                    </div>
-                                                                ))
-                                                            ) : <div className="opacity-50 text-center text-xs">No activity recorded.</div>}
-                                                    </div>
+                                            <div>
+                                                <div className="font-bold text-white flex items-center gap-2">
+                                                    {v.display_name}
+                                                    {v.visit_count > 10 && <span className="text-[10px] bg-yellow-500/20 text-yellow-500 px-1.5 rounded border border-yellow-500/30">REGULAR</span>}
                                                 </div>
-
-                                                {/* Chat Log */}
-                                                <div className="bg-white/5 border border-white/10 rounded-xl flex flex-col overflow-hidden">
-                                                    <div className="p-3 bg-black/20 border-b border-white/10 font-bold flex items-center gap-2 text-sm text-purple-300">
-                                                        <MessageSquare size={16} /> Bot Interactions
-                                                    </div>
-                                                    <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                                                        {loadingDetails ? <div className="text-center p-4"><Loader2 className="animate-spin mx-auto" /></div> :
-                                                            visitorDetails?.chats && visitorDetails.chats.length > 0 ? (
-                                                                visitorDetails.chats.map((chat, i) => (
-                                                                    <div key={i} className="flex flex-col gap-2 text-xs border-b border-white/5 pb-3">
-                                                                        <div className="font-mono opacity-30 text-[10px]">{new Date(chat.timestamp).toLocaleString()}</div>
-                                                                        <div className="bg-white/5 p-2 rounded text-white italic">"{chat.user_query}"</div>
-                                                                        <div className="pl-2 border-l-2 border-purple-500/50 text-purple-100 opacity-80 line-clamp-3 hover:line-clamp-none transition-all cursor-pointer">
-                                                                            {chat.bot_response.replace(/<[^>]+>/g, '')}
-                                                                        </div>
-                                                                    </div>
-                                                                ))
-                                                            ) : <div className="opacity-50 text-center text-xs">No conversations found.</div>}
-                                                    </div>
-                                                </div>
+                                                <div className="font-mono text-[10px] opacity-40">{v.visitor_id.substring(0, 12)}...</div>
                                             </div>
                                         </div>
-                                    )}
-                                </div>
-                            )}
+                                    </td>
+                                    <td className="p-4">
+                                        <div className="flex flex-col gap-1">
+                                            <div className="flex items-center gap-2 text-xs">
+                                                <Activity size={12} className="text-green-400" />
+                                                <span className="opacity-80 font-mono">{v.visit_count} Sessions</span>
+                                            </div>
+                                            <div className="flex items-center gap-2 text-xs">
+                                                <Monitor size={12} className="text-purple-400" />
+                                                <span className="opacity-80 font-mono">{(v.total_time_spent / 60).toFixed(1)}m Active</span>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td className="p-4">
+                                        <div className="text-xs">
+                                            <div className="opacity-80">{new Date(v.last_active).toLocaleDateString()}</div>
+                                            <div className="opacity-40 font-mono">{new Date(v.last_active).toLocaleTimeString()}</div>
+                                        </div>
+                                    </td>
+                                    <td className="p-4 text-right">
+                                        <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button 
+                                                onClick={() => handleVisitorSelect(v)}
+                                                className="px-3 py-1.5 rounded bg-blue-600/20 border border-blue-500/30 text-blue-300 text-xs font-bold hover:bg-blue-600 hover:text-white transition-all"
+                                            >
+                                                DOSSIER
+                                            </button>
+                                            <button 
+                                                onClick={async (e) => {
+                                                    e.stopPropagation();
+                                                    if(!confirm(`PERMANENTLY DELETE records for ${v.display_name}?`)) return;
+                                                    
+                                                    try {
+                                                        const res = await fetch(`${API_URL}/api/admin/visitors/${v.visitor_id}`, {
+                                                            method: 'DELETE',
+                                                            headers: { 'x-csrf-token': csrfToken },
+                                                            credentials: 'include'
+                                                        });
+                                                        if(res.ok) {
+                                                            fetchVisitors();
+                                                        } else {
+                                                            alert("Delete failed");
+                                                        }
+                                                    } catch(err) { alert("Error deleting"); }
+                                                }}
+                                                className="p-1.5 rounded bg-red-900/20 border border-red-500/30 text-red-400 hover:bg-red-600 hover:text-white transition-all"
+                                                title="Delete Visitor Log"
+                                            >
+                                                <Trash2 size={14} />
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                    {visitors.length === 0 && (
+                        <div className="flex flex-col items-center justify-center h-64 opacity-30">
+                            <ScanFace size={64} />
+                            <p className="mt-4 text-sm font-mono">NO SIGNALS DETECTED</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+        ) : (
+            <div className="flex flex-col h-full animate-[fade-in-up_0.2s]">
+                 <div className="flex items-center gap-4 mb-4">
+                    <button onClick={() => setSelectedVisitor(null)} className="p-2 rounded bg-white/10 hover:bg-white/20 text-xs font-bold flex items-center gap-2">
+                        <ArrowDownUp className="rotate-90" size={14} /> BACK
+                    </button>
+                    <h3 className="text-xl font-bold">{selectedVisitor.display_name}'s Dossier</h3>
+                    <span className="px-2 py-1 rounded bg-blue-900/50 text-blue-200 text-xs font-mono">{selectedVisitor.visitor_id}</span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-1 min-h-0">
+                    {/* ACTIVITY LOG - DETAIL VIEW */}
+                    <div className="bg-white/5 border border-white/10 rounded-xl flex flex-col overflow-hidden">
+                        <div className="p-3 bg-black/20 border-b border-white/10 font-bold flex items-center gap-2 text-sm text-blue-300">
+                            <Activity size={16} /> Activity History
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+                            {loadingDetails ? <div className="text-center p-4"><Loader2 className="animate-spin mx-auto" /></div> :
+                                visitorDetails?.activity && visitorDetails.activity.length > 0 ? (
+                                    visitorDetails.activity.map((act, i) => (
+                                        <div key={i} className="flex gap-3 text-xs border-b border-white/5 pb-2">
+                                            <div className="opacity-50 font-mono whitespace-nowrap w-16 text-right">{new Date(act.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
+                                            <div>
+                                                <div className="font-bold text-white mb-0.5">{act.activity_type.replace('_', ' ')}</div>
+                                                <div className="opacity-70">{act.resource_title || act.resource_id}</div>
+                                                {act.duration_seconds > 0 && <div className="text-[10px] text-green-400 mt-1">{act.duration_seconds}s duration</div>}
+                                            </div>
+                                        </div>
+                                    ))
+                                ) : <div className="opacity-50 text-center text-xs">No activity recorded.</div>}
+                        </div>
+                    </div>
+
+                    {/* CHAT LOG - DETAIL VIEW */}
+                    <div className="bg-white/5 border border-white/10 rounded-xl flex flex-col overflow-hidden">
+                        <div className="p-3 bg-black/20 border-b border-white/10 font-bold flex items-center gap-2 text-sm text-purple-300">
+                            <MessageSquare size={16} /> Oracle Interactions
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
+                            {loadingDetails ? <div className="text-center p-4"><Loader2 className="animate-spin mx-auto" /></div> :
+                                visitorDetails?.chats && visitorDetails.chats.length > 0 ? (
+                                    visitorDetails.chats.map((chat, i) => (
+                                        <div key={i} className="flex flex-col gap-2 text-xs border-b border-white/5 pb-3">
+                                            <div className="font-mono opacity-30 text-[10px]">{new Date(chat.timestamp).toLocaleString()}</div>
+                                            <div className="bg-white/5 p-2 rounded text-white italic">"{chat.user_query}"</div>
+                                            <div className="pl-2 border-l-2 border-purple-500/50 text-purple-100 opacity-80 line-clamp-3 hover:line-clamp-none transition-all cursor-pointer">
+                                                {chat.bot_response.replace(/<[^>]+>/g, '')}
+                                            </div>
+                                        </div>
+                                    ))
+                                ) : <div className="opacity-50 text-center text-xs">No conversations found.</div>}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )}
+    </div>
+)}
 
                             {/* LOGS TAB - RESTORED */}
                             {activeTab === 'logs' && (
