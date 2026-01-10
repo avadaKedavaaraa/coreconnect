@@ -28,13 +28,15 @@ export interface ItemStyle {
 export interface LectureRule {
   id: string;
   subject: string;
-  batch: 'AICS' | 'CSDA'; // <--- NEW FIELD
+  batch: 'AICS' | 'CSDA';
   dayOfWeek: string;
-  startTime: string; 
+  startTime: string;
   link: string;
   endDate?: string;
   recurrence: 'weekly' | 'monthly';
   isActive: boolean;
+  image?: string;          // <--- NEW
+  customMessage?: string;  // <--- NEW
 }
 
 export interface CarouselItem {

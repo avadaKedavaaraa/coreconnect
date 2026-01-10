@@ -1221,591 +1221,621 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                         </div>
                                     </div>
 
-                                    {/* Add/Edit Section (Floating or Fixed Bottom) */}
-                                    <div className={`p-4 rounded-xl border ${isWizard ? 'bg-emerald-950/30 border-emerald-500/30' : 'bg-fuchsia-950/30 border-fuchsia-500/30'}`}>
-                                        <h4 className="text-sm font-bold uppercase mb-3 flex items-center gap-2 opacity-80">
-                                            <Plus size={16} /> Create Schedule Entry
+                                    {/* Add/Edit Section - Updated for Images & Messages */}
+                                    <div className={`p-6 rounded-xl border relative overflow-hidden ${isWizard ? 'bg-emerald-950/30 border-emerald-500/30' : 'bg-fuchsia-950/30 border-fuchsia-500/30'}`}>
+                                        <h4 className="text-sm font-bold uppercase mb-4 flex items-center gap-2 opacity-90 relative z-10">
+                                            <Plus size={16} /> Configure Broadcast Signal
                                         </h4>
-                                        <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+
+                                        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start relative z-10">
+                                            {/* Row 1 */}
                                             <div className="md:col-span-2">
-                                                <label className="text-[10px] uppercase opacity-50 block mb-1">Batch</label>
+                                                <label className="text-[10px] uppercase opacity-50 block mb-1">Target Batch</label>
                                                 <select
                                                     value={newRule.batch}
                                                     onChange={e => setNewRule({ ...newRule, batch: e.target.value as 'AICS' | 'CSDA' })}
-                                                    className="w-full p-2 bg-black/50 border border-white/10 rounded text-sm text-white outline-none focus:border-white/30"
+                                                    className="w-full p-2.5 bg-black/50 border border-white/10 rounded text-sm text-white outline-none focus:border-white/30"
                                                 >
                                                     <option value="AICS">AICS</option>
                                                     <option value="CSDA">CSDA</option>
                                                 </select>
                                             </div>
-                                            <div className="md:col-span-3">
-                                                <label className="text-[10px] uppercase opacity-50 block mb-1">Subject</label>
+
+                                            <div className="md:col-span-4">
+                                                <label className="text-[10px] uppercase opacity-50 block mb-1">Subject Frequency</label>
                                                 <input
                                                     value={newRule.subject}
                                                     onChange={e => setNewRule({ ...newRule, subject: e.target.value })}
-                                                    className="w-full p-2 bg-black/50 border border-white/10 rounded text-sm text-white outline-none focus:border-white/30"
-                                                    placeholder="e.g. Data Structures"
+                                                    className="w-full p-2.5 bg-black/50 border border-white/10 rounded text-sm text-white outline-none focus:border-white/30"
+                                                    placeholder="e.g. Advanced Dark Arts"
                                                 />
                                             </div>
-                                            <div className="md:col-span-2">
-                                                <label className="text-[10px] uppercase opacity-50 block mb-1">Day</label>
+
+                                            <div className="md:col-span-3">
+                                                <label className="text-[10px] uppercase opacity-50 block mb-1">Transmission Day</label>
                                                 <select
                                                     value={newRule.dayOfWeek}
                                                     onChange={e => setNewRule({ ...newRule, dayOfWeek: e.target.value })}
-                                                    className="w-full p-2 bg-black/50 border border-white/10 rounded text-sm text-white outline-none focus:border-white/30"
+                                                    className="w-full p-2.5 bg-black/50 border border-white/10 rounded text-sm text-white outline-none focus:border-white/30"
                                                 >
                                                     {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(d => <option key={d} value={d}>{d}</option>)}
                                                 </select>
                                             </div>
-                                            <div className="md:col-span-2">
-                                                <label className="text-[10px] uppercase opacity-50 block mb-1">Time</label>
+
+                                            <div className="md:col-span-3">
+                                                <label className="text-[10px] uppercase opacity-50 block mb-1">Time (24h)</label>
                                                 <input
                                                     type="time"
                                                     value={newRule.startTime}
                                                     onChange={e => setNewRule({ ...newRule, startTime: e.target.value })}
-                                                    className="w-full p-2 bg-black/50 border border-white/10 rounded text-sm text-white outline-none focus:border-white/30"
+                                                    className="w-full p-2.5 bg-black/50 border border-white/10 rounded text-sm text-white outline-none focus:border-white/30"
                                                 />
                                             </div>
-                                            <div className="md:col-span-3">
-                                                <label className="text-[10px] uppercase opacity-50 block mb-1">Join Link</label>
+
+                                            {/* Row 2 - Details */}
+                                            <div className="md:col-span-6">
+                                                <label className="text-[10px] uppercase opacity-50 block mb-1">Visual Cover (Image URL)</label>
+                                                <div className="flex gap-2">
+                                                    <input
+                                                        value={newRule.image || ''}
+                                                        onChange={e => setNewRule({ ...newRule, image: e.target.value })}
+                                                        className="w-full p-2.5 bg-black/50 border border-white/10 rounded text-sm text-white outline-none focus:border-white/30"
+                                                        placeholder="https://... (Stranger Things vibe recommended)"
+                                                    />
+                                                    <label className="p-2.5 bg-white/10 rounded cursor-pointer hover:bg-white/20">
+                                                        <ImageIcon size={16} />
+                                                        <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'wizardImage')} />
+                                                        {/* Note: Reuse your existing upload logic here if needed, or stick to URL */}
+                                                    </label>
+                                                </div>
+                                            </div>
+
+                                            <div className="md:col-span-6">
+                                                <label className="text-[10px] uppercase opacity-50 block mb-1">Portal Link</label>
                                                 <input
                                                     value={newRule.link}
                                                     onChange={e => setNewRule({ ...newRule, link: e.target.value })}
-                                                    className="w-full p-2 bg-black/50 border border-white/10 rounded text-sm text-white outline-none focus:border-white/30"
+                                                    className="w-full p-2.5 bg-black/50 border border-white/10 rounded text-sm text-white outline-none focus:border-white/30"
                                                     placeholder="https://zoom.us/..."
                                                 />
                                             </div>
+
+                                            {/* Row 3 - Custom Message */}
+                                            <div className="md:col-span-12">
+                                                <label className="text-[10px] uppercase opacity-50 block mb-1">Custom Message / Warning</label>
+                                                <input
+                                                    value={newRule.customMessage || ''}
+                                                    onChange={e => setNewRule({ ...newRule, customMessage: e.target.value })}
+                                                    className="w-full p-2.5 bg-black/50 border border-white/10 rounded text-sm text-white outline-none focus:border-white/30 font-mono text-xs"
+                                                    placeholder="e.g. 'DON'T BE LATE. THE DOOR CLOSES AT 10:05.'"
+                                                />
+                                            </div>
                                         </div>
-                                        <div className="mt-4 flex justify-between items-center">
-                                            <div className="text-[10px] opacity-40">
-                                                * Links will open in a new tab automatically.
-                                            </div>
-                                            <div className="flex gap-2">
-                                                <button
-                                                    onClick={handleAddRule}
-                                                    className={`px-8 py-2 rounded font-bold text-xs uppercase tracking-wider transition-all hover:scale-105 active:scale-95 text-black ${isWizard ? 'bg-emerald-500 hover:bg-emerald-400' : 'bg-fuchsia-500 hover:bg-fuchsia-400'}`}
-                                                >
-                                                    Add to Schedule
-                                                </button>
-                                                <button onClick={handleSaveConfig} disabled={isSavingConfig} className="px-4 py-2 bg-blue-600 rounded font-bold text-xs hover:bg-blue-500 flex items-center gap-2">
-                                                    {isSavingConfig ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} SAVE CHANGES
-                                                </button>
-                                            </div>
+
+                                        <div className="mt-6 flex justify-end gap-3 relative z-10 border-t border-white/5 pt-4">
+                                            <button
+                                                onClick={handleAddRule}
+                                                className={`px-8 py-2.5 rounded font-bold text-xs uppercase tracking-widest transition-all hover:scale-105 active:scale-95 shadow-lg text-black ${isWizard ? 'bg-emerald-500 hover:bg-emerald-400' : 'bg-fuchsia-500 hover:bg-fuchsia-400'}`}
+                                            >
+                                                Initialize Rule
+                                            </button>
+                                            <button onClick={handleSaveConfig} disabled={isSavingConfig} className="px-6 py-2.5 bg-blue-900/50 border border-blue-500/50 text-blue-200 rounded font-bold text-xs hover:bg-blue-800 flex items-center gap-2">
+                                                {isSavingConfig ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} SAVE DATABASE
+                                            </button>
                                         </div>
                                     </div>
-                                </div>
-                            )}
+                            
 
-                            {/* VISITOR SURVEILLANCE TAB START */}
-                            {activeTab === 'visitors' && (
-                                <div className="space-y-6 h-full flex flex-col">
-                                    {!selectedVisitor ? (
-                                        <div className="bg-white/5 border border-white/10 rounded-xl flex flex-col flex-1 overflow-hidden shadow-2xl animate-[fade-in_0.3s]">
-                                            {/* TOP BAR: SEARCH & REFRESH */}
-                                            <div className="p-4 bg-black/40 border-b border-white/10 flex flex-col md:flex-row gap-4 justify-between items-center backdrop-blur-md z-10">
-                                                <div className="flex items-center gap-3 w-full md:w-auto">
-                                                    <ScanFace className="text-blue-400" size={24} />
-                                                    <div>
-                                                        <h3 className="font-bold text-white">Visitor Surveillance</h3>
-                                                        <p className="text-[10px] text-white/50 uppercase tracking-widest">Real-time Tracking</p>
+                                    {/* VISITOR SURVEILLANCE TAB START */}
+                                    {activeTab === 'visitors' && (
+                                        <div className="space-y-6 h-full flex flex-col">
+                                            {!selectedVisitor ? (
+                                                <div className="bg-white/5 border border-white/10 rounded-xl flex flex-col flex-1 overflow-hidden shadow-2xl animate-[fade-in_0.3s]">
+                                                    {/* TOP BAR: SEARCH & REFRESH */}
+                                                    <div className="p-4 bg-black/40 border-b border-white/10 flex flex-col md:flex-row gap-4 justify-between items-center backdrop-blur-md z-10">
+                                                        <div className="flex items-center gap-3 w-full md:w-auto">
+                                                            <ScanFace className="text-blue-400" size={24} />
+                                                            <div>
+                                                                <h3 className="font-bold text-white">Visitor Surveillance</h3>
+                                                                <p className="text-[10px] text-white/50 uppercase tracking-widest">Real-time Tracking</p>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="flex gap-2 w-full md:w-auto">
+                                                            <div className="relative flex-1 md:w-64">
+                                                                <Search className="absolute left-3 top-2.5 text-white/30" size={14} />
+                                                                <input
+                                                                    placeholder="Search Name or ID..."
+                                                                    className="w-full pl-9 pr-4 py-2 bg-white/5 border border-white/10 rounded-lg text-xs text-white outline-none focus:border-blue-500/50 transition-colors"
+                                                                    onChange={(e) => {
+                                                                        const term = e.target.value.toLowerCase();
+                                                                        const rows = document.querySelectorAll('.visitor-row');
+                                                                        rows.forEach(row => {
+                                                                            const text = row.textContent?.toLowerCase() || '';
+                                                                            (row as HTMLElement).style.display = text.includes(term) ? 'table-row' : 'none';
+                                                                        });
+                                                                    }}
+                                                                />
+                                                            </div>
+                                                            <button onClick={fetchVisitors} className="p-2 bg-blue-600/20 text-blue-400 border border-blue-500/30 rounded-lg hover:bg-blue-600 hover:text-white transition-all">
+                                                                <RefreshCw size={16} />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* MAIN DATA TABLE */}
+                                                    <div className="flex-1 overflow-y-auto custom-scrollbar">
+                                                        <table className="w-full text-sm text-left border-collapse">
+                                                            <thead className="bg-white/5 text-xs uppercase font-bold text-zinc-400 sticky top-0 z-10 backdrop-blur-md shadow-sm">
+                                                                <tr>
+                                                                    <th className="p-4 border-b border-white/10">Identity</th>
+                                                                    <th className="p-4 border-b border-white/10">Engagement</th>
+                                                                    <th className="p-4 border-b border-white/10">Last Signal</th>
+                                                                    <th className="p-4 border-b border-white/10 text-right">Actions</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                {visitors.map((v) => (
+                                                                    <tr key={v.visitor_id} className="visitor-row border-b border-white/5 hover:bg-white/5 group transition-colors">
+                                                                        <td className="p-4">
+                                                                            <div className="flex items-center gap-3">
+                                                                                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg border shadow-lg ${v.display_name === 'Guest'
+                                                                                    ? 'bg-zinc-800 border-zinc-600 text-zinc-400'
+                                                                                    : 'bg-blue-900/30 border-blue-500 text-blue-400'
+                                                                                    }`}>
+                                                                                    {v.display_name.charAt(0).toUpperCase()}
+                                                                                </div>
+                                                                                <div>
+                                                                                    <div className="font-bold text-white flex items-center gap-2">
+                                                                                        {v.display_name}
+                                                                                        {v.visit_count > 10 && <span className="text-[10px] bg-yellow-500/20 text-yellow-500 px-1.5 rounded border border-yellow-500/30">REGULAR</span>}
+                                                                                    </div>
+                                                                                    <div className="font-mono text-[10px] opacity-40">{v.visitor_id.substring(0, 12)}...</div>
+                                                                                </div>
+                                                                            </div>
+                                                                        </td>
+                                                                        <td className="p-4">
+                                                                            <div className="flex flex-col gap-1">
+                                                                                <div className="flex items-center gap-2 text-xs">
+                                                                                    <Activity size={12} className="text-green-400" />
+                                                                                    <span className="opacity-80 font-mono">{v.visit_count} Sessions</span>
+                                                                                </div>
+                                                                                <div className="flex items-center gap-2 text-xs">
+                                                                                    <Monitor size={12} className="text-purple-400" />
+                                                                                    <span className="opacity-80 font-mono">{(v.total_time_spent / 60).toFixed(1)}m Active</span>
+                                                                                </div>
+                                                                            </div>
+                                                                        </td>
+                                                                        <td className="p-4">
+                                                                            <div className="text-xs">
+                                                                                <div className="opacity-80">{new Date(v.last_active).toLocaleDateString()}</div>
+                                                                                <div className="opacity-40 font-mono">{new Date(v.last_active).toLocaleTimeString()}</div>
+                                                                            </div>
+                                                                        </td>
+                                                                        <td className="p-4 text-right">
+                                                                            <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                                <button
+                                                                                    onClick={() => handleVisitorSelect(v)}
+                                                                                    className="px-3 py-1.5 rounded bg-blue-600/20 border border-blue-500/30 text-blue-300 text-xs font-bold hover:bg-blue-600 hover:text-white transition-all"
+                                                                                >
+                                                                                    DOSSIER
+                                                                                </button>
+                                                                                <button
+                                                                                    onClick={async (e) => {
+                                                                                        e.stopPropagation();
+                                                                                        if (!confirm(`PERMANENTLY DELETE records for ${v.display_name}?`)) return;
+
+                                                                                        try {
+                                                                                            const res = await fetch(`${API_URL}/api/admin/visitors/${v.visitor_id}`, {
+                                                                                                method: 'DELETE',
+                                                                                                headers: { 'x-csrf-token': csrfToken },
+                                                                                                credentials: 'include'
+                                                                                            });
+                                                                                            if (res.ok) {
+                                                                                                fetchVisitors();
+                                                                                            } else {
+                                                                                                alert("Delete failed");
+                                                                                            }
+                                                                                        } catch (err) { alert("Error deleting"); }
+                                                                                    }}
+                                                                                    className="p-1.5 rounded bg-red-900/20 border border-red-500/30 text-red-400 hover:bg-red-600 hover:text-white transition-all"
+                                                                                    title="Delete Visitor Log"
+                                                                                >
+                                                                                    <Trash2 size={14} />
+                                                                                </button>
+                                                                            </div>
+                                                                        </td>
+                                                                    </tr>
+                                                                ))}
+                                                            </tbody>
+                                                        </table>
+                                                        {visitors.length === 0 && (
+                                                            <div className="flex flex-col items-center justify-center h-64 opacity-30">
+                                                                <ScanFace size={64} />
+                                                                <p className="mt-4 text-sm font-mono">NO SIGNALS DETECTED</p>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
-
-                                                <div className="flex gap-2 w-full md:w-auto">
-                                                    <div className="relative flex-1 md:w-64">
-                                                        <Search className="absolute left-3 top-2.5 text-white/30" size={14} />
-                                                        <input
-                                                            placeholder="Search Name or ID..."
-                                                            className="w-full pl-9 pr-4 py-2 bg-white/5 border border-white/10 rounded-lg text-xs text-white outline-none focus:border-blue-500/50 transition-colors"
-                                                            onChange={(e) => {
-                                                                const term = e.target.value.toLowerCase();
-                                                                const rows = document.querySelectorAll('.visitor-row');
-                                                                rows.forEach(row => {
-                                                                    const text = row.textContent?.toLowerCase() || '';
-                                                                    (row as HTMLElement).style.display = text.includes(term) ? 'table-row' : 'none';
-                                                                });
-                                                            }}
-                                                        />
+                                            ) : (
+                                                // DETAIL VIEW (DOSSIER)
+                                                <div className="flex flex-col h-full animate-[fade-in-up_0.2s]">
+                                                    <div className="flex items-center gap-4 mb-4">
+                                                        <button onClick={() => setSelectedVisitor(null)} className="p-2 rounded bg-white/10 hover:bg-white/20 text-xs font-bold flex items-center gap-2">
+                                                            <ArrowDownUp className="rotate-90" size={14} /> BACK
+                                                        </button>
+                                                        <h3 className="text-xl font-bold">{selectedVisitor.display_name}'s Dossier</h3>
+                                                        <span className="px-2 py-1 rounded bg-blue-900/50 text-blue-200 text-xs font-mono">{selectedVisitor.visitor_id}</span>
                                                     </div>
-                                                    <button onClick={fetchVisitors} className="p-2 bg-blue-600/20 text-blue-400 border border-blue-500/30 rounded-lg hover:bg-blue-600 hover:text-white transition-all">
-                                                        <RefreshCw size={16} />
-                                                    </button>
+
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-1 min-h-0">
+                                                        {/* ACTIVITY LOG */}
+                                                        <div className="bg-white/5 border border-white/10 rounded-xl flex flex-col overflow-hidden">
+                                                            <div className="p-3 bg-black/20 border-b border-white/10 font-bold flex items-center gap-2 text-sm text-blue-300">
+                                                                <Activity size={16} /> Activity History
+                                                            </div>
+                                                            <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+                                                                {loadingDetails ? <div className="text-center p-4"><Loader2 className="animate-spin mx-auto" /></div> :
+                                                                    visitorDetails?.activity && visitorDetails.activity.length > 0 ? (
+                                                                        visitorDetails.activity.map((act, i) => (
+                                                                            <div key={i} className="flex gap-3 text-xs border-b border-white/5 pb-2">
+                                                                                <div className="opacity-50 font-mono whitespace-nowrap w-16 text-right">{new Date(act.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
+                                                                                <div>
+                                                                                    <div className="font-bold text-white mb-0.5">{act.activity_type.replace('_', ' ')}</div>
+                                                                                    <div className="opacity-70">{act.resource_title || act.resource_id}</div>
+                                                                                    {act.duration_seconds > 0 && <div className="text-[10px] text-green-400 mt-1">{act.duration_seconds}s duration</div>}
+                                                                                </div>
+                                                                            </div>
+                                                                        ))
+                                                                    ) : <div className="opacity-50 text-center text-xs">No activity recorded.</div>}
+                                                            </div>
+                                                        </div>
+
+                                                        {/* CHAT LOG */}
+                                                        <div className="bg-white/5 border border-white/10 rounded-xl flex flex-col overflow-hidden">
+                                                            <div className="p-3 bg-black/20 border-b border-white/10 font-bold flex items-center gap-2 text-sm text-purple-300">
+                                                                <MessageSquare size={16} /> Oracle Interactions
+                                                            </div>
+                                                            <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
+                                                                {loadingDetails ? <div className="text-center p-4"><Loader2 className="animate-spin mx-auto" /></div> :
+                                                                    visitorDetails?.chats && visitorDetails.chats.length > 0 ? (
+                                                                        visitorDetails.chats.map((chat, i) => (
+                                                                            <div key={i} className="flex flex-col gap-2 text-xs border-b border-white/5 pb-3">
+                                                                                <div className="font-mono opacity-30 text-[10px]">{new Date(chat.timestamp).toLocaleString()}</div>
+                                                                                <div className="bg-white/5 p-2 rounded text-white italic">"{chat.user_query}"</div>
+                                                                                <div className="pl-2 border-l-2 border-purple-500/50 text-purple-100 opacity-80 line-clamp-3 hover:line-clamp-none transition-all cursor-pointer">
+                                                                                    {chat.bot_response.replace(/<[^>]+>/g, '')}
+                                                                                </div>
+                                                                            </div>
+                                                                        ))
+                                                                    ) : <div className="opacity-50 text-center text-xs">No conversations found.</div>}
+                                                            </div>
+                                                        </div>
+                                                    </div>
                                                 </div>
+                                            )}
+                                        </div>
+                                    )}
+                                    {/* VISITOR SURVEILLANCE TAB END */}
+
+                                    {/* LOGS TAB - RESTORED */}
+                                    {activeTab === 'logs' && (
+                                        <div className="space-y-6">
+                                            <div className="flex justify-between items-center mb-4">
+                                                <h3 className="font-bold text-xl">System Audit Logs</h3>
+                                                <button onClick={fetchAuditLogs} className="p-2 bg-white/10 rounded hover:bg-white/20"><RefreshCw size={16} /></button>
                                             </div>
-
-                                            {/* MAIN DATA TABLE */}
-                                            <div className="flex-1 overflow-y-auto custom-scrollbar">
-                                                <table className="w-full text-sm text-left border-collapse">
-                                                    <thead className="bg-white/5 text-xs uppercase font-bold text-zinc-400 sticky top-0 z-10 backdrop-blur-md shadow-sm">
+                                            <div className="bg-white/5 border border-white/10 rounded overflow-hidden">
+                                                <table className="w-full text-sm text-left">
+                                                    <thead className="bg-black/40 text-xs uppercase font-bold text-zinc-400">
                                                         <tr>
-                                                            <th className="p-4 border-b border-white/10">Identity</th>
-                                                            <th className="p-4 border-b border-white/10">Engagement</th>
-                                                            <th className="p-4 border-b border-white/10">Last Signal</th>
-                                                            <th className="p-4 border-b border-white/10 text-right">Actions</th>
+                                                            <th className="p-3">Time</th>
+                                                            <th className="p-3">User</th>
+                                                            <th className="p-3">Action</th>
+                                                            <th className="p-3">Details</th>
+                                                            <th className="p-3">IP</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody>
-                                                        {visitors.map((v) => (
-                                                            <tr key={v.visitor_id} className="visitor-row border-b border-white/5 hover:bg-white/5 group transition-colors">
-                                                                <td className="p-4">
-                                                                    <div className="flex items-center gap-3">
-                                                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg border shadow-lg ${v.display_name === 'Guest'
-                                                                                ? 'bg-zinc-800 border-zinc-600 text-zinc-400'
-                                                                                : 'bg-blue-900/30 border-blue-500 text-blue-400'
-                                                                            }`}>
-                                                                            {v.display_name.charAt(0).toUpperCase()}
-                                                                        </div>
-                                                                        <div>
-                                                                            <div className="font-bold text-white flex items-center gap-2">
-                                                                                {v.display_name}
-                                                                                {v.visit_count > 10 && <span className="text-[10px] bg-yellow-500/20 text-yellow-500 px-1.5 rounded border border-yellow-500/30">REGULAR</span>}
-                                                                            </div>
-                                                                            <div className="font-mono text-[10px] opacity-40">{v.visitor_id.substring(0, 12)}...</div>
-                                                                        </div>
-                                                                    </div>
-                                                                </td>
-                                                                <td className="p-4">
-                                                                    <div className="flex flex-col gap-1">
-                                                                        <div className="flex items-center gap-2 text-xs">
-                                                                            <Activity size={12} className="text-green-400" />
-                                                                            <span className="opacity-80 font-mono">{v.visit_count} Sessions</span>
-                                                                        </div>
-                                                                        <div className="flex items-center gap-2 text-xs">
-                                                                            <Monitor size={12} className="text-purple-400" />
-                                                                            <span className="opacity-80 font-mono">{(v.total_time_spent / 60).toFixed(1)}m Active</span>
-                                                                        </div>
-                                                                    </div>
-                                                                </td>
-                                                                <td className="p-4">
-                                                                    <div className="text-xs">
-                                                                        <div className="opacity-80">{new Date(v.last_active).toLocaleDateString()}</div>
-                                                                        <div className="opacity-40 font-mono">{new Date(v.last_active).toLocaleTimeString()}</div>
-                                                                    </div>
-                                                                </td>
-                                                                <td className="p-4 text-right">
-                                                                    <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                        <button
-                                                                            onClick={() => handleVisitorSelect(v)}
-                                                                            className="px-3 py-1.5 rounded bg-blue-600/20 border border-blue-500/30 text-blue-300 text-xs font-bold hover:bg-blue-600 hover:text-white transition-all"
-                                                                        >
-                                                                            DOSSIER
-                                                                        </button>
-                                                                        <button
-                                                                            onClick={async (e) => {
-                                                                                e.stopPropagation();
-                                                                                if (!confirm(`PERMANENTLY DELETE records for ${v.display_name}?`)) return;
-
-                                                                                try {
-                                                                                    const res = await fetch(`${API_URL}/api/admin/visitors/${v.visitor_id}`, {
-                                                                                        method: 'DELETE',
-                                                                                        headers: { 'x-csrf-token': csrfToken },
-                                                                                        credentials: 'include'
-                                                                                    });
-                                                                                    if (res.ok) {
-                                                                                        fetchVisitors();
-                                                                                    } else {
-                                                                                        alert("Delete failed");
-                                                                                    }
-                                                                                } catch (err) { alert("Error deleting"); }
-                                                                            }}
-                                                                            className="p-1.5 rounded bg-red-900/20 border border-red-500/30 text-red-400 hover:bg-red-600 hover:text-white transition-all"
-                                                                            title="Delete Visitor Log"
-                                                                        >
-                                                                            <Trash2 size={14} />
-                                                                        </button>
-                                                                    </div>
-                                                                </td>
+                                                        {auditLogs.map((log, i) => (
+                                                            <tr key={i} className="border-t border-white/5 hover:bg-white/5">
+                                                                <td className="p-3 font-mono text-xs opacity-70 whitespace-nowrap">{new Date(log.timestamp).toLocaleString()}</td>
+                                                                <td className="p-3 font-bold text-white">{log.username}</td>
+                                                                <td className="p-3"><span className="px-2 py-1 rounded bg-white/10 font-mono text-[10px]">{log.action}</span></td>
+                                                                <td className="p-3 opacity-80">{log.details}</td>
+                                                                <td className="p-3 font-mono text-xs opacity-50">{log.ip}</td>
                                                             </tr>
                                                         ))}
                                                     </tbody>
                                                 </table>
-                                                {visitors.length === 0 && (
-                                                    <div className="flex flex-col items-center justify-center h-64 opacity-30">
-                                                        <ScanFace size={64} />
-                                                        <p className="mt-4 text-sm font-mono">NO SIGNALS DETECTED</p>
+                                                {auditLogs.length === 0 && <div className="p-8 text-center opacity-50">No logs recorded.</div>}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* AI LAB TAB - RESTORED */}
+                                    {activeTab === 'ai-lab' && (
+                                        <div className="flex flex-col h-full max-w-4xl mx-auto space-y-6">
+                                            <div className="p-6 rounded-xl border bg-white/5 border-white/10">
+                                                <h3 className="font-bold text-lg mb-4 flex items-center gap-2"><BrainCircuit size={20} /> AI Parser & Content Generator</h3>
+                                                <p className="text-sm opacity-60 mb-4">Upload a file or paste text to extract structured data for the database.</p>
+
+                                                <div className="flex flex-col gap-4">
+                                                    <div className="flex gap-4">
+                                                        <input type="file" ref={fileInputRef} onChange={(e) => setSelectedFile(e.target.files?.[0] || null)} className="flex-1 bg-black/40 border border-white/10 rounded p-2 text-sm" />
+                                                        <button onClick={() => setSelectedFile(null)} className="p-2 border border-white/10 rounded hover:bg-white/10"><X size={16} /></button>
+                                                    </div>
+                                                    <textarea value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)} placeholder="Optional Instructions (e.g. 'Extract title and summary')" className="w-full h-24 bg-black/40 border border-white/10 rounded p-3 text-sm outline-none resize-none" />
+                                                    <button onClick={handleAiParse} disabled={aiLoading} className={`w-full py-3 rounded font-bold transition-all ${isWizard ? 'bg-purple-900 text-purple-100 hover:bg-purple-800' : 'bg-blue-900 text-blue-100 hover:bg-blue-800'}`}>
+                                                        {aiLoading ? <Loader2 className="animate-spin mx-auto" /> : 'ANALYZE CONTENT'}
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {aiResult && (
+                                                <div className="flex-1 overflow-y-auto p-4 rounded-xl border bg-white/5 border-white/10">
+                                                    <div className="flex justify-between items-center mb-2">
+                                                        <h4 className="font-bold">Analysis Result</h4>
+                                                        <button onClick={transferAiToForm} className="px-4 py-1.5 bg-green-600 rounded text-black font-bold text-xs hover:bg-green-500">USE THIS DATA</button>
+                                                    </div>
+                                                    <pre className="text-xs font-mono whitespace-pre-wrap opacity-70 bg-black/40 p-4 rounded">{JSON.stringify(aiResult, null, 2)}</pre>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* USERS TAB */}
+                                    {activeTab === 'users' && (
+                                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                            <div>
+                                                <h3 className="font-bold mb-4">Manage Admins</h3>
+                                                <div className="space-y-2">
+                                                    {users.map(u => (
+                                                        <div key={u.username} className="p-4 rounded border border-white/10 bg-white/5 flex justify-between items-center">
+                                                            <div>
+                                                                <div className="font-bold text-lg">{u.username}</div>
+                                                                <div className="text-xs opacity-50 flex gap-2 mt-1">
+                                                                    {u.permissions?.isGod && <span className="text-red-400">GOD</span>}
+                                                                    {u.permissions?.canEdit && <span>EDITOR</span>}
+                                                                    {u.permissions?.canDelete && <span>DELETER</span>}
+                                                                </div>
+                                                            </div>
+                                                            {u.username !== 'admin' && u.username !== currentUser && (
+                                                                <button onClick={() => handleDeleteUser(u.username)} className="p-2 bg-red-900/50 hover:bg-red-900 text-red-200 rounded"><Trash2 size={16} /></button>
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            <div className="space-y-6">
+                                                <div className="p-6 rounded border border-white/10 bg-white/5 space-y-4">
+                                                    <h3 className="font-bold">Create New Admin</h3>
+                                                    <input value={newUser} onChange={e => setNewUser(e.target.value)} placeholder="Username" className="w-full p-2 bg-black/40 border border-white/10 rounded text-white" />
+                                                    <input type="password" value={newUserPass} onChange={e => setNewUserPass(e.target.value)} placeholder="Password" className="w-full p-2 bg-black/40 border border-white/10 rounded text-white" />
+
+                                                    <div className="space-y-2">
+                                                        <div className="text-xs font-bold opacity-50 uppercase">Permissions</div>
+                                                        <label className="flex items-center gap-2"><input type="checkbox" checked={newPermissions.canEdit} onChange={e => setNewPermissions({ ...newPermissions, canEdit: e.target.checked })} /> Can Edit</label>
+                                                        <label className="flex items-center gap-2"><input type="checkbox" checked={newPermissions.canDelete} onChange={e => setNewPermissions({ ...newPermissions, canDelete: e.target.checked })} /> Can Delete</label>
+                                                        <label className="flex items-center gap-2"><input type="checkbox" checked={newPermissions.canViewLogs} onChange={e => setNewPermissions({ ...newPermissions, canViewLogs: e.target.checked })} /> View Logs</label>
+                                                        <label className="flex items-center gap-2"><input type="checkbox" checked={newPermissions.canManageUsers} onChange={e => setNewPermissions({ ...newPermissions, canManageUsers: e.target.checked })} /> Manage Users</label>
+                                                    </div>
+
+                                                    <button onClick={handleCreateUser} className="w-full py-2 bg-green-600 rounded font-bold hover:bg-green-500">CREATE USER</button>
+                                                </div>
+
+                                                <div className="p-6 rounded border border-white/10 bg-white/5 space-y-4">
+                                                    <h3 className="font-bold">Change My Password</h3>
+                                                    <input type="password" value={changePassData.current} onChange={e => setChangePassData({ ...changePassData, current: e.target.value })} placeholder="Current Password" className="w-full p-2 bg-black/40 border border-white/10 rounded text-white" />
+                                                    <input type="password" value={changePassData.new} onChange={e => setChangePassData({ ...changePassData, new: e.target.value })} placeholder="New Password" className="w-full p-2 bg-black/40 border border-white/10 rounded text-white" />
+                                                    <input type="password" value={changePassData.confirm} onChange={e => setChangePassData({ ...changePassData, confirm: e.target.value })} placeholder="Confirm New Password" className="w-full p-2 bg-black/40 border border-white/10 rounded text-white" />
+                                                    <button onClick={handleChangePassword} disabled={isLoading} className="w-full py-2 bg-blue-600 rounded font-bold hover:bg-blue-500">UPDATE PASSWORD</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* BACKUP TAB */}
+                                    {activeTab === 'backup' && (
+                                        <div className="space-y-8 max-w-xl mx-auto text-center py-10">
+                                            <div className="p-8 border border-white/10 rounded-xl bg-white/5 space-y-4">
+                                                <HardDrive size={48} className="mx-auto text-blue-400 mb-4" />
+                                                <h3 className="text-2xl font-bold">System Backup</h3>
+                                                <p className="opacity-70 text-sm">Download a full JSON snapshot of the database, config, and logs.</p>
+                                                <button onClick={handleExportData} className="px-8 py-3 bg-blue-600 rounded-full font-bold hover:bg-blue-500 inline-flex items-center gap-2">
+                                                    {isLoading ? <Loader2 className="animate-spin" /> : <FileUp size={18} />} EXPORT DATA
+                                                </button>
+                                            </div>
+
+                                            <div className="p-8 border border-white/10 rounded-xl bg-white/5 space-y-4 relative overflow-hidden">
+                                                <div className="absolute top-0 left-0 w-full h-1 bg-red-500"></div>
+                                                <AlertTriangle size={48} className="mx-auto text-red-400 mb-4" />
+                                                <h3 className="text-2xl font-bold text-red-400">System Restore</h3>
+                                                <p className="opacity-70 text-sm">Upload a backup JSON to overwrite the current database. <br /><span className="font-bold text-red-300">WARNING: This cannot be undone.</span></p>
+
+                                                <input type="file" ref={importFileRef} onChange={handleImportData} accept=".json" className="hidden" />
+                                                <button onClick={() => importFileRef.current?.click()} className="px-8 py-3 bg-red-900/50 border border-red-500 rounded-full font-bold hover:bg-red-900 text-red-200 inline-flex items-center gap-2">
+                                                    {isLoading ? <Loader2 className="animate-spin" /> : <RefreshCw size={18} />} RESTORE FROM BACKUP
+                                                </button>
+                                                {importStatus && (
+                                                    <div className="mt-4 text-xs font-mono p-2 bg-black/50 rounded border border-white/10">
+                                                        STATUS: {importStatus}
+                                                        <div className="w-full h-1 bg-white/10 mt-1 rounded-full overflow-hidden">
+                                                            <div className="h-full bg-green-500 transition-all duration-300" style={{ width: `${importProgress}%` }}></div>
+                                                        </div>
                                                     </div>
                                                 )}
                                             </div>
                                         </div>
-                                    ) : (
-                                        // DETAIL VIEW (DOSSIER)
-                                        <div className="flex flex-col h-full animate-[fade-in-up_0.2s]">
-                                            <div className="flex items-center gap-4 mb-4">
-                                                <button onClick={() => setSelectedVisitor(null)} className="p-2 rounded bg-white/10 hover:bg-white/20 text-xs font-bold flex items-center gap-2">
-                                                    <ArrowDownUp className="rotate-90" size={14} /> BACK
+                                    )}
+
+                                    {/* CONFIG TAB - UPDATED WITH ALARMS AND BACKGROUNDS */}
+                                    {activeTab === 'config' && (
+                                        <div className="space-y-6 max-w-3xl">
+                                            <div className="p-6 rounded border bg-white/5 border-white/10 space-y-6">
+                                                <h3 className="font-bold text-lg border-b border-white/10 pb-2">Identity & Branding</h3>
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div>
+                                                        <label className="text-xs opacity-50 mb-1 block">Wizard Title</label>
+                                                        <input value={editedConfig.wizardTitle} onChange={e => setEditedConfig({ ...editedConfig, wizardTitle: e.target.value })} className="w-full p-2 bg-black/40 border border-white/10 rounded text-white text-sm" />
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-xs opacity-50 mb-1 block">Muggle Title</label>
+                                                        <input value={editedConfig.muggleTitle} onChange={e => setEditedConfig({ ...editedConfig, muggleTitle: e.target.value })} className="w-full p-2 bg-black/40 border border-white/10 rounded text-white text-sm" />
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-xs opacity-50 mb-1 block">Wizard Logo Text</label>
+                                                        <input value={editedConfig.wizardLogoText} onChange={e => setEditedConfig({ ...editedConfig, wizardLogoText: e.target.value })} className="w-full p-2 bg-black/40 border border-white/10 rounded text-white text-sm" />
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-xs opacity-50 mb-1 block">Muggle Logo Text</label>
+                                                        <input value={editedConfig.muggleLogoText} onChange={e => setEditedConfig({ ...editedConfig, muggleLogoText: e.target.value })} className="w-full p-2 bg-black/40 border border-white/10 rounded text-white text-sm" />
+                                                    </div>
+                                                </div>
+
+                                                <div className="space-y-4">
+                                                    <h4 className="text-xs font-bold uppercase opacity-50">Logos & Images</h4>
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                        <div className="flex gap-2 items-end">
+                                                            <div className="flex-1">
+                                                                <label className="text-xs opacity-50 mb-1 block">Wizard Logo URL</label>
+                                                                <input value={editedConfig.wizardLogoUrl || ''} onChange={e => setEditedConfig({ ...editedConfig, wizardLogoUrl: e.target.value })} className="w-full p-2 bg-black/40 border border-white/10 rounded text-white text-sm" />
+                                                            </div>
+                                                            <label className="p-2 bg-white/10 rounded cursor-pointer hover:bg-white/20"><ImageIcon size={16} /><input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'wizardLogoUrl')} /></label>
+                                                        </div>
+                                                        <div className="flex gap-2 items-end">
+                                                            <div className="flex-1">
+                                                                <label className="text-xs opacity-50 mb-1 block">Muggle Logo URL</label>
+                                                                <input value={editedConfig.muggleLogoUrl || ''} onChange={e => setEditedConfig({ ...editedConfig, muggleLogoUrl: e.target.value })} className="w-full p-2 bg-black/40 border border-white/10 rounded text-white text-sm" />
+                                                            </div>
+                                                            <label className="p-2 bg-white/10 rounded cursor-pointer hover:bg-white/20"><ImageIcon size={16} /><input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'muggleLogoUrl')} /></label>
+                                                        </div>
+                                                        <div className="flex gap-2 items-end">
+                                                            <div className="flex-1">
+                                                                <label className="text-xs opacity-50 mb-1 block">Wizard Background URL</label>
+                                                                <input value={editedConfig.wizardImage || ''} onChange={e => setEditedConfig({ ...editedConfig, wizardImage: e.target.value })} className="w-full p-2 bg-black/40 border border-white/10 rounded text-white text-sm" />
+                                                            </div>
+                                                            <label className="p-2 bg-white/10 rounded cursor-pointer hover:bg-white/20"><ImageIcon size={16} /><input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'wizardImage')} /></label>
+                                                        </div>
+                                                        <div className="flex gap-2 items-end">
+                                                            <div className="flex-1">
+                                                                <label className="text-xs opacity-50 mb-1 block">Muggle Background URL</label>
+                                                                <input value={editedConfig.muggleImage || ''} onChange={e => setEditedConfig({ ...editedConfig, muggleImage: e.target.value })} className="w-full p-2 bg-black/40 border border-white/10 rounded text-white text-sm" />
+                                                            </div>
+                                                            <label className="p-2 bg-white/10 rounded cursor-pointer hover:bg-white/20"><ImageIcon size={16} /><input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'muggleImage')} /></label>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="space-y-4 pt-4 border-t border-white/10">
+                                                    <h4 className="text-xs font-bold uppercase opacity-50 flex items-center gap-2"><BellRing size={14} /> Audio Alarms</h4>
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                        <div>
+                                                            <label className="text-xs opacity-50 mb-1 block">Wizard Alarm URL</label>
+                                                            <input value={editedConfig.wizardAlarmUrl || ''} onChange={e => setEditedConfig({ ...editedConfig, wizardAlarmUrl: e.target.value })} className="w-full p-2 bg-black/40 border border-white/10 rounded text-white text-sm" placeholder="https://.../harp.mp3" />
+                                                        </div>
+                                                        <div>
+                                                            <label className="text-xs opacity-50 mb-1 block">Muggle Alarm URL</label>
+                                                            <input value={editedConfig.muggleAlarmUrl || ''} onChange={e => setEditedConfig({ ...editedConfig, muggleAlarmUrl: e.target.value })} className="w-full p-2 bg-black/40 border border-white/10 rounded text-white text-sm" placeholder="https://.../beep.mp3" />
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="space-y-4 pt-4 border-t border-white/10">
+                                                    <h3 className="font-bold text-lg border-b border-white/10 pb-2">Gate & System</h3>
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                        <div>
+                                                            <label className="text-xs opacity-50 mb-1 block">Wizard Gate Text</label>
+                                                            <textarea value={editedConfig.wizardGateText} onChange={e => setEditedConfig({ ...editedConfig, wizardGateText: e.target.value })} className="w-full p-2 bg-black/40 border border-white/10 rounded text-white text-sm h-20" />
+                                                        </div>
+                                                        <div>
+                                                            <label className="text-xs opacity-50 mb-1 block">Muggle Gate Text</label>
+                                                            <textarea value={editedConfig.muggleGateText} onChange={e => setEditedConfig({ ...editedConfig, muggleGateText: e.target.value })} className="w-full p-2 bg-black/40 border border-white/10 rounded text-white text-sm h-20" />
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-xs opacity-50 mb-1 block">Telegram Channel Link</label>
+                                                        <input value={editedConfig.telegramLink || ''} onChange={e => setEditedConfig({ ...editedConfig, telegramLink: e.target.value })} className="w-full p-2 bg-black/40 border border-white/10 rounded text-white text-sm" placeholder="https://t.me/..." />
+                                                    </div>
+                                                </div>
+
+                                                <button onClick={handleSaveConfig} disabled={isSavingConfig} className="w-full py-3 bg-blue-600 rounded font-bold hover:bg-blue-500 flex justify-center items-center gap-2">
+                                                    {isSavingConfig ? <Loader2 className="animate-spin" /> : <Save size={18} />} SAVE CONFIGURATION
                                                 </button>
-                                                <h3 className="text-xl font-bold">{selectedVisitor.display_name}'s Dossier</h3>
-                                                <span className="px-2 py-1 rounded bg-blue-900/50 text-blue-200 text-xs font-mono">{selectedVisitor.visitor_id}</span>
-                                            </div>
-
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-1 min-h-0">
-                                                {/* ACTIVITY LOG */}
-                                                <div className="bg-white/5 border border-white/10 rounded-xl flex flex-col overflow-hidden">
-                                                    <div className="p-3 bg-black/20 border-b border-white/10 font-bold flex items-center gap-2 text-sm text-blue-300">
-                                                        <Activity size={16} /> Activity History
-                                                    </div>
-                                                    <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
-                                                        {loadingDetails ? <div className="text-center p-4"><Loader2 className="animate-spin mx-auto" /></div> :
-                                                            visitorDetails?.activity && visitorDetails.activity.length > 0 ? (
-                                                                visitorDetails.activity.map((act, i) => (
-                                                                    <div key={i} className="flex gap-3 text-xs border-b border-white/5 pb-2">
-                                                                        <div className="opacity-50 font-mono whitespace-nowrap w-16 text-right">{new Date(act.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
-                                                                        <div>
-                                                                            <div className="font-bold text-white mb-0.5">{act.activity_type.replace('_', ' ')}</div>
-                                                                            <div className="opacity-70">{act.resource_title || act.resource_id}</div>
-                                                                            {act.duration_seconds > 0 && <div className="text-[10px] text-green-400 mt-1">{act.duration_seconds}s duration</div>}
-                                                                        </div>
-                                                                    </div>
-                                                                ))
-                                                            ) : <div className="opacity-50 text-center text-xs">No activity recorded.</div>}
-                                                    </div>
-                                                </div>
-
-                                                {/* CHAT LOG */}
-                                                <div className="bg-white/5 border border-white/10 rounded-xl flex flex-col overflow-hidden">
-                                                    <div className="p-3 bg-black/20 border-b border-white/10 font-bold flex items-center gap-2 text-sm text-purple-300">
-                                                        <MessageSquare size={16} /> Oracle Interactions
-                                                    </div>
-                                                    <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
-                                                        {loadingDetails ? <div className="text-center p-4"><Loader2 className="animate-spin mx-auto" /></div> :
-                                                            visitorDetails?.chats && visitorDetails.chats.length > 0 ? (
-                                                                visitorDetails.chats.map((chat, i) => (
-                                                                    <div key={i} className="flex flex-col gap-2 text-xs border-b border-white/5 pb-3">
-                                                                        <div className="font-mono opacity-30 text-[10px]">{new Date(chat.timestamp).toLocaleString()}</div>
-                                                                        <div className="bg-white/5 p-2 rounded text-white italic">"{chat.user_query}"</div>
-                                                                        <div className="pl-2 border-l-2 border-purple-500/50 text-purple-100 opacity-80 line-clamp-3 hover:line-clamp-none transition-all cursor-pointer">
-                                                                            {chat.bot_response.replace(/<[^>]+>/g, '')}
-                                                                        </div>
-                                                                    </div>
-                                                                ))
-                                                            ) : <div className="opacity-50 text-center text-xs">No conversations found.</div>}
-                                                    </div>
-                                                </div>
                                             </div>
                                         </div>
                                     )}
-                                </div>
-                            )}
-                            {/* VISITOR SURVEILLANCE TAB END */}
 
-                            {/* LOGS TAB - RESTORED */}
-                            {activeTab === 'logs' && (
-                                <div className="space-y-6">
-                                    <div className="flex justify-between items-center mb-4">
-                                        <h3 className="font-bold text-xl">System Audit Logs</h3>
-                                        <button onClick={fetchAuditLogs} className="p-2 bg-white/10 rounded hover:bg-white/20"><RefreshCw size={16} /></button>
-                                    </div>
-                                    <div className="bg-white/5 border border-white/10 rounded overflow-hidden">
-                                        <table className="w-full text-sm text-left">
-                                            <thead className="bg-black/40 text-xs uppercase font-bold text-zinc-400">
-                                                <tr>
-                                                    <th className="p-3">Time</th>
-                                                    <th className="p-3">User</th>
-                                                    <th className="p-3">Action</th>
-                                                    <th className="p-3">Details</th>
-                                                    <th className="p-3">IP</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {auditLogs.map((log, i) => (
-                                                    <tr key={i} className="border-t border-white/5 hover:bg-white/5">
-                                                        <td className="p-3 font-mono text-xs opacity-70 whitespace-nowrap">{new Date(log.timestamp).toLocaleString()}</td>
-                                                        <td className="p-3 font-bold text-white">{log.username}</td>
-                                                        <td className="p-3"><span className="px-2 py-1 rounded bg-white/10 font-mono text-[10px]">{log.action}</span></td>
-                                                        <td className="p-3 opacity-80">{log.details}</td>
-                                                        <td className="p-3 font-mono text-xs opacity-50">{log.ip}</td>
-                                                    </tr>
+
+                                    {/* STRUCTURE TAB - EXPANDED */}
+                                    {activeTab === 'structure' && (
+                                        <div className="space-y-6 pb-20">
+                                            <div className="sticky top-0 z-20 bg-black/80 backdrop-blur-md p-4 -mx-4 -mt-4 border-b border-white/10 flex justify-between items-center mb-4">
+                                                <div>
+                                                    <h3 className="font-bold text-xl text-white">Sector Configuration</h3>
+                                                    <p className="text-xs opacity-50">Manage section names, icons, and sorting rules.</p>
+                                                </div>
+                                                <button onClick={handleSaveSectors} disabled={isSavingSectors} className="px-6 py-2 rounded-full font-bold bg-blue-600 text-white flex items-center gap-2">
+                                                    {isSavingSectors ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} SAVE ALL
+                                                </button>
+                                            </div>
+                                            <div className="grid gap-6">
+                                                {editedSectors.map((sector, idx) => (
+                                                    <div key={sector.id} className="p-6 rounded-xl border bg-white/5 border-white/10 shadow-lg relative group">
+                                                        <div className="absolute top-4 right-4 text-xs font-mono opacity-30">{sector.id.toUpperCase()}</div>
+
+                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                            <div className="space-y-4">
+                                                                <h4 className="text-xs font-bold uppercase opacity-50 text-emerald-400">Wizard Mode</h4>
+                                                                <div>
+                                                                    <label className="text-[10px] uppercase opacity-50 block mb-1">Display Name</label>
+                                                                    <input value={sector.wizardName} onChange={e => handleUpdateSector(idx, 'wizardName', e.target.value)} className="w-full p-2 bg-black border border-white/10 rounded text-white text-sm" />
+                                                                </div>
+                                                                <div>
+                                                                    <label className="text-[10px] uppercase opacity-50 block mb-1">Icon Name (Lucide)</label>
+                                                                    <input value={sector.wizardIcon} onChange={e => handleUpdateSector(idx, 'wizardIcon', e.target.value)} className="w-full p-2 bg-black border border-white/10 rounded text-white text-sm" />
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="space-y-4">
+                                                                <h4 className="text-xs font-bold uppercase opacity-50 text-fuchsia-400">Muggle Mode</h4>
+                                                                <div>
+                                                                    <label className="text-[10px] uppercase opacity-50 block mb-1">Display Name</label>
+                                                                    <input value={sector.muggleName} onChange={e => handleUpdateSector(idx, 'muggleName', e.target.value)} className="w-full p-2 bg-black border border-white/10 rounded text-white text-sm" />
+                                                                </div>
+                                                                <div>
+                                                                    <label className="text-[10px] uppercase opacity-50 block mb-1">Icon Name (Lucide)</label>
+                                                                    <input value={sector.muggleIcon} onChange={e => handleUpdateSector(idx, 'muggleIcon', e.target.value)} className="w-full p-2 bg-black border border-white/10 rounded text-white text-sm" />
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="mt-4 pt-4 border-t border-white/10 grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                            <div className="md:col-span-2">
+                                                                <label className="text-[10px] uppercase opacity-50 block mb-1">Description</label>
+                                                                <input value={sector.description} onChange={e => handleUpdateSector(idx, 'description', e.target.value)} className="w-full p-2 bg-black border border-white/10 rounded text-white text-sm" />
+                                                            </div>
+                                                            <div>
+                                                                <label className="text-[10px] uppercase opacity-50 block mb-1">Sorting Rule</label>
+                                                                <select
+                                                                    value={sector.sortOrder || 'newest'}
+                                                                    onChange={e => handleUpdateSector(idx, 'sortOrder', e.target.value)}
+                                                                    className="w-full p-2 bg-black border border-white/10 rounded text-white text-sm"
+                                                                >
+                                                                    <option value="newest">Newest First</option>
+                                                                    <option value="oldest">Oldest First</option>
+                                                                    <option value="alphabetical">Alphabetical (A-Z)</option>
+                                                                    <option value="manual">Manual Drag & Drop</option>
+                                                                </select>
+                                                            </div>
+                                                        </div>
+                                                    </div>
                                                 ))}
-                                            </tbody>
-                                        </table>
-                                        {auditLogs.length === 0 && <div className="p-8 text-center opacity-50">No logs recorded.</div>}
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* AI LAB TAB - RESTORED */}
-                            {activeTab === 'ai-lab' && (
-                                <div className="flex flex-col h-full max-w-4xl mx-auto space-y-6">
-                                    <div className="p-6 rounded-xl border bg-white/5 border-white/10">
-                                        <h3 className="font-bold text-lg mb-4 flex items-center gap-2"><BrainCircuit size={20} /> AI Parser & Content Generator</h3>
-                                        <p className="text-sm opacity-60 mb-4">Upload a file or paste text to extract structured data for the database.</p>
-
-                                        <div className="flex flex-col gap-4">
-                                            <div className="flex gap-4">
-                                                <input type="file" ref={fileInputRef} onChange={(e) => setSelectedFile(e.target.files?.[0] || null)} className="flex-1 bg-black/40 border border-white/10 rounded p-2 text-sm" />
-                                                <button onClick={() => setSelectedFile(null)} className="p-2 border border-white/10 rounded hover:bg-white/10"><X size={16} /></button>
                                             </div>
-                                            <textarea value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)} placeholder="Optional Instructions (e.g. 'Extract title and summary')" className="w-full h-24 bg-black/40 border border-white/10 rounded p-3 text-sm outline-none resize-none" />
-                                            <button onClick={handleAiParse} disabled={aiLoading} className={`w-full py-3 rounded font-bold transition-all ${isWizard ? 'bg-purple-900 text-purple-100 hover:bg-purple-800' : 'bg-blue-900 text-blue-100 hover:bg-blue-800'}`}>
-                                                {aiLoading ? <Loader2 className="animate-spin mx-auto" /> : 'ANALYZE CONTENT'}
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    {aiResult && (
-                                        <div className="flex-1 overflow-y-auto p-4 rounded-xl border bg-white/5 border-white/10">
-                                            <div className="flex justify-between items-center mb-2">
-                                                <h4 className="font-bold">Analysis Result</h4>
-                                                <button onClick={transferAiToForm} className="px-4 py-1.5 bg-green-600 rounded text-black font-bold text-xs hover:bg-green-500">USE THIS DATA</button>
-                                            </div>
-                                            <pre className="text-xs font-mono whitespace-pre-wrap opacity-70 bg-black/40 p-4 rounded">{JSON.stringify(aiResult, null, 2)}</pre>
                                         </div>
                                     )}
-                                </div>
-                            )}
 
-                            {/* USERS TAB */}
-                            {activeTab === 'users' && (
-                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                                    <div>
-                                        <h3 className="font-bold mb-4">Manage Admins</h3>
-                                        <div className="space-y-2">
-                                            {users.map(u => (
-                                                <div key={u.username} className="p-4 rounded border border-white/10 bg-white/5 flex justify-between items-center">
-                                                    <div>
-                                                        <div className="font-bold text-lg">{u.username}</div>
-                                                        <div className="text-xs opacity-50 flex gap-2 mt-1">
-                                                            {u.permissions?.isGod && <span className="text-red-400">GOD</span>}
-                                                            {u.permissions?.canEdit && <span>EDITOR</span>}
-                                                            {u.permissions?.canDelete && <span>DELETER</span>}
-                                                        </div>
-                                                    </div>
-                                                    {u.username !== 'admin' && u.username !== currentUser && (
-                                                        <button onClick={() => handleDeleteUser(u.username)} className="p-2 bg-red-900/50 hover:bg-red-900 text-red-200 rounded"><Trash2 size={16} /></button>
-                                                    )}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                    <div className="space-y-6">
-                                        <div className="p-6 rounded border border-white/10 bg-white/5 space-y-4">
-                                            <h3 className="font-bold">Create New Admin</h3>
-                                            <input value={newUser} onChange={e => setNewUser(e.target.value)} placeholder="Username" className="w-full p-2 bg-black/40 border border-white/10 rounded text-white" />
-                                            <input type="password" value={newUserPass} onChange={e => setNewUserPass(e.target.value)} placeholder="Password" className="w-full p-2 bg-black/40 border border-white/10 rounded text-white" />
-
-                                            <div className="space-y-2">
-                                                <div className="text-xs font-bold opacity-50 uppercase">Permissions</div>
-                                                <label className="flex items-center gap-2"><input type="checkbox" checked={newPermissions.canEdit} onChange={e => setNewPermissions({ ...newPermissions, canEdit: e.target.checked })} /> Can Edit</label>
-                                                <label className="flex items-center gap-2"><input type="checkbox" checked={newPermissions.canDelete} onChange={e => setNewPermissions({ ...newPermissions, canDelete: e.target.checked })} /> Can Delete</label>
-                                                <label className="flex items-center gap-2"><input type="checkbox" checked={newPermissions.canViewLogs} onChange={e => setNewPermissions({ ...newPermissions, canViewLogs: e.target.checked })} /> View Logs</label>
-                                                <label className="flex items-center gap-2"><input type="checkbox" checked={newPermissions.canManageUsers} onChange={e => setNewPermissions({ ...newPermissions, canManageUsers: e.target.checked })} /> Manage Users</label>
-                                            </div>
-
-                                            <button onClick={handleCreateUser} className="w-full py-2 bg-green-600 rounded font-bold hover:bg-green-500">CREATE USER</button>
-                                        </div>
-
-                                        <div className="p-6 rounded border border-white/10 bg-white/5 space-y-4">
-                                            <h3 className="font-bold">Change My Password</h3>
-                                            <input type="password" value={changePassData.current} onChange={e => setChangePassData({ ...changePassData, current: e.target.value })} placeholder="Current Password" className="w-full p-2 bg-black/40 border border-white/10 rounded text-white" />
-                                            <input type="password" value={changePassData.new} onChange={e => setChangePassData({ ...changePassData, new: e.target.value })} placeholder="New Password" className="w-full p-2 bg-black/40 border border-white/10 rounded text-white" />
-                                            <input type="password" value={changePassData.confirm} onChange={e => setChangePassData({ ...changePassData, confirm: e.target.value })} placeholder="Confirm New Password" className="w-full p-2 bg-black/40 border border-white/10 rounded text-white" />
-                                            <button onClick={handleChangePassword} disabled={isLoading} className="w-full py-2 bg-blue-600 rounded font-bold hover:bg-blue-500">UPDATE PASSWORD</button>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* BACKUP TAB */}
-                            {activeTab === 'backup' && (
-                                <div className="space-y-8 max-w-xl mx-auto text-center py-10">
-                                    <div className="p-8 border border-white/10 rounded-xl bg-white/5 space-y-4">
-                                        <HardDrive size={48} className="mx-auto text-blue-400 mb-4" />
-                                        <h3 className="text-2xl font-bold">System Backup</h3>
-                                        <p className="opacity-70 text-sm">Download a full JSON snapshot of the database, config, and logs.</p>
-                                        <button onClick={handleExportData} className="px-8 py-3 bg-blue-600 rounded-full font-bold hover:bg-blue-500 inline-flex items-center gap-2">
-                                            {isLoading ? <Loader2 className="animate-spin" /> : <FileUp size={18} />} EXPORT DATA
-                                        </button>
-                                    </div>
-
-                                    <div className="p-8 border border-white/10 rounded-xl bg-white/5 space-y-4 relative overflow-hidden">
-                                        <div className="absolute top-0 left-0 w-full h-1 bg-red-500"></div>
-                                        <AlertTriangle size={48} className="mx-auto text-red-400 mb-4" />
-                                        <h3 className="text-2xl font-bold text-red-400">System Restore</h3>
-                                        <p className="opacity-70 text-sm">Upload a backup JSON to overwrite the current database. <br /><span className="font-bold text-red-300">WARNING: This cannot be undone.</span></p>
-
-                                        <input type="file" ref={importFileRef} onChange={handleImportData} accept=".json" className="hidden" />
-                                        <button onClick={() => importFileRef.current?.click()} className="px-8 py-3 bg-red-900/50 border border-red-500 rounded-full font-bold hover:bg-red-900 text-red-200 inline-flex items-center gap-2">
-                                            {isLoading ? <Loader2 className="animate-spin" /> : <RefreshCw size={18} />} RESTORE FROM BACKUP
-                                        </button>
-                                        {importStatus && (
-                                            <div className="mt-4 text-xs font-mono p-2 bg-black/50 rounded border border-white/10">
-                                                STATUS: {importStatus}
-                                                <div className="w-full h-1 bg-white/10 mt-1 rounded-full overflow-hidden">
-                                                    <div className="h-full bg-green-500 transition-all duration-300" style={{ width: `${importProgress}%` }}></div>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* CONFIG TAB - UPDATED WITH ALARMS AND BACKGROUNDS */}
-                            {activeTab === 'config' && (
-                                <div className="space-y-6 max-w-3xl">
-                                    <div className="p-6 rounded border bg-white/5 border-white/10 space-y-6">
-                                        <h3 className="font-bold text-lg border-b border-white/10 pb-2">Identity & Branding</h3>
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div>
-                                                <label className="text-xs opacity-50 mb-1 block">Wizard Title</label>
-                                                <input value={editedConfig.wizardTitle} onChange={e => setEditedConfig({ ...editedConfig, wizardTitle: e.target.value })} className="w-full p-2 bg-black/40 border border-white/10 rounded text-white text-sm" />
-                                            </div>
-                                            <div>
-                                                <label className="text-xs opacity-50 mb-1 block">Muggle Title</label>
-                                                <input value={editedConfig.muggleTitle} onChange={e => setEditedConfig({ ...editedConfig, muggleTitle: e.target.value })} className="w-full p-2 bg-black/40 border border-white/10 rounded text-white text-sm" />
-                                            </div>
-                                            <div>
-                                                <label className="text-xs opacity-50 mb-1 block">Wizard Logo Text</label>
-                                                <input value={editedConfig.wizardLogoText} onChange={e => setEditedConfig({ ...editedConfig, wizardLogoText: e.target.value })} className="w-full p-2 bg-black/40 border border-white/10 rounded text-white text-sm" />
-                                            </div>
-                                            <div>
-                                                <label className="text-xs opacity-50 mb-1 block">Muggle Logo Text</label>
-                                                <input value={editedConfig.muggleLogoText} onChange={e => setEditedConfig({ ...editedConfig, muggleLogoText: e.target.value })} className="w-full p-2 bg-black/40 border border-white/10 rounded text-white text-sm" />
-                                            </div>
-                                        </div>
-
-                                        <div className="space-y-4">
-                                            <h4 className="text-xs font-bold uppercase opacity-50">Logos & Images</h4>
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                <div className="flex gap-2 items-end">
-                                                    <div className="flex-1">
-                                                        <label className="text-xs opacity-50 mb-1 block">Wizard Logo URL</label>
-                                                        <input value={editedConfig.wizardLogoUrl || ''} onChange={e => setEditedConfig({ ...editedConfig, wizardLogoUrl: e.target.value })} className="w-full p-2 bg-black/40 border border-white/10 rounded text-white text-sm" />
-                                                    </div>
-                                                    <label className="p-2 bg-white/10 rounded cursor-pointer hover:bg-white/20"><ImageIcon size={16} /><input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'wizardLogoUrl')} /></label>
-                                                </div>
-                                                <div className="flex gap-2 items-end">
-                                                    <div className="flex-1">
-                                                        <label className="text-xs opacity-50 mb-1 block">Muggle Logo URL</label>
-                                                        <input value={editedConfig.muggleLogoUrl || ''} onChange={e => setEditedConfig({ ...editedConfig, muggleLogoUrl: e.target.value })} className="w-full p-2 bg-black/40 border border-white/10 rounded text-white text-sm" />
-                                                    </div>
-                                                    <label className="p-2 bg-white/10 rounded cursor-pointer hover:bg-white/20"><ImageIcon size={16} /><input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'muggleLogoUrl')} /></label>
-                                                </div>
-                                                <div className="flex gap-2 items-end">
-                                                    <div className="flex-1">
-                                                        <label className="text-xs opacity-50 mb-1 block">Wizard Background URL</label>
-                                                        <input value={editedConfig.wizardImage || ''} onChange={e => setEditedConfig({ ...editedConfig, wizardImage: e.target.value })} className="w-full p-2 bg-black/40 border border-white/10 rounded text-white text-sm" />
-                                                    </div>
-                                                    <label className="p-2 bg-white/10 rounded cursor-pointer hover:bg-white/20"><ImageIcon size={16} /><input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'wizardImage')} /></label>
-                                                </div>
-                                                <div className="flex gap-2 items-end">
-                                                    <div className="flex-1">
-                                                        <label className="text-xs opacity-50 mb-1 block">Muggle Background URL</label>
-                                                        <input value={editedConfig.muggleImage || ''} onChange={e => setEditedConfig({ ...editedConfig, muggleImage: e.target.value })} className="w-full p-2 bg-black/40 border border-white/10 rounded text-white text-sm" />
-                                                    </div>
-                                                    <label className="p-2 bg-white/10 rounded cursor-pointer hover:bg-white/20"><ImageIcon size={16} /><input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'muggleImage')} /></label>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div className="space-y-4 pt-4 border-t border-white/10">
-                                            <h4 className="text-xs font-bold uppercase opacity-50 flex items-center gap-2"><BellRing size={14} /> Audio Alarms</h4>
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                <div>
-                                                    <label className="text-xs opacity-50 mb-1 block">Wizard Alarm URL</label>
-                                                    <input value={editedConfig.wizardAlarmUrl || ''} onChange={e => setEditedConfig({ ...editedConfig, wizardAlarmUrl: e.target.value })} className="w-full p-2 bg-black/40 border border-white/10 rounded text-white text-sm" placeholder="https://.../harp.mp3" />
-                                                </div>
-                                                <div>
-                                                    <label className="text-xs opacity-50 mb-1 block">Muggle Alarm URL</label>
-                                                    <input value={editedConfig.muggleAlarmUrl || ''} onChange={e => setEditedConfig({ ...editedConfig, muggleAlarmUrl: e.target.value })} className="w-full p-2 bg-black/40 border border-white/10 rounded text-white text-sm" placeholder="https://.../beep.mp3" />
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div className="space-y-4 pt-4 border-t border-white/10">
-                                            <h3 className="font-bold text-lg border-b border-white/10 pb-2">Gate & System</h3>
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div>
-                                                    <label className="text-xs opacity-50 mb-1 block">Wizard Gate Text</label>
-                                                    <textarea value={editedConfig.wizardGateText} onChange={e => setEditedConfig({ ...editedConfig, wizardGateText: e.target.value })} className="w-full p-2 bg-black/40 border border-white/10 rounded text-white text-sm h-20" />
-                                                </div>
-                                                <div>
-                                                    <label className="text-xs opacity-50 mb-1 block">Muggle Gate Text</label>
-                                                    <textarea value={editedConfig.muggleGateText} onChange={e => setEditedConfig({ ...editedConfig, muggleGateText: e.target.value })} className="w-full p-2 bg-black/40 border border-white/10 rounded text-white text-sm h-20" />
-                                                </div>
-                                            </div>
-                                            <div>
-                                                <label className="text-xs opacity-50 mb-1 block">Telegram Channel Link</label>
-                                                <input value={editedConfig.telegramLink || ''} onChange={e => setEditedConfig({ ...editedConfig, telegramLink: e.target.value })} className="w-full p-2 bg-black/40 border border-white/10 rounded text-white text-sm" placeholder="https://t.me/..." />
-                                            </div>
-                                        </div>
-
-                                        <button onClick={handleSaveConfig} disabled={isSavingConfig} className="w-full py-3 bg-blue-600 rounded font-bold hover:bg-blue-500 flex justify-center items-center gap-2">
-                                            {isSavingConfig ? <Loader2 className="animate-spin" /> : <Save size={18} />} SAVE CONFIGURATION
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
-
-
-                            {/* STRUCTURE TAB - EXPANDED */}
-                            {activeTab === 'structure' && (
-                                <div className="space-y-6 pb-20">
-                                    <div className="sticky top-0 z-20 bg-black/80 backdrop-blur-md p-4 -mx-4 -mt-4 border-b border-white/10 flex justify-between items-center mb-4">
-                                        <div>
-                                            <h3 className="font-bold text-xl text-white">Sector Configuration</h3>
-                                            <p className="text-xs opacity-50">Manage section names, icons, and sorting rules.</p>
-                                        </div>
-                                        <button onClick={handleSaveSectors} disabled={isSavingSectors} className="px-6 py-2 rounded-full font-bold bg-blue-600 text-white flex items-center gap-2">
-                                            {isSavingSectors ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} SAVE ALL
-                                        </button>
-                                    </div>
-                                    <div className="grid gap-6">
-                                        {editedSectors.map((sector, idx) => (
-                                            <div key={sector.id} className="p-6 rounded-xl border bg-white/5 border-white/10 shadow-lg relative group">
-                                                <div className="absolute top-4 right-4 text-xs font-mono opacity-30">{sector.id.toUpperCase()}</div>
-
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                                    <div className="space-y-4">
-                                                        <h4 className="text-xs font-bold uppercase opacity-50 text-emerald-400">Wizard Mode</h4>
-                                                        <div>
-                                                            <label className="text-[10px] uppercase opacity-50 block mb-1">Display Name</label>
-                                                            <input value={sector.wizardName} onChange={e => handleUpdateSector(idx, 'wizardName', e.target.value)} className="w-full p-2 bg-black border border-white/10 rounded text-white text-sm" />
-                                                        </div>
-                                                        <div>
-                                                            <label className="text-[10px] uppercase opacity-50 block mb-1">Icon Name (Lucide)</label>
-                                                            <input value={sector.wizardIcon} onChange={e => handleUpdateSector(idx, 'wizardIcon', e.target.value)} className="w-full p-2 bg-black border border-white/10 rounded text-white text-sm" />
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="space-y-4">
-                                                        <h4 className="text-xs font-bold uppercase opacity-50 text-fuchsia-400">Muggle Mode</h4>
-                                                        <div>
-                                                            <label className="text-[10px] uppercase opacity-50 block mb-1">Display Name</label>
-                                                            <input value={sector.muggleName} onChange={e => handleUpdateSector(idx, 'muggleName', e.target.value)} className="w-full p-2 bg-black border border-white/10 rounded text-white text-sm" />
-                                                        </div>
-                                                        <div>
-                                                            <label className="text-[10px] uppercase opacity-50 block mb-1">Icon Name (Lucide)</label>
-                                                            <input value={sector.muggleIcon} onChange={e => handleUpdateSector(idx, 'muggleIcon', e.target.value)} className="w-full p-2 bg-black border border-white/10 rounded text-white text-sm" />
-                                                        </div>
-                                                    </div>
-                                                </div>
-
-                                                <div className="mt-4 pt-4 border-t border-white/10 grid grid-cols-1 md:grid-cols-3 gap-4">
-                                                    <div className="md:col-span-2">
-                                                        <label className="text-[10px] uppercase opacity-50 block mb-1">Description</label>
-                                                        <input value={sector.description} onChange={e => handleUpdateSector(idx, 'description', e.target.value)} className="w-full p-2 bg-black border border-white/10 rounded text-white text-sm" />
-                                                    </div>
-                                                    <div>
-                                                        <label className="text-[10px] uppercase opacity-50 block mb-1">Sorting Rule</label>
-                                                        <select
-                                                            value={sector.sortOrder || 'newest'}
-                                                            onChange={e => handleUpdateSector(idx, 'sortOrder', e.target.value)}
-                                                            className="w-full p-2 bg-black border border-white/10 rounded text-white text-sm"
-                                                        >
-                                                            <option value="newest">Newest First</option>
-                                                            <option value="oldest">Oldest First</option>
-                                                            <option value="alphabetical">Alphabetical (A-Z)</option>
-                                                            <option value="manual">Manual Drag & Drop</option>
-                                                        </select>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-
-                        </main>
+                                </main>
                     </div>
                 )}
             </div>
