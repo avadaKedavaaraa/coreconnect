@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Suspense, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, Suspense, useMemo, useCallback, useRef } from 'react';
 import { 
   Lineage, Sector, GlobalConfig, CarouselItem, UserProfile, AdminPermissions, 
   SECTORS as DEFAULT_SECTORS, LectureRule, FONT_LIBRARY 
@@ -240,6 +240,28 @@ function App() {
   const [viewingItem, setViewingItem] = useState<CarouselItem | null>(null);
   const [announcementViewMode, setAnnouncementViewMode] = useState<'carousel' | 'list'>('carousel');
   const [editingItem, setEditingItem] = useState<CarouselItem | null>(null);
+  // --- HEARTBEAT FIX (Option 2) ---
+  // 1. Create a "box" (ref) to hold the latest profile
+  const profileRef = useRef(profile);
+
+  // 2. Whenever profile changes (e.g. user logs in), update the box
+  useEffect(() => {
+      profileRef.current = profile;
+  }, [profile]);
+
+  // 3. The Heartbeat Timer
+  useEffect(() => {
+      const interval = setInterval(() => {
+          // Always grab the FRESH profile from the box
+          const p = profileRef.current; 
+          
+          if (p.id && p.id !== 'guest') {
+              trackActivity(p.id, 'HEARTBEAT', '', '', 0, p.displayName);
+          }
+      }, 10000); // Runs every 10 seconds
+
+      return () => clearInterval(interval);
+  }, []); // Empty dependency array = Timer never resets, never glitches
 
   // Data
   const normalizedLocalFiles: CarouselItem[] = (MY_FILES as any[]).map(f => ({
