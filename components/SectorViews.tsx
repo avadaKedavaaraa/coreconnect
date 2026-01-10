@@ -253,67 +253,139 @@ export const SectorView: React.FC<SectorViewProps> = ({
     };
 
     // --- RENDER HELPERS ---
-    // --- STRANGER THINGS THEMED TIMETABLE ---
-    const renderTimetable = () => (
-        <div className="mb-10 animate-[fade-in_0.5s]">
-            {/* Header */}
-            <div className={`relative p-6 rounded-t-xl border-t border-x overflow-hidden flex justify-between items-end
-              ${isWizard
-                    ? 'bg-[#050a05] border-emerald-900/50'
-                    : 'bg-[#0a050a] border-red-900/50 shadow-[0_0_30px_rgba(220,38,38,0.1)]'}
-          `}>
-                {/* Retro Grid Background */}
-                <div className="absolute inset-0 opacity-20 pointer-events-none"
-                    style={{ backgroundImage: 'linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px)', backgroundSize: '20px 20px' }}>
-                </div>
+    // --- LECTURE SCHEDULE RENDERER ---
+  const renderTimetable = () => {
+    // 1. Get today's classes
+    const today = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+    
+    // 2. Separate into batches
+    const aicsClasses = (schedules || []).filter(s => 
+        s.isActive && s.dayOfWeek === today && (s.batch === 'AICS' || !s.batch)
+    ).sort((a,b) => a.startTime.localeCompare(b.startTime));
 
-                <div>
-                    <h3 className={`text-3xl md:text-5xl font-black uppercase tracking-tighter drop-shadow-[0_0_10px_rgba(220,38,38,0.8)]
-                        ${isWizard ? 'font-serif text-emerald-500' : 'font-serif text-red-600'}
-                        stranger-things-title
-                   `}>
-                        {activeBatch}
-                    </h3>
-                    <div className="text-xs font-mono tracking-[0.3em] opacity-60 uppercase mt-1 pl-1">
-                        Weekly Course Schedule
+    const csdaClasses = (schedules || []).filter(s => 
+        s.isActive && s.dayOfWeek === today && s.batch === 'CSDA'
+    ).sort((a,b) => a.startTime.localeCompare(b.startTime));
+
+    const renderClassCard = (cls: LectureRule) => (
+        <div key={cls.id} className={`group relative rounded-2xl overflow-hidden border transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl flex flex-col
+            ${isWizard ? 'bg-[#0a0f0a] border-emerald-900/50 hover:border-emerald-500' : 'bg-[#0f0a15] border-purple-900/50 hover:border-purple-500'}
+        `}>
+            {/* Banner Image */}
+            <div className="h-32 w-full bg-black/50 relative overflow-hidden">
+                {cls.image ? (
+                    <img src={cls.image} alt={cls.subject} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
+                ) : (
+                    <div className={`w-full h-full flex items-center justify-center opacity-20 ${isWizard ? 'bg-emerald-900' : 'bg-purple-900'}`}>
+                        <Video size={40} />
                     </div>
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/90 to-transparent"></div>
+                
+                {/* Time Badge */}
+                <div className="absolute bottom-3 left-3 flex items-center gap-2">
+                    <span className={`px-2 py-1 rounded-md text-xs font-bold font-mono ${isWizard ? 'bg-emerald-500 text-black' : 'bg-purple-500 text-white'}`}>
+                        {cls.startTime}
+                    </span>
+                    <span className="text-[10px] text-white/80 uppercase tracking-widest font-bold">Live Class</span>
                 </div>
-
-                <button onClick={() => setShowFullTimetable(!showFullTimetable)} className={`relative z-10 px-4 py-1 text-[10px] font-bold uppercase tracking-widest border transition-all hover:bg-white/5 ${isWizard ? 'border-emerald-800 text-emerald-400' : 'border-red-800 text-red-500'}`}>
-                    {showFullTimetable ? 'Collapse Timeline' : 'Expand Full Week'}
-                </button>
             </div>
 
-            {/* FULL WEEK VIEW */}
-            {(showFullTimetable || todaysLectures.length === 0) && (
-                <div className={`p-4 border-x border-b rounded-b-xl overflow-x-auto ${isWizard ? 'bg-[#0a0f0a]/90 border-emerald-900/30' : 'bg-[#0f0a0f]/90 border-red-900/30'}`}>
-                    <div className="flex gap-4 min-w-max pb-4">
-                        {Object.entries(weeklySchedule).map(([day, classes]) => (
-                            <div key={day} className={`w-64 shrink-0 rounded-lg border bg-black/40 flex flex-col ${isWizard ? 'border-emerald-500/20' : 'border-red-500/20'}`}>
-                                <div className={`p-2 text-center text-xs font-bold uppercase border-b tracking-widest ${isWizard ? 'bg-emerald-900/20 text-emerald-400 border-emerald-500/20' : 'bg-red-900/20 text-red-500 border-red-500/20'}`}>{day}</div>
-                                <div className="p-3 space-y-3 flex-1 min-h-[100px]">
-                                    {classes.length > 0 ? classes.map(cls => (
-                                        <div key={cls.id} className="relative group p-3 rounded border border-white/5 bg-gradient-to-br from-white/5 to-transparent hover:border-white/20 transition-all overflow-hidden">
-                                            {/* Image Background (Subtle) */}
-                                            {cls.image && (
-                                                <div className="absolute inset-0 opacity-20 group-hover:opacity-30 transition-opacity bg-cover bg-center" style={{ backgroundImage: `url(${cls.image})` }}></div>
-                                            )}
-                                            <div className="relative z-10">
-                                                <div className="font-bold text-sm text-zinc-200 leading-tight mb-1">{cls.subject}</div>
-                                                <div className="flex justify-between items-end">
-                                                    <div className="text-[10px] font-mono opacity-50">{cls.startTime}</div>
-                                                    {cls.link && <span className={`text-[10px] font-bold ${isWizard ? 'text-emerald-500' : 'text-red-500'}`}>JOIN &rarr;</span>}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )) : <div className="h-full flex items-center justify-center opacity-20 text-[10px] uppercase font-mono tracking-widest">No Signals</div>}
-                                </div>
+            {/* Content */}
+            <div className="p-5 flex-1 flex flex-col">
+                <h3 className={`text-xl font-bold leading-tight mb-2 ${isWizard ? 'text-emerald-100' : 'text-purple-100'}`}>
+                    {cls.subject}
+                </h3>
+                
+                {cls.customMessage ? (
+                    <p className="text-sm text-white/60 mb-4 line-clamp-3 flex-1">{cls.customMessage}</p>
+                ) : (
+                    <p className="text-sm text-white/30 italic mb-4 flex-1">No additional notes provided.</p>
+                )}
+
+                {cls.link && (
+                    <a 
+                        href={cls.link} 
+                        target="_blank" 
+                        rel="noreferrer"
+                        className={`w-full py-3 rounded-lg font-bold text-xs uppercase tracking-widest text-center transition-colors
+                            ${isWizard 
+                                ? 'bg-emerald-900/50 text-emerald-400 hover:bg-emerald-500 hover:text-black border border-emerald-500/30' 
+                                : 'bg-purple-900/50 text-purple-400 hover:bg-purple-500 hover:text-white border border-purple-500/30'}
+                        `}
+                    >
+                        Join Class
+                    </a>
+                )}
+            </div>
+        </div>
+    );
+
+    return (
+        <div className="mb-12 animate-[fade-in_0.5s] space-y-8">
+            {/* Header */}
+            <div className="text-center space-y-2">
+                <h2 className={`text-3xl md:text-4xl font-bold uppercase tracking-widest ${isWizard ? 'font-wizardTitle text-emerald-200' : 'font-muggle text-purple-200'}`}>
+                    Today's Schedule
+                </h2>
+                <div className="flex justify-center items-center gap-2 opacity-60 text-sm">
+                    <Calendar size={14} /> <span>{new Date().toLocaleDateString(undefined, {weekday:'long', year:'numeric', month:'long', day:'numeric'})}</span>
+                </div>
+            </div>
+
+            {/* SECTIONS CONTAINER */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+                
+                {/* AICS SECTION */}
+                <div className={`rounded-3xl p-6 border ${isWizard ? 'bg-emerald-950/10 border-emerald-500/20' : 'bg-blue-950/10 border-blue-500/20'}`}>
+                    <div className="flex items-center justify-between mb-6">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center border border-blue-500/30 font-bold">A</div>
+                            <div>
+                                <h3 className="text-xl font-bold text-blue-100">AICS Batch</h3>
+                                <p className="text-xs opacity-50 text-blue-200">Artificial Intelligence & CS</p>
                             </div>
-                        ))}
+                        </div>
+                        <span className="text-xs font-mono opacity-50">{aicsClasses.length} Sessions</span>
+                    </div>
+
+                    <div className="space-y-4">
+                        {aicsClasses.length > 0 ? aicsClasses.map(renderClassCard) : (
+                            <div className="text-center py-10 opacity-30 border-2 border-dashed border-white/10 rounded-xl">
+                                <div className="text-4xl mb-2">😴</div>
+                                <div className="text-sm">No AICS classes scheduled today.</div>
+                            </div>
+                        )}
                     </div>
                 </div>
-            )}
 
+                {/* CSDA SECTION */}
+                <div className={`rounded-3xl p-6 border ${isWizard ? 'bg-emerald-950/10 border-emerald-500/20' : 'bg-fuchsia-950/10 border-fuchsia-500/20'}`}>
+                    <div className="flex items-center justify-between mb-6">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-fuchsia-500/20 text-fuchsia-400 flex items-center justify-center border border-fuchsia-500/30 font-bold">C</div>
+                            <div>
+                                <h3 className="text-xl font-bold text-fuchsia-100">CSDA Batch</h3>
+                                <p className="text-xs opacity-50 text-fuchsia-200">Cyber Security & Data Analytics</p>
+                            </div>
+                        </div>
+                        <span className="text-xs font-mono opacity-50">{csdaClasses.length} Sessions</span>
+                    </div>
+
+                    <div className="space-y-4">
+                        {csdaClasses.length > 0 ? csdaClasses.map(renderClassCard) : (
+                             <div className="text-center py-10 opacity-30 border-2 border-dashed border-white/10 rounded-xl">
+                                <div className="text-4xl mb-2">💤</div>
+                                <div className="text-sm">No CSDA classes scheduled today.</div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    );
+  };
             {/* ACTIVE LECTURES (TODAY) - STRANGER THINGS CARDS */}
             {!showFullTimetable && todaysLectures.length > 0 && (
                 <div className={`p-6 grid grid-cols-1 md:grid-cols-2 gap-8 border-x border-b rounded-b-xl ${isWizard ? 'bg-[#0a0f0a] border-emerald-900/30' : 'bg-[#050005] border-red-900/30'}`}>

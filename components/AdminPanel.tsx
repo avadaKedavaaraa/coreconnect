@@ -1115,203 +1115,147 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                 </div>
                             )}
 
-                            {/* SCHEDULER TAB - COMPLETE & FIXED */}
-{activeTab === 'scheduler' && (
-    <div className="space-y-6 h-full flex flex-col">
-        
-        {/* Header & Controls */}
-        <div className="flex flex-col md:flex-row justify-between items-center bg-white/5 p-4 rounded-xl border border-white/10 gap-4">
-            <div className="flex items-center gap-3">
-                <CalendarDays className={isWizard ? 'text-emerald-400' : 'text-fuchsia-400'} size={28} />
-                <div>
-                    <h3 className="font-bold text-lg leading-tight">Academic Timetable</h3>
-                    <p className="text-xs opacity-50">Manage broadcast signals for AICS & CSDA</p>
-                </div>
-            </div>
-
-            {/* Batch Toggle */}
-            <div className="flex bg-black/40 rounded-lg p-1 border border-white/10">
-                <button 
-                    onClick={() => setSelectedBatch('AICS')}
-                    className={`px-6 py-2 rounded-md text-sm font-bold transition-all ${selectedBatch === 'AICS' ? (isWizard ? 'bg-emerald-600 text-black' : 'bg-fuchsia-600 text-black') : 'text-white/50 hover:text-white'}`}
-                >
-                    AICS
-                </button>
-                <button 
-                    onClick={() => setSelectedBatch('CSDA')}
-                    className={`px-6 py-2 rounded-md text-sm font-bold transition-all ${selectedBatch === 'CSDA' ? (isWizard ? 'bg-emerald-600 text-black' : 'bg-fuchsia-600 text-black') : 'text-white/50 hover:text-white'}`}
-                >
-                    CSDA
-                </button>
-            </div>
-        </div>
-
-        {/* Weekly Grid */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => {
-                    const daysClasses = schedules
-                        .filter(s => s.dayOfWeek === day && (s.batch === selectedBatch || !s.batch)) // Fallback for old data
-                        .sort((a,b) => a.startTime.localeCompare(b.startTime));
-
-                    return (
-                        <div key={day} className={`rounded-xl border flex flex-col overflow-hidden transition-all hover:border-opacity-50 ${isWizard ? 'bg-[#0f1510] border-emerald-900' : 'bg-[#150f1a] border-fuchsia-900'}`}>
-                            {/* Day Header */}
-                            <div className={`p-3 text-center font-bold text-sm tracking-widest uppercase border-b ${isWizard ? 'bg-emerald-900/20 border-emerald-900/50 text-emerald-100' : 'bg-fuchsia-900/20 border-fuchsia-900/50 text-fuchsia-100'}`}>
-                                {day}
-                            </div>
-                            
-                            {/* Class List */}
-                            <div className="p-3 space-y-3 flex-1 min-h-[100px]">
-                                {daysClasses.length > 0 ? (
-                                    daysClasses.map(rule => (
-                                        <div key={rule.id} className="group relative p-3 rounded-lg bg-white/5 border border-white/5 hover:border-white/20 transition-all hover:bg-white/10">
-                                            <div className="flex justify-between items-start">
-                                                <div className="w-full">
-                                                    <div className={`text-lg font-bold ${isWizard ? 'text-emerald-300' : 'text-fuchsia-300'}`}>
-                                                        {rule.subject}
-                                                    </div>
-                                                    <div className="flex items-center gap-2 text-xs opacity-70 mt-1">
-                                                        <span className="font-mono bg-black/30 px-1.5 py-0.5 rounded">{rule.startTime}</span>
-                                                        {rule.recurrence === 'weekly' && <span className="opacity-50">Weekly</span>}
-                                                    </div>
-                                                    {rule.customMessage && (
-                                                        <div className="mt-2 text-[10px] font-mono bg-yellow-500/10 text-yellow-500 p-1 rounded border border-yellow-500/20">
-                                                            "{rule.customMessage}"
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                
-                                                <button 
-                                                    onClick={() => handleDeleteRule(rule.id)}
-                                                    className="opacity-0 group-hover:opacity-100 p-1.5 text-red-400 hover:bg-red-900/50 rounded transition-all absolute top-2 right-2"
-                                                    title="Remove Class"
+                            {/* SCHEDULER TAB */}
+                            {activeTab === 'scheduler' && (
+                                <div className="space-y-8">
+                                    {/* New Rule Form */}
+                                    <div className="p-6 rounded-xl border bg-white/5 border-white/10 shadow-lg">
+                                        <h3 className="font-bold mb-6 flex items-center gap-2 text-lg border-b border-white/10 pb-4">
+                                            <CalendarDays size={20} className="text-blue-400" /> Schedule New Class
+                                        </h3>
+                                        
+                                        <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+                                            {/* Row 1 */}
+                                            <div className="md:col-span-2">
+                                                <label className="text-xs font-bold opacity-50 block mb-1 uppercase">Batch</label>
+                                                <select 
+                                                    value={newRule.batch || 'AICS'} 
+                                                    onChange={e => setNewRule({ ...newRule, batch: e.target.value as 'AICS' | 'CSDA' })} 
+                                                    className="w-full p-3 bg-black/40 border border-white/10 rounded-lg outline-none text-sm text-white focus:border-blue-500/50"
                                                 >
-                                                    <Trash2 size={14} />
+                                                    <option value="AICS">AICS</option>
+                                                    <option value="CSDA">CSDA</option>
+                                                </select>
+                                            </div>
+                                            
+                                            <div className="md:col-span-4">
+                                                <label className="text-xs font-bold opacity-50 block mb-1 uppercase">Subject Name</label>
+                                                <input 
+                                                    value={newRule.subject} 
+                                                    onChange={e => setNewRule({ ...newRule, subject: e.target.value })} 
+                                                    className="w-full p-3 bg-black/40 border border-white/10 rounded-lg outline-none text-sm text-white focus:border-blue-500/50" 
+                                                    placeholder="e.g. Data Structures" 
+                                                />
+                                            </div>
+
+                                            <div className="md:col-span-3">
+                                                <label className="text-xs font-bold opacity-50 block mb-1 uppercase">Day</label>
+                                                <select 
+                                                    value={newRule.dayOfWeek} 
+                                                    onChange={e => setNewRule({ ...newRule, dayOfWeek: e.target.value })} 
+                                                    className="w-full p-3 bg-black/40 border border-white/10 rounded-lg outline-none text-sm text-white focus:border-blue-500/50"
+                                                >
+                                                    {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(d => <option key={d} value={d} className="bg-black">{d}</option>)}
+                                                </select>
+                                            </div>
+
+                                            <div className="md:col-span-3">
+                                                <label className="text-xs font-bold opacity-50 block mb-1 uppercase">Time</label>
+                                                <input 
+                                                    type="time" 
+                                                    value={newRule.startTime} 
+                                                    onChange={e => setNewRule({ ...newRule, startTime: e.target.value })} 
+                                                    className="w-full p-3 bg-black/40 border border-white/10 rounded-lg outline-none text-sm text-white focus:border-blue-500/50" 
+                                                />
+                                            </div>
+
+                                            {/* Row 2 - Visuals */}
+                                            <div className="md:col-span-6">
+                                                <label className="text-xs font-bold opacity-50 block mb-1 uppercase">Banner Image URL</label>
+                                                <div className="flex gap-2">
+                                                    <input 
+                                                        value={newRule.image || ''} 
+                                                        onChange={e => setNewRule({ ...newRule, image: e.target.value })} 
+                                                        className="w-full p-3 bg-black/40 border border-white/10 rounded-lg outline-none text-sm text-white focus:border-blue-500/50" 
+                                                        placeholder="https://..." 
+                                                    />
+                                                    {/* Optional: Add file upload button logic here if desired, similar to Creator tab */}
+                                                </div>
+                                            </div>
+
+                                            <div className="md:col-span-6">
+                                                <label className="text-xs font-bold opacity-50 block mb-1 uppercase">Class Link</label>
+                                                <input 
+                                                    value={newRule.link} 
+                                                    onChange={e => setNewRule({ ...newRule, link: e.target.value })} 
+                                                    className="w-full p-3 bg-black/40 border border-white/10 rounded-lg outline-none text-sm text-white focus:border-blue-500/50" 
+                                                    placeholder="Zoom / Meet Link" 
+                                                />
+                                            </div>
+
+                                            {/* Row 3 - Description */}
+                                            <div className="md:col-span-12">
+                                                <label className="text-xs font-bold opacity-50 block mb-1 uppercase">Description / Message</label>
+                                                <input 
+                                                    value={newRule.customMessage || ''} 
+                                                    onChange={e => setNewRule({ ...newRule, customMessage: e.target.value })} 
+                                                    className="w-full p-3 bg-black/40 border border-white/10 rounded-lg outline-none text-sm text-white focus:border-blue-500/50" 
+                                                    placeholder="e.g. 'Please install VS Code before joining'" 
+                                                />
+                                            </div>
+
+                                            <div className="md:col-span-12 flex justify-end pt-2">
+                                                <button 
+                                                    onClick={handleAddRule} 
+                                                    className="px-8 py-3 bg-green-600 rounded-lg text-white font-bold text-sm hover:bg-green-500 transition-all shadow-lg hover:shadow-green-900/20"
+                                                >
+                                                    ADD CLASS
                                                 </button>
                                             </div>
                                         </div>
-                                    ))
-                                ) : (
-                                    <div className="h-full flex flex-col items-center justify-center text-white/10">
-                                        <div className="text-2xl font-bold opacity-20">---</div>
-                                        <div className="text-[10px] uppercase">No Signals</div>
                                     </div>
-                                )}
-                            </div>
 
-                            {/* Add Button for specific day */}
-                            <button 
-                                onClick={() => setNewRule({...newRule, dayOfWeek: day, batch: selectedBatch})}
-                                className={`w-full py-2 text-xs font-bold uppercase transition-colors flex items-center justify-center gap-2
-                                    ${isWizard ? 'bg-emerald-900/10 hover:bg-emerald-900/30 text-emerald-500' : 'bg-fuchsia-900/10 hover:bg-fuchsia-900/30 text-fuchsia-500'}`}
-                            >
-                                <Plus size={12} /> Add Class
-                            </button>
-                        </div>
-                    );
-                })}
-            </div>
-        </div>
+                                    {/* Active Schedules List */}
+                                    <div className="space-y-4">
+                                        <h4 className="font-bold text-lg opacity-80">Active Schedule</h4>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            {schedules.map(rule => (
+                                                <div key={rule.id} className="relative p-4 rounded-xl bg-white/5 border border-white/10 hover:border-white/20 transition-all group overflow-hidden">
+                                                    {rule.image && (
+                                                        <div className="absolute inset-0 opacity-10 bg-cover bg-center" style={{backgroundImage: `url(${rule.image})`}}></div>
+                                                    )}
+                                                    <div className="relative z-10 flex justify-between items-start">
+                                                        <div>
+                                                            <div className="flex items-center gap-2 mb-1">
+                                                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${rule.batch === 'CSDA' ? 'bg-purple-500/20 text-purple-300' : 'bg-blue-500/20 text-blue-300'}`}>
+                                                                    {rule.batch || 'AICS'}
+                                                                </span>
+                                                                <span className="text-xs opacity-50">{rule.dayOfWeek} • {rule.startTime}</span>
+                                                            </div>
+                                                            <div className="font-bold text-lg">{rule.subject}</div>
+                                                            {rule.customMessage && <div className="text-xs opacity-60 mt-1 italic">"{rule.customMessage}"</div>}
+                                                            {rule.link && <div className="text-[10px] text-blue-400 mt-2 truncate max-w-[200px]">{rule.link}</div>}
+                                                        </div>
+                                                        <button onClick={() => handleDeleteRule(rule.id)} className="p-2 bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white rounded-lg transition-colors">
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        
+                                        {schedules.length === 0 && <div className="text-center opacity-50 py-10 border border-dashed border-white/10 rounded-xl">No classes scheduled yet.</div>}
 
-        {/* Add/Edit Section - Stranger Things Edition */}
-        <div className={`p-6 rounded-xl border relative overflow-hidden ${isWizard ? 'bg-emerald-950/30 border-emerald-500/30' : 'bg-fuchsia-950/30 border-fuchsia-500/30'}`}>
-            <h4 className="text-sm font-bold uppercase mb-4 flex items-center gap-2 opacity-90 relative z-10">
-                <Plus size={16} /> Configure Broadcast Signal
-            </h4>
-            
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start relative z-10">
-                {/* Row 1: Basic Info */}
-                <div className="md:col-span-2">
-                    <label className="text-[10px] uppercase opacity-50 block mb-1">Target Batch</label>
-                    <select 
-                        value={newRule.batch} 
-                        onChange={e => setNewRule({ ...newRule, batch: e.target.value as 'AICS' | 'CSDA' })} 
-                        className="w-full p-2.5 bg-black/50 border border-white/10 rounded text-sm text-white outline-none focus:border-white/30"
-                    >
-                        <option value="AICS">AICS</option>
-                        <option value="CSDA">CSDA</option>
-                    </select>
-                </div>
-                
-                <div className="md:col-span-4">
-                    <label className="text-[10px] uppercase opacity-50 block mb-1">Subject Frequency</label>
-                    <input 
-                        value={newRule.subject} 
-                        onChange={e => setNewRule({ ...newRule, subject: e.target.value })} 
-                        className="w-full p-2.5 bg-black/50 border border-white/10 rounded text-sm text-white outline-none focus:border-white/30" 
-                        placeholder="e.g. Advanced Data Structures" 
-                    />
-                </div>
-
-                <div className="md:col-span-3">
-                    <label className="text-[10px] uppercase opacity-50 block mb-1">Day</label>
-                    <select 
-                        value={newRule.dayOfWeek} 
-                        onChange={e => setNewRule({ ...newRule, dayOfWeek: e.target.value })} 
-                        className="w-full p-2.5 bg-black/50 border border-white/10 rounded text-sm text-white outline-none focus:border-white/30"
-                    >
-                        {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(d => <option key={d} value={d}>{d}</option>)}
-                    </select>
-                </div>
-
-                <div className="md:col-span-3">
-                    <label className="text-[10px] uppercase opacity-50 block mb-1">Time (24h)</label>
-                    <input 
-                        type="time" 
-                        value={newRule.startTime} 
-                        onChange={e => setNewRule({ ...newRule, startTime: e.target.value })} 
-                        className="w-full p-2.5 bg-black/50 border border-white/10 rounded text-sm text-white outline-none focus:border-white/30" 
-                    />
-                </div>
-
-                {/* Row 2: Visuals & Links */}
-                <div className="md:col-span-6">
-                    <label className="text-[10px] uppercase opacity-50 block mb-1">Visual Cover (Image URL)</label>
-                    <input 
-                        value={newRule.image || ''} 
-                        onChange={e => setNewRule({ ...newRule, image: e.target.value })} 
-                        className="w-full p-2.5 bg-black/50 border border-white/10 rounded text-sm text-white outline-none focus:border-white/30" 
-                        placeholder="https://... (Retro/Dark vibe recommended)" 
-                    />
-                </div>
-
-                <div className="md:col-span-6">
-                    <label className="text-[10px] uppercase opacity-50 block mb-1">Portal Link (Zoom/Meet)</label>
-                    <input 
-                        value={newRule.link} 
-                        onChange={e => setNewRule({ ...newRule, link: e.target.value })} 
-                        className="w-full p-2.5 bg-black/50 border border-white/10 rounded text-sm text-white outline-none focus:border-white/30" 
-                        placeholder="https://zoom.us/..." 
-                    />
-                </div>
-
-                {/* Row 3: Custom Message */}
-                <div className="md:col-span-12">
-                    <label className="text-[10px] uppercase opacity-50 block mb-1">Custom Message / Warning</label>
-                    <input 
-                        value={newRule.customMessage || ''} 
-                        onChange={e => setNewRule({ ...newRule, customMessage: e.target.value })} 
-                        className="w-full p-2.5 bg-black/50 border border-white/10 rounded text-sm text-white outline-none focus:border-white/30 font-mono text-xs" 
-                        placeholder="e.g. 'DON'T BE LATE. THE GATE CLOSES.'" 
-                    />
-                </div>
-            </div>
-
-            <div className="mt-6 flex justify-end gap-3 relative z-10 border-t border-white/5 pt-4">
-                 <button 
-                    onClick={handleAddRule} 
-                    className={`px-8 py-2.5 rounded font-bold text-xs uppercase tracking-widest transition-all hover:scale-105 active:scale-95 shadow-lg text-black ${isWizard ? 'bg-emerald-500 hover:bg-emerald-400' : 'bg-fuchsia-500 hover:bg-fuchsia-400'}`}
-                >
-                    Initialize Rule
-                </button>
-                 <button onClick={handleSaveConfig} disabled={isSavingConfig} className="px-6 py-2.5 bg-blue-900/50 border border-blue-500/50 text-blue-200 rounded font-bold text-xs hover:bg-blue-800 flex items-center gap-2">
-                    {isSavingConfig ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} SAVE DATABASE
-                </button>
-            </div>
-        </div>
-    </div>
-)}
+                                        {schedules.length > 0 && (
+                                            <div className="pt-4 flex justify-end border-t border-white/10">
+                                                <button onClick={handleSaveConfig} disabled={isSavingConfig} className="px-8 py-3 bg-blue-600 rounded-lg font-bold text-white hover:bg-blue-500 flex items-center gap-2 shadow-lg hover:shadow-blue-900/20">
+                                                    {isSavingConfig ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />} SAVE ALL CHANGES
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
 
                                     {/* VISITOR SURVEILLANCE TAB START */}
                                     {activeTab === 'visitors' && (

@@ -552,12 +552,22 @@ function App() {
       setAdminPanelOpen(false);
   };
 
+  // --- UPDATED PDF DETECTION LOGIC ---
   const isPDF = (item: CarouselItem | null) => {
-      if (!item) return false;
-      const url = item.fileUrl?.toLowerCase() || '';
+      if (!item || !item.fileUrl) return false;
+      const url = item.fileUrl.toLowerCase();
+      
+      // Check content, NOT just the item type.
+      // 1. Google Drive Links
+      // 2. Standard .pdf files
       const isDrive = url.includes('drive.google.com');
       const isPdfExtension = url.endsWith('.pdf');
-      return (item.type === 'file' || item.type === 'link') && (isPdfExtension || isDrive);
+      
+      // If it's a Drive link or PDF, use internal viewer.
+      if (isDrive || isPdfExtension) return true;
+      
+      // Otherwise (Zoom, Meet, YouTube, etc.) return false so it uses standard viewer/link behavior
+      return false;
   };
 
   const handleViewItem = (item: CarouselItem) => {
