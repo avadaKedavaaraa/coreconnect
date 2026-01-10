@@ -576,30 +576,23 @@ router.post('/admin/drive-scan', requireAuth, async (req, res) => {
 
 // ... existing routes ...
 
-// NEW: DELETE VISITOR ROUTE
+// --- DELETE VISITOR ROUTE ---
 router.delete('/admin/visitors/:id', requireAuth, async (req, res) => {
-    // 1. Check Permissions
     if(!hasPermission(req.user, 'canViewLogs')) return res.status(403).json({error: "Forbidden"});
-    
     try {
         const visitorId = req.params.id;
-
-        // 2. Delete main log
-        const { error } = await supabase.from('visitor_logs').delete().eq('visitor_id', visitorId);
-        if (error) throw error;
-
-        // 3. Clean up related data (Optional but recommended)
+        // Delete from all tables
+        await supabase.from('visitor_logs').delete().eq('visitor_id', visitorId);
         await supabase.from('visitor_activity').delete().eq('visitor_id', visitorId);
         await supabase.from('visitor_chats').delete().eq('visitor_id', visitorId);
         
-        // 4. Log the action
-        await logAction(req.user.username, 'DEL_VISITOR', `Deleted visitor data: ${visitorId}`, req);
-
+        await logAction(req.user.username, 'DEL_VISITOR', `Deleted visitor: ${visitorId}`, req);
         res.json({ success: true });
     } catch(e) { 
-        res.status(500).json({ error: "Delete failed: " + e.message }); 
+        res.status(500).json({ error: "Delete failed" }); 
     }
 });
+// -----------------------------
 
 // ... app.use('/api', router);
 app.use('/api', router);

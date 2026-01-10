@@ -312,7 +312,6 @@ function App() {
 
              // Start Heartbeat
              trackActivity(currentProfile.id, 'HEARTBEAT', '', '', 0, currentProfile.displayName);
-
              await fetchData();
              try {
                  const meRes = await fetch(`${API_URL}/api/me`, { credentials: 'include' });
@@ -359,10 +358,10 @@ function App() {
 
   useEffect(() => {
       if (profile.id && activeSectorId && profile.id !== 'guest') {
-          // Pass profile.displayName to ensure name sync on every page move
+          // Push name to server every time they move
           trackActivity(profile.id, 'ENTER_SECTOR', activeSectorId, activeSectorId, 0, profile.displayName);
       }
-  }, [activeSectorId, profile.id, profile.displayName]); // Added profile.displayName here
+  }, [activeSectorId, profile.id, profile.displayName]);
 
   // --- FONT APPLICATION LOGIC ---
   const fontToUse = profile.preferredFont || globalConfig.defaultFont || 'cinzel';
@@ -408,14 +407,21 @@ function App() {
           visitorId = crypto.randomUUID();
       }
       
-      const finalName = name || profile.displayName;
+      // Name from Input OR existing Profile
+      const finalName = name || profile.displayName; 
+      
       const newProfile = { ...profile, displayName: finalName, id: visitorId };
       setProfile(newProfile);
+      
+      // 1. Save to Phone Storage First
       localStorage.setItem('core_connect_profile', JSON.stringify(newProfile));
 
-      // SEND NAME IMMEDIATELY TO SERVER
+      // 2. FORCE UPDATE SERVER immediately
       trackActivity(newProfile.id, 'LOGIN', '', '', 0, finalName);
   };
+    //   // SEND NAME IMMEDIATELY TO SERVER
+    //   trackActivity(newProfile.id, 'LOGIN', '', '', 0, finalName);
+//   };
 
   const toggleLineage = () => {
       setLineage(l => l === Lineage.WIZARD ? Lineage.MUGGLE : Lineage.WIZARD);

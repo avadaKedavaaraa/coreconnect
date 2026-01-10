@@ -1,16 +1,15 @@
 import { API_URL } from '../lib/config';
 
-// UPDATED: Added 'currentName' parameter to the end
 export const trackActivity = async (
     visitorId: string, 
     type: string, 
     resourceId: string, 
     title: string, 
     duration: number = 0,
-    currentName?: string 
+    currentName?: string  // <--- This is the new part that fixes the red line!
 ) => {
-    // 1. Prioritize the explicitly passed name (currentName)
-    // 2. Fallback to 'Guest' only if no name is known
+    // 1. Prioritize the name passed explicitly (currentName) from the phone
+    // 2. If not passed, use 'Guest'
     let displayName = currentName || 'Guest';
     let visitCount = 1;
     let totalTime = 0;
@@ -19,9 +18,7 @@ export const trackActivity = async (
         const stored = localStorage.getItem('core_connect_profile');
         if (stored) {
             const p = JSON.parse(stored);
-            
-            // If currentName wasn't passed, try to get it from storage
-            // But if currentName IS passed, we ignore storage (because storage might be stale)
+            // Double check: Only use stored name if we didn't explicitly pass one
             if (!currentName && p.displayName) displayName = p.displayName;
             
             if (p.visitCount) visitCount = p.visitCount;
@@ -30,14 +27,13 @@ export const trackActivity = async (
     } catch(e) {}
 
     try {
-        // The backend uses 'upsert'. If the ID exists, it simply updates the name 
-        // to whatever we send here.
+        // This sends the data (including the correct name) to the server
         await fetch(`${API_URL}/api/visitor/heartbeat`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ 
                 visitorId, 
-                displayName, // This forces the database to update the name
+                displayName, 
                 type, 
                 resourceId, 
                 title, 
