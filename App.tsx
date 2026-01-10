@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, Suspense, useMemo, useCallback } from 'react';
 import { 
   Lineage, Sector, GlobalConfig, CarouselItem, UserProfile, AdminPermissions, 
@@ -312,6 +311,7 @@ function App() {
 
              // Start Heartbeat
              trackActivity(currentProfile.id, 'HEARTBEAT', '', '', 0, currentProfile.displayName);
+
              await fetchData();
              try {
                  const meRes = await fetch(`${API_URL}/api/me`, { credentials: 'include' });
@@ -419,9 +419,6 @@ function App() {
       // 2. FORCE UPDATE SERVER immediately
       trackActivity(newProfile.id, 'LOGIN', '', '', 0, finalName);
   };
-    //   // SEND NAME IMMEDIATELY TO SERVER
-    //   trackActivity(newProfile.id, 'LOGIN', '', '', 0, finalName);
-//   };
 
   const toggleLineage = () => {
       setLineage(l => l === Lineage.WIZARD ? Lineage.MUGGLE : Lineage.WIZARD);
