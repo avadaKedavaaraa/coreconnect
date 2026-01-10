@@ -355,7 +355,7 @@ export const SectorView: React.FC<SectorViewProps> = ({
                             <div className="h-8 w-1 bg-blue-500 rounded-full"></div>
                             <div>
                                 <h3 className="font-bold text-blue-100 leading-none">AICS</h3>
-                                <div className="text-[10px] text-blue-300/60 uppercase tracking-wider">Artificial Intelligence</div>
+                                <div className="text-[10px] text-blue-300/60 uppercase tracking-wider">Artificial Intelligence & Cybersecurity</div>
                             </div>
                         </div>
                         <span className="text-[10px] font-mono bg-blue-900/40 text-blue-300 px-2 py-1 rounded border border-blue-500/20">
@@ -378,7 +378,7 @@ export const SectorView: React.FC<SectorViewProps> = ({
                             <div className="h-8 w-1 bg-fuchsia-500 rounded-full"></div>
                             <div>
                                 <h3 className="font-bold text-fuchsia-100 leading-none">CSDA</h3>
-                                <div className="text-[10px] text-fuchsia-300/60 uppercase tracking-wider">Cyber Security</div>
+                                <div className="text-[10px] text-fuchsia-300/60 uppercase tracking-wider">Computer Science & Data Analytics</div>
                             </div>
                         </div>
                         <span className="text-[10px] font-mono bg-fuchsia-900/40 text-fuchsia-300 px-2 py-1 rounded border border-fuchsia-500/20">

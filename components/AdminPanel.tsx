@@ -5,7 +5,7 @@ import {
   X, Unlock, Lock, Loader2, Database, PenTool, CalendarDays, HardDrive, 
   BrainCircuit, ScanFace, Users, Activity, Settings, LayoutTemplate, Search, 
   Filter, Replace, Edit3, Trash2, Plus, Upload, ImageIcon, Save, Shield, 
-  ShieldAlert, FileUp, AlertTriangle, RefreshCw, Key, Type, Link as LinkIcon, Share2, FileText, Pin, ArrowDownUp, SortAsc, SortDesc, Sparkles, FolderInput, AlertCircle, Wand2, Check, GripVertical, File, Eye, MessageSquare, Smartphone, Monitor, BellRing
+  ShieldAlert, FileUp, AlertTriangle, RefreshCw, Key, Type, Link as LinkIcon, Share2, FileText, Pin, ArrowDownUp, SortAsc, SortDesc, Sparkles, FolderInput, AlertCircle, Wand2, Check, GripVertical, File, Eye, MessageSquare, Smartphone, Monitor, BellRing, Layers, ImagePlus
 } from 'lucide-react';
 import DOMPurify from 'dompurify';
 
@@ -72,14 +72,16 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   const [itemForm, setItemForm] = useState<CarouselItem>({
       id: '', title: '', content: '', date: new Date().toISOString().split('T')[0].replace(/-/g, '.'),
       type: 'announcement', sector: defaultSector, subject: 'General', isUnread: true, isPinned: false, likes: 0,
-      fileUrl: '', // Explicitly init
+      fileUrl: '',
       image: '',
+      images: [], // Init gallery array
       style: { titleColor: '#ffffff', titleColorEnd: '', contentColor: '#e4e4e7', fontFamily: 'sans', isGradient: false }
   });
   const [isEditingItem, setIsEditingItem] = useState(false);
   const [isCustomSubject, setIsCustomSubject] = useState(false); 
   const contentRef = useRef<HTMLTextAreaElement>(null);
   const [previewMode, setPreviewMode] = useState<'desktop' | 'mobile'>('desktop');
+  const [galleryUploading, setGalleryUploading] = useState(false);
   
   // Drive Import State
   const [driveLink, setDriveLink] = useState('');
@@ -167,6 +169,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
           type: 'announcement', sector: defaultSector, subject: 'General', isUnread: true, isPinned: false, likes: 0,
           fileUrl: '',
           image: '',
+          images: [],
           style: { titleColor: '#ffffff', titleColorEnd: '', contentColor: '#e4e4e7', fontFamily: 'sans', isGradient: false }
       });
       setIsEditingItem(false);
@@ -337,6 +340,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
       setItemForm({ ...itemForm, content: before + insert + after });
   };
 
+  // Single file upload
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, field: 'image' | 'fileUrl' | 'wizardLogoUrl' | 'muggleLogoUrl' | 'wizardImage' | 'muggleImage') => {
       const file = e.target.files?.[0];
       if (!file) return;
@@ -366,6 +370,55 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
       }
   };
 
+  // Multi-file upload for Gallery
+  const handleGalleryUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = e.target.files;
+      if (!files || files.length === 0) return;
+
+      setGalleryUploading(true);
+      const newUrls: string[] = [];
+
+      try {
+          // Upload sequentially to ensure order (or parallel for speed, sequential is safer for simple logic)
+          for (let i = 0; i < files.length; i++) {
+              const formData = new FormData();
+              formData.append('file', files[i]);
+              
+              const res = await fetch(`${API_URL}/api/admin/upload`, {
+                  method: 'POST',
+                  headers: { 'x-csrf-token': csrfToken },
+                  body: formData,
+                  credentials: 'include'
+              });
+              
+              const data = await res.json();
+              if (res.ok && data.url) {
+                  newUrls.push(data.url);
+              }
+          }
+          
+          if (newUrls.length > 0) {
+              setItemForm(prev => ({
+                  ...prev,
+                  images: [...(prev.images || []), ...newUrls]
+              }));
+          }
+      } catch (e) {
+          alert("Gallery upload partially failed.");
+      } finally {
+          setGalleryUploading(false);
+          // Reset input
+          e.target.value = ''; 
+      }
+  };
+
+  const removeGalleryImage = (indexToRemove: number) => {
+      setItemForm(prev => ({
+          ...prev,
+          images: (prev.images || []).filter((_, idx) => idx !== indexToRemove)
+      }));
+  };
+
   // --- DRIVE IMPORT LOGIC ---
   const handleDriveImport = async () => {
       if (!driveLink) return;
@@ -373,7 +426,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
       setDriveImportStatus('Initializing scan...');
       
       try {
-          // Send request to server to fetch files
           const res = await fetch(`${API_URL}/api/admin/drive-scan`, {
               method: 'POST',
               headers: { 
@@ -396,7 +448,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
           if (data.items && Array.isArray(data.items)) {
               setDriveImportStatus(`Found ${data.items.length} files. Creating items...`);
-              // Add fetched items to state
               data.items.forEach((newItem: CarouselItem) => onAddItem(newItem));
               setDriveImportStatus(`Success! Imported ${data.items.length} files.`);
               setTimeout(() => {
@@ -626,11 +677,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
         fontFamily: selectedFont?.family
     };
 
-  const previewContentHtml = DOMPurify.sanitize(itemForm.content, {
-      ADD_TAGS: ['style', 'img', 'b', 'i', 'em', 'strong', 'a', 'p', 'br', 'ul', 'li', 'ol', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'code', 'pre', 'div', 'span', 'table', 'thead', 'tbody', 'tr', 'td', 'th', 'hr'],
-      ADD_ATTR: ['target', 'href', 'src', 'frameborder', 'allow', 'allowfullscreen', 'style', 'class', 'id', 'width', 'height', 'align']
-  });
-
   if (!isOpen) return null;
 
   return (
@@ -657,6 +703,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
         {!isAdmin ? (
           <div className="flex-1 flex items-center justify-center p-6 w-full relative overflow-hidden h-full">
+             {/* ... (Login Form) ... */}
              <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-30">
                 <div className={`w-[600px] h-[600px] border-[2px] rounded-full absolute animate-spin-slow ${isWizard ? 'border-red-600/20' : 'border-blue-600/20'}`}></div>
                 <div className={`w-[500px] h-[500px] border-[4px] border-dashed rounded-full absolute animate-reverse-spin ${isWizard ? 'border-red-500/30' : 'border-blue-500/30'}`}></div>
@@ -821,11 +868,11 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                 </div>
                             )}
 
-                            {/* CREATOR TAB */}
+                            {/* CREATOR TAB - FIXED FOR MOBILE */}
                             {activeTab === 'creator' && (
-                                <div className="flex flex-col xl:flex-row gap-8 h-full">
+                                <div className="flex flex-col xl:flex-row gap-8 xl:h-full">
                                     {/* Editor Column */}
-                                    <div className="flex-1 space-y-6 max-w-2xl overflow-y-auto">
+                                    <div className="flex-1 space-y-6 max-w-2xl xl:overflow-y-auto">
 
                                         {/* GOOGLE DRIVE FOLDER IMPORT SECTION */}
                                         <div className={`p-6 rounded-xl border-2 border-dashed relative overflow-hidden transition-colors ${isWizard ? 'border-emerald-500/30 bg-emerald-950/10' : 'border-fuchsia-500/30 bg-fuchsia-950/10'}`}>
@@ -994,10 +1041,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                             </div>
                                         </div>
 
-                                        {/* ... Rest of Creator Form (Image Upload, Styling) ... */}
+                                        {/* LOCAL MEDIA & GALLERY */}
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                             <div className="space-y-4">
-                                                <h4 className="text-xs font-bold uppercase opacity-50">Local Media</h4>
+                                                <h4 className="text-xs font-bold uppercase opacity-50">Visual Assets</h4>
 
                                                 {/* Cover Image Upload */}
                                                 <div className="flex gap-2">
@@ -1013,7 +1060,35 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                                     </label>
                                                 </div>
 
-                                                {/* File Attachment Upload (Restored) */}
+                                                {/* GALLERY UPLOAD - NEW */}
+                                                <div className="space-y-2">
+                                                    <label className="text-xs opacity-50 block">Gallery Images (Multiple)</label>
+                                                    <div className="flex gap-2">
+                                                        <div className="flex-1 border border-white/10 rounded p-2 bg-white/5 flex items-center gap-2 overflow-x-auto">
+                                                            {itemForm.images && itemForm.images.length > 0 ? (
+                                                                itemForm.images.map((img, idx) => (
+                                                                    <div key={idx} className="relative w-8 h-8 shrink-0 group">
+                                                                        <img src={img} className="w-full h-full object-cover rounded" />
+                                                                        <button 
+                                                                            onClick={() => removeGalleryImage(idx)}
+                                                                            className="absolute -top-1 -right-1 bg-red-600 rounded-full p-0.5 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                                                                        >
+                                                                            <X size={8} />
+                                                                        </button>
+                                                                    </div>
+                                                                ))
+                                                            ) : (
+                                                                <span className="text-[10px] opacity-30 italic">No gallery images</span>
+                                                            )}
+                                                        </div>
+                                                        <label className={`p-2 bg-white/10 rounded cursor-pointer hover:bg-white/20 ${galleryUploading ? 'opacity-50 pointer-events-none' : ''}`} title="Upload Multiple Images">
+                                                            {galleryUploading ? <Loader2 size={14} className="animate-spin" /> : <ImagePlus size={14} />}
+                                                            <input type="file" className="hidden" accept="image/*" multiple onChange={handleGalleryUpload} />
+                                                        </label>
+                                                    </div>
+                                                </div>
+
+                                                {/* File Attachment Upload */}
                                                 <div className="flex gap-2">
                                                     <input
                                                         value={itemForm.fileUrl || ''}
@@ -1077,8 +1152,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                         </button>
                                     </div>
 
-                                    {/* Preview Column */}
-                                    <div className={`hidden xl:flex flex-col border-l border-white/10 pl-8 transition-all ${previewMode === 'mobile' ? 'w-[350px]' : 'flex-1'}`}>
+                                    {/* Preview Column - FIXED FOR MOBILE VISIBILITY */}
+                                    <div className={`flex flex-col border-t xl:border-t-0 xl:border-l border-white/10 pt-8 xl:pt-0 xl:pl-8 transition-all shrink-0 ${previewMode === 'mobile' ? 'w-full xl:w-[350px]' : 'w-full xl:flex-1'}`}>
                                         <div className="flex justify-between items-center mb-4">
                                             <h4 className="text-xs font-bold uppercase opacity-50">Live Preview</h4>
                                             <div className="flex gap-2 bg-white/5 p-1 rounded">
@@ -1087,25 +1162,36 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                             </div>
                                         </div>
 
-                                        <div className={`rounded-xl border overflow-hidden relative shadow-2xl transition-all duration-300
+                                        <div className={`rounded-xl border overflow-hidden relative shadow-2xl transition-all duration-300 mx-auto
                                 ${isWizard ? 'bg-[#0f1510] border-emerald-500/30' : 'bg-[#150f1a] border-fuchsia-500/30'}
-                                ${previewMode === 'mobile' ? 'h-[600px] w-full' : 'w-full h-auto min-h-[400px]'}
+                                ${previewMode === 'mobile' ? 'h-[600px] w-full max-w-[350px]' : 'w-full h-auto min-h-[400px]'}
                             `}>
                                             <div className="p-4 border-b border-white/10 flex justify-between items-center bg-black/20">
                                                 <span className="text-[10px] uppercase font-bold opacity-70 tracking-widest">{itemForm.sector}</span>
                                                 <span className="text-[10px] opacity-50">{itemForm.date}</span>
                                             </div>
                                             {itemForm.image && <img src={itemForm.image} className="w-full h-48 object-cover opacity-80" />}
-                                            <div className="p-6 space-y-4">
+                                            <div className="p-6 space-y-4 overflow-y-auto max-h-full">
                                                 <div className="flex items-start justify-between">
                                                     <h2 className="text-2xl font-bold" style={previewTitleStyle}>{itemForm.title || 'Untitled'}</h2>
                                                     {itemForm.isPinned && <Pin size={16} className="text-yellow-400 fill-yellow-400 shrink-0" />}
                                                 </div>
                                                 <div
-                                                    className="text-sm opacity-80 line-clamp-6 whitespace-pre-wrap font-sans html-content"
+                                                    className="text-sm opacity-80 whitespace-pre-wrap font-sans html-content"
                                                     style={{ color: itemForm.style?.contentColor }}
                                                     dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(itemForm.content, { ADD_TAGS: ['style'] }) }}
                                                 ></div>
+
+                                                {/* GALLERY PREVIEW GRID */}
+                                                {itemForm.images && itemForm.images.length > 0 && (
+                                                    <div className="grid grid-cols-2 gap-2 mt-4 pt-4 border-t border-white/10">
+                                                        {itemForm.images.map((img, i) => (
+                                                            <div key={i} className="aspect-square rounded-lg overflow-hidden border border-white/10">
+                                                                <img src={img} className="w-full h-full object-cover" />
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     </div>

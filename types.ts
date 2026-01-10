@@ -17,10 +17,10 @@ export interface Sector {
 // Inside types.ts
 export interface ItemStyle {
   titleColor?: string;
-  titleColorEnd?: string; // <--- MUST BE PRESENT
+  titleColorEnd?: string;
   contentColor?: string;
   fontFamily?: string;
-  isGradient?: boolean;   // <--- MUST BE PRESENT
+  isGradient?: boolean;
 }
 
 // In types.ts
@@ -50,11 +50,12 @@ export interface CarouselItem {
   style?: ItemStyle;
   subject?: string;
   isUnread?: boolean;
-  isPinned?: boolean;     // <--- MUST BE PRESENT
+  isPinned?: boolean;
   likes?: number;
   isLiked?: boolean;
   author?: string;
-  image?: string;
+  image?: string;        // Main Cover Image
+  images?: string[];     // <--- NEW: Gallery Images
   fileUrl?: string;
   order_index?: number;
 }
