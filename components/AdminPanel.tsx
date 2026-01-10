@@ -1,7 +1,7 @@
-{
-type: uploaded file
-fileName: avadakedavaaraa/coreconnect/coreconnect-aad630eb88cbc6bbf22f365b26e6dfc4e75ca05d/components/AdminPanel.tsx
-fullContent:
+// {
+// type: uploaded file
+// fileName: avadakedavaaraa/coreconnect/coreconnect-aad630eb88cbc6bbf22f365b26e6dfc4e75ca05d/components/AdminPanel.tsx
+// fullContent:
 import React, { useState, useEffect, useRef } from 'react';
 import { Lineage, Sector, CarouselItem, AdminPermissions, GlobalConfig, LectureRule, VisitorLog, AdminUser, AuditLog, FONT_LIBRARY } from '../types';
 import { API_URL } from '../lib/config';
