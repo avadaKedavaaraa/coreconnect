@@ -14,12 +14,13 @@ export interface Sector {
   sortOrder?: 'newest' | 'oldest' | 'alphabetical' | 'manual';
 }
 
+// Inside types.ts
 export interface ItemStyle {
   titleColor?: string;
-  titleColorEnd?: string; // Added for gradients
+  titleColorEnd?: string; // <--- Make sure this is added
   contentColor?: string;
-  fontFamily?: string; // Changed to string to support all IDs
-  isGradient?: boolean;
+  fontFamily?: string;
+  isGradient?: boolean;   // <--- Make sure this is added
 }
 
 export interface LectureRule {
