@@ -254,6 +254,7 @@ export const SectorView: React.FC<SectorViewProps> = ({
 
     // --- RENDER HELPERS ---
     // --- LECTURE SCHEDULE RENDERER ---
+  // --- LECTURE SCHEDULE RENDERER (Redesigned & Fixed) ---
   const renderTimetable = () => {
     // 1. Get today's classes
     const today = new Date().toLocaleDateString('en-US', { weekday: 'long' });
@@ -267,40 +268,38 @@ export const SectorView: React.FC<SectorViewProps> = ({
         s.isActive && s.dayOfWeek === today && s.batch === 'CSDA'
     ).sort((a,b) => a.startTime.localeCompare(b.startTime));
 
-    const renderClassCard = (cls: LectureRule) => (
-        <div key={cls.id} className={`group relative rounded-2xl overflow-hidden border transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl flex flex-col
-            ${isWizard ? 'bg-[#0a0f0a] border-emerald-900/50 hover:border-emerald-500' : 'bg-[#0f0a15] border-purple-900/50 hover:border-purple-500'}
-        `}>
-            {/* Banner Image */}
-            <div className="h-32 w-full bg-black/50 relative overflow-hidden">
+    const renderClassCard = (cls: LectureRule, themeColor: string) => (
+        <div key={cls.id} className={`group relative rounded-xl overflow-hidden border border-white/10 flex flex-col transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl bg-[#121212]`}>
+            {/* Top Banner Area */}
+            <div className="h-28 w-full relative overflow-hidden">
                 {cls.image ? (
-                    <img src={cls.image} alt={cls.subject} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
+                    <img src={cls.image} alt={cls.subject} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
                 ) : (
-                    <div className={`w-full h-full flex items-center justify-center opacity-20 ${isWizard ? 'bg-emerald-900' : 'bg-purple-900'}`}>
-                        <Video size={40} />
+                    <div className={`w-full h-full flex items-center justify-center opacity-20 bg-gradient-to-br ${themeColor === 'blue' ? 'from-blue-900 to-black' : 'from-fuchsia-900 to-black'}`}>
+                        <Video size={32} />
                     </div>
                 )}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/90 to-transparent"></div>
+                {/* Gradient Overlay for Text Readability */}
+                <div className="absolute inset-0 bg-gradient-to-t from-[#121212] via-transparent to-transparent"></div>
                 
-                {/* Time Badge */}
-                <div className="absolute bottom-3 left-3 flex items-center gap-2">
-                    <span className={`px-2 py-1 rounded-md text-xs font-bold font-mono ${isWizard ? 'bg-emerald-500 text-black' : 'bg-purple-500 text-white'}`}>
-                        {cls.startTime}
-                    </span>
-                    <span className="text-[10px] text-white/80 uppercase tracking-widest font-bold">Live Class</span>
+                {/* Time Tag */}
+                <div className={`absolute top-3 right-3 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider bg-black/60 backdrop-blur border border-white/10 text-white shadow-lg`}>
+                    {cls.startTime}
                 </div>
             </div>
 
-            {/* Content */}
-            <div className="p-5 flex-1 flex flex-col">
-                <h3 className={`text-xl font-bold leading-tight mb-2 ${isWizard ? 'text-emerald-100' : 'text-purple-100'}`}>
-                    {cls.subject}
-                </h3>
+            {/* Content Area */}
+            <div className="p-4 flex-1 flex flex-col relative -mt-6">
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 border-[#121212] shadow-lg mb-2 z-10 ${themeColor === 'blue' ? 'bg-blue-600 text-white' : 'bg-fuchsia-600 text-white'}`}>
+                    <Video size={18} />
+                </div>
+                
+                <h3 className="text-lg font-bold text-white leading-tight mb-1">{cls.subject}</h3>
                 
                 {cls.customMessage ? (
-                    <p className="text-sm text-white/60 mb-4 line-clamp-3 flex-1">{cls.customMessage}</p>
+                    <p className="text-xs text-white/60 mb-4 line-clamp-2 min-h-[2.5em]">{cls.customMessage}</p>
                 ) : (
-                    <p className="text-sm text-white/30 italic mb-4 flex-1">No additional notes provided.</p>
+                    <p className="text-xs text-white/20 italic mb-4 min-h-[2.5em]">No class notes.</p>
                 )}
 
                 {cls.link && (
@@ -308,77 +307,90 @@ export const SectorView: React.FC<SectorViewProps> = ({
                         href={cls.link} 
                         target="_blank" 
                         rel="noreferrer"
-                        className={`w-full py-3 rounded-lg font-bold text-xs uppercase tracking-widest text-center transition-colors
-                            ${isWizard 
-                                ? 'bg-emerald-900/50 text-emerald-400 hover:bg-emerald-500 hover:text-black border border-emerald-500/30' 
-                                : 'bg-purple-900/50 text-purple-400 hover:bg-purple-500 hover:text-white border border-purple-500/30'}
+                        className={`mt-auto w-full py-2.5 rounded font-bold text-[10px] uppercase tracking-widest text-center transition-all border
+                            ${themeColor === 'blue' 
+                                ? 'bg-blue-900/20 text-blue-300 border-blue-500/30 hover:bg-blue-600 hover:text-white hover:border-blue-500' 
+                                : 'bg-fuchsia-900/20 text-fuchsia-300 border-fuchsia-500/30 hover:bg-fuchsia-600 hover:text-white hover:border-fuchsia-500'}
                         `}
                     >
-                        Join Class
+                        Join Session
                     </a>
                 )}
             </div>
         </div>
     );
 
+    const renderEmptyState = (text: string) => (
+        <div className="flex flex-col items-center justify-center py-12 px-4 border border-dashed border-white/10 rounded-2xl bg-white/5 text-center">
+            <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mb-3 text-white/30">
+                <Calendar size={20} />
+            </div>
+            <h4 className="text-sm font-bold text-white/50 uppercase tracking-widest mb-1">No Active Classes</h4>
+            <p className="text-xs text-white/30">{text}</p>
+        </div>
+    );
+
     return (
-        <div className="mb-12 animate-[fade-in_0.5s] space-y-8">
-            {/* Header */}
-            <div className="text-center space-y-2">
-                <h2 className={`text-3xl md:text-4xl font-bold uppercase tracking-widest ${isWizard ? 'font-wizardTitle text-emerald-200' : 'font-muggle text-purple-200'}`}>
-                    Today's Schedule
-                </h2>
-                <div className="flex justify-center items-center gap-2 opacity-60 text-sm">
-                    <Calendar size={14} /> <span>{new Date().toLocaleDateString(undefined, {weekday:'long', year:'numeric', month:'long', day:'numeric'})}</span>
+        <div className="mb-12 animate-[fade-in_0.5s] space-y-6 relative z-0">
+            {/* Today's Header */}
+            <div className="flex items-center justify-between px-2 pb-4 border-b border-white/5">
+                <div>
+                    <h2 className={`text-2xl font-bold uppercase tracking-wide ${isWizard ? 'font-wizardTitle text-emerald-100' : 'font-muggle text-white'}`}>
+                        Today's Schedule
+                    </h2>
+                    <p className="text-xs opacity-50 mt-1 flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                        {new Date().toLocaleDateString(undefined, {weekday:'long', month:'long', day:'numeric'})}
+                    </p>
                 </div>
             </div>
 
-            {/* SECTIONS CONTAINER */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+            {/* BATCH SECTIONS */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 
-                {/* AICS SECTION */}
-                <div className={`rounded-3xl p-6 border ${isWizard ? 'bg-emerald-950/10 border-emerald-500/20' : 'bg-blue-950/10 border-blue-500/20'}`}>
-                    <div className="flex items-center justify-between mb-6">
+                {/* AICS COLUMN */}
+                <div className="space-y-4">
+                    <div className="flex items-center justify-between bg-blue-950/20 p-3 rounded-lg border border-blue-500/20">
                         <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center border border-blue-500/30 font-bold">A</div>
+                            <div className="h-8 w-1 bg-blue-500 rounded-full"></div>
                             <div>
-                                <h3 className="text-xl font-bold text-blue-100">AICS Batch</h3>
-                                <p className="text-xs opacity-50 text-blue-200">Artificial Intelligence & CS</p>
+                                <h3 className="font-bold text-blue-100 leading-none">AICS</h3>
+                                <div className="text-[10px] text-blue-300/60 uppercase tracking-wider">Artificial Intelligence</div>
                             </div>
                         </div>
-                        <span className="text-xs font-mono opacity-50">{aicsClasses.length} Sessions</span>
+                        <span className="text-[10px] font-mono bg-blue-900/40 text-blue-300 px-2 py-1 rounded border border-blue-500/20">
+                            {aicsClasses.length} Events
+                        </span>
                     </div>
 
-                    <div className="space-y-4">
-                        {aicsClasses.length > 0 ? aicsClasses.map(renderClassCard) : (
-                            <div className="text-center py-10 opacity-30 border-2 border-dashed border-white/10 rounded-xl">
-                                <div className="text-4xl mb-2">😴</div>
-                                <div className="text-sm">No AICS classes scheduled today.</div>
-                            </div>
-                        )}
+                    <div className="grid gap-4">
+                        {aicsClasses.length > 0 
+                            ? aicsClasses.map(c => renderClassCard(c, 'blue'))
+                            : renderEmptyState("No AICS lectures scheduled for today.")
+                        }
                     </div>
                 </div>
 
-                {/* CSDA SECTION */}
-                <div className={`rounded-3xl p-6 border ${isWizard ? 'bg-emerald-950/10 border-emerald-500/20' : 'bg-fuchsia-950/10 border-fuchsia-500/20'}`}>
-                    <div className="flex items-center justify-between mb-6">
+                {/* CSDA COLUMN */}
+                <div className="space-y-4">
+                    <div className="flex items-center justify-between bg-fuchsia-950/20 p-3 rounded-lg border border-fuchsia-500/20">
                         <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-fuchsia-500/20 text-fuchsia-400 flex items-center justify-center border border-fuchsia-500/30 font-bold">C</div>
+                            <div className="h-8 w-1 bg-fuchsia-500 rounded-full"></div>
                             <div>
-                                <h3 className="text-xl font-bold text-fuchsia-100">CSDA Batch</h3>
-                                <p className="text-xs opacity-50 text-fuchsia-200">Cyber Security & Data Analytics</p>
+                                <h3 className="font-bold text-fuchsia-100 leading-none">CSDA</h3>
+                                <div className="text-[10px] text-fuchsia-300/60 uppercase tracking-wider">Cyber Security</div>
                             </div>
                         </div>
-                        <span className="text-xs font-mono opacity-50">{csdaClasses.length} Sessions</span>
+                        <span className="text-[10px] font-mono bg-fuchsia-900/40 text-fuchsia-300 px-2 py-1 rounded border border-fuchsia-500/20">
+                            {csdaClasses.length} Events
+                        </span>
                     </div>
 
-                    <div className="space-y-4">
-                        {csdaClasses.length > 0 ? csdaClasses.map(renderClassCard) : (
-                             <div className="text-center py-10 opacity-30 border-2 border-dashed border-white/10 rounded-xl">
-                                <div className="text-4xl mb-2">💤</div>
-                                <div className="text-sm">No CSDA classes scheduled today.</div>
-                            </div>
-                        )}
+                    <div className="grid gap-4">
+                        {csdaClasses.length > 0 
+                            ? csdaClasses.map(c => renderClassCard(c, 'fuchsia'))
+                            : renderEmptyState("No CSDA lectures scheduled for today.")
+                        }
                     </div>
                 </div>
 
