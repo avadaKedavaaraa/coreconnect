@@ -2,38 +2,38 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Lineage, Sector, CarouselItem, AdminPermissions, GlobalConfig, LectureRule, VisitorLog, AdminUser, AuditLog, FONT_LIBRARY } from '../types';
 import { API_URL } from '../lib/config';
-import { 
-  X, Unlock, Lock, Loader2, Database, PenTool, CalendarDays, HardDrive, 
-  BrainCircuit, ScanFace, Users, Activity, Settings, LayoutTemplate, Search, 
-  Filter, Replace, Edit3, Trash2, Plus, Upload, ImageIcon, Save, Shield, 
-  ShieldAlert, FileUp, AlertTriangle, RefreshCw, Key, Type, Link as LinkIcon, Share2, FileText, Pin, ArrowDownUp, SortAsc, SortDesc, Sparkles, FolderInput, AlertCircle, Wand2, Check, GripVertical, File, Eye, MessageSquare, Smartphone, Monitor, BellRing
+import {
+    X, Unlock, Lock, Loader2, Database, PenTool, CalendarDays, HardDrive,
+    BrainCircuit, ScanFace, Users, Activity, Settings, LayoutTemplate, Search,
+    Filter, Replace, Edit3, Trash2, Plus, Upload, ImageIcon, Save, Shield,
+    ShieldAlert, FileUp, AlertTriangle, RefreshCw, Key, Type, Link as LinkIcon, Share2, FileText, Pin, ArrowDownUp, SortAsc, SortDesc, Sparkles, FolderInput, AlertCircle, Wand2, Check, GripVertical, File, Eye, MessageSquare, Smartphone, Monitor, BellRing
 } from 'lucide-react';
 import DOMPurify from 'dompurify';
 
 interface AdminPanelProps {
-  lineage: Lineage | null;
-  isOpen: boolean;
-  onClose: () => void;
-  isAdmin: boolean;
-  csrfToken: string;
-  onLogin: (token: string, permissions: AdminPermissions) => void;
-  onLogout: () => void;
-  currentUser: string;
-  permissions: AdminPermissions | null;
-  initialTab?: 'database' | 'creator' | 'scheduler' | 'config' | 'users' | 'visitors' | 'backup' | 'ai-lab' | 'structure';
-  
-  allItems: CarouselItem[];
-  sectors: Sector[];
-  globalConfig: GlobalConfig;
-  initialEditingItem: CarouselItem | null;
-  defaultSector: string;
+    lineage: Lineage | null;
+    isOpen: boolean;
+    onClose: () => void;
+    isAdmin: boolean;
+    csrfToken: string;
+    onLogin: (token: string, permissions: AdminPermissions) => void;
+    onLogout: () => void;
+    currentUser: string;
+    permissions: AdminPermissions | null;
+    initialTab?: 'database' | 'creator' | 'scheduler' | 'config' | 'users' | 'visitors' | 'backup' | 'ai-lab' | 'structure';
 
-  onAddItem: (item: CarouselItem) => void;
-  onUpdateItem: (item: CarouselItem) => void;
-  onDeleteItem: (id: string) => void;
-  onUpdateSectors: (sectors: Sector[]) => Promise<void>;
-  onUpdateConfig: (config: GlobalConfig) => Promise<void>;
-  onClearData: () => void;
+    allItems: CarouselItem[];
+    sectors: Sector[];
+    globalConfig: GlobalConfig;
+    initialEditingItem: CarouselItem | null;
+    defaultSector: string;
+
+    onAddItem: (item: CarouselItem) => void;
+    onUpdateItem: (item: CarouselItem) => void;
+    onDeleteItem: (id: string) => void;
+    onUpdateSectors: (sectors: Sector[]) => Promise<void>;
+    onUpdateConfig: (config: GlobalConfig) => Promise<void>;
+    onClearData: () => void;
 }
 
 const loadFontPreview = (fontId: string) => {
@@ -49,573 +49,574 @@ const loadFontPreview = (fontId: string) => {
     }
 };
 
-const AdminPanel: React.FC<AdminPanelProps> = ({ 
-  lineage, isOpen, onClose, isAdmin, csrfToken, onLogin, onLogout, currentUser, permissions, initialTab = 'database',
-  onAddItem, onUpdateItem, onDeleteItem, onUpdateSectors, onUpdateConfig, allItems = [], sectors = [], globalConfig, onClearData, initialEditingItem, defaultSector
+const AdminPanel: React.FC<AdminPanelProps> = ({
+    lineage, isOpen, onClose, isAdmin, csrfToken, onLogin, onLogout, currentUser, permissions, initialTab = 'database',
+    onAddItem, onUpdateItem, onDeleteItem, onUpdateSectors, onUpdateConfig, allItems = [], sectors = [], globalConfig, onClearData, initialEditingItem, defaultSector
 }) => {
-  const isWizard = lineage === Lineage.WIZARD;
-  const [activeTab, setActiveTab] = useState<'creator' | 'ai-lab' | 'database' | 'visitors' | 'structure' | 'users' | 'logs' | 'config' | 'backup' | 'scheduler'>(initialTab || 'database');
-  
-  // Login State
-  const [loginUser, setLoginUser] = useState('');
-  const [loginPass, setLoginPass] = useState('');
-  const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+    const isWizard = lineage === Lineage.WIZARD;
+    const [activeTab, setActiveTab] = useState<'creator' | 'ai-lab' | 'database' | 'visitors' | 'structure' | 'users' | 'logs' | 'config' | 'backup' | 'scheduler'>(initialTab || 'database');
 
-  // Database Tab State
-  const [itemSearch, setItemSearch] = useState('');
-  const [typeFilter, setTypeFilter] = useState('all');
-  const [findText, setFindText] = useState('');
-  const [replaceText, setReplaceText] = useState('');
-  const [foundMatches, setFoundMatches] = useState<{id: string, title: string, context: string}[]>([]);
+    // Login State
+    const [loginUser, setLoginUser] = useState('');
+    const [loginPass, setLoginPass] = useState('');
+    const [error, setError] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
 
-  // Creator Tab State
-  const [itemForm, setItemForm] = useState<CarouselItem>({
-      id: '', title: '', content: '', date: new Date().toISOString().split('T')[0].replace(/-/g, '.'),
-      type: 'announcement', sector: defaultSector, subject: 'General', isUnread: true, isPinned: false, likes: 0,
-      fileUrl: '', // Explicitly init
-      image: '',
-      style: { titleColor: '#ffffff', titleColorEnd: '', contentColor: '#e4e4e7', fontFamily: 'sans', isGradient: false }
-  });
-  const [isEditingItem, setIsEditingItem] = useState(false);
-  const [isCustomSubject, setIsCustomSubject] = useState(false); 
-  const contentRef = useRef<HTMLTextAreaElement>(null);
-  const [previewMode, setPreviewMode] = useState<'desktop' | 'mobile'>('desktop');
-  
-  // Drive Import State
-  const [driveLink, setDriveLink] = useState('');
-  const [driveSubject, setDriveSubject] = useState('');
-  const [driveSector, setDriveSector] = useState(defaultSector);
-  const [driveImportStatus, setDriveImportStatus] = useState('');
-  const [driveImportLoading, setDriveImportLoading] = useState(false);
-  const [driveIsCustomSubject, setDriveIsCustomSubject] = useState(false); 
+    // Database Tab State
+    const [itemSearch, setItemSearch] = useState('');
+    const [typeFilter, setTypeFilter] = useState('all');
+    const [findText, setFindText] = useState('');
+    const [replaceText, setReplaceText] = useState('');
+    const [foundMatches, setFoundMatches] = useState<{ id: string, title: string, context: string }[]>([]);
 
-  // Scheduler Tab State
-  const [schedules, setSchedules] = useState<LectureRule[]>(globalConfig.schedules || []);
-  const [newRule, setNewRule] = useState<LectureRule>({
-      id: '', subject: '', dayOfWeek: 'Monday', startTime: '10:00', link: '', recurrence: 'weekly', isActive: true
-  });
+    // Creator Tab State
+    const [itemForm, setItemForm] = useState<CarouselItem>({
+        id: '', title: '', content: '', date: new Date().toISOString().split('T')[0].replace(/-/g, '.'),
+        type: 'announcement', sector: defaultSector, subject: 'General', isUnread: true, isPinned: false, likes: 0,
+        fileUrl: '', // Explicitly init
+        image: '',
+        style: { titleColor: '#ffffff', titleColorEnd: '', contentColor: '#e4e4e7', fontFamily: 'sans', isGradient: false }
+    });
+    const [isEditingItem, setIsEditingItem] = useState(false);
+    const [isCustomSubject, setIsCustomSubject] = useState(false);
+    const contentRef = useRef<HTMLTextAreaElement>(null);
+    const [previewMode, setPreviewMode] = useState<'desktop' | 'mobile'>('desktop');
 
-  // Config Tab State
-  const [editedConfig, setEditedConfig] = useState<GlobalConfig>(globalConfig);
-  const [isSavingConfig, setIsSavingConfig] = useState(false);
+    // Drive Import State
+    const [driveLink, setDriveLink] = useState('');
+    const [driveSubject, setDriveSubject] = useState('');
+    const [driveSector, setDriveSector] = useState(defaultSector);
+    const [driveImportStatus, setDriveImportStatus] = useState('');
+    const [driveImportLoading, setDriveImportLoading] = useState(false);
+    const [driveIsCustomSubject, setDriveIsCustomSubject] = useState(false);
 
-  // Structure Tab State
-  const [editedSectors, setEditedSectors] = useState<Sector[]>(sectors);
-  const [isSavingSectors, setIsSavingSectors] = useState(false);
-  const [sectorSaveStatus, setSectorSaveStatus] = useState('');
+    // Scheduler Tab State
+    const [schedules, setSchedules] = useState<LectureRule[]>(globalConfig.schedules || []);
+    const [selectedBatch, setSelectedBatch] = useState<'AICS' | 'CSDA'>('AICS');
+    const [newRule, setNewRule] = useState<LectureRule>({
+        id: '', subject: '', dayOfWeek: 'Monday', startTime: '10:00', link: '', recurrence: 'weekly', isActive: true, batch: 'AICS'
+    });
 
-  // Users Tab State
-  const [users, setUsers] = useState<AdminUser[]>([]);
-  const [newUser, setNewUser] = useState('');
-  const [newUserPass, setNewUserPass] = useState('');
-  const [newPermissions, setNewPermissions] = useState<AdminPermissions>({ canEdit: false, canDelete: false, canManageUsers: false, canViewLogs: false, isGod: false });
-  const [changePassData, setChangePassData] = useState({ current: '', new: '', confirm: '' });
+    // Config Tab State
+    const [editedConfig, setEditedConfig] = useState<GlobalConfig>(globalConfig);
+    const [isSavingConfig, setIsSavingConfig] = useState(false);
 
-  // Logs/Visitors Tab State
-  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
-  const [visitors, setVisitors] = useState<VisitorLog[]>([]);
-  const [selectedVisitor, setSelectedVisitor] = useState<VisitorLog | null>(null);
-  const [visitorDetails, setVisitorDetails] = useState<{activity: any[], chats: any[]} | null>(null);
-  const [loadingDetails, setLoadingDetails] = useState(false);
+    // Structure Tab State
+    const [editedSectors, setEditedSectors] = useState<Sector[]>(sectors);
+    const [isSavingSectors, setIsSavingSectors] = useState(false);
+    const [sectorSaveStatus, setSectorSaveStatus] = useState('');
 
-  // AI Lab State
-  const [aiPrompt, setAiPrompt] = useState('');
-  const [aiLoading, setAiLoading] = useState(false);
-  const [aiResult, setAiResult] = useState<any>(null);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+    // Users Tab State
+    const [users, setUsers] = useState<AdminUser[]>([]);
+    const [newUser, setNewUser] = useState('');
+    const [newUserPass, setNewUserPass] = useState('');
+    const [newPermissions, setNewPermissions] = useState<AdminPermissions>({ canEdit: false, canDelete: false, canManageUsers: false, canViewLogs: false, isGod: false });
+    const [changePassData, setChangePassData] = useState({ current: '', new: '', confirm: '' });
 
-  // Backup Tab State
-  const importFileRef = useRef<HTMLInputElement>(null);
-  const [importStatus, setImportStatus] = useState('');
-  const [importProgress, setImportProgress] = useState(0);
+    // Logs/Visitors Tab State
+    const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+    const [visitors, setVisitors] = useState<VisitorLog[]>([]);
+    const [selectedVisitor, setSelectedVisitor] = useState<VisitorLog | null>(null);
+    const [visitorDetails, setVisitorDetails] = useState<{ activity: any[], chats: any[] } | null>(null);
+    const [loadingDetails, setLoadingDetails] = useState(false);
 
-  // --- EFFECTS ---
-  useEffect(() => {
-    if (initialTab) setActiveTab(initialTab);
-  }, [initialTab, isOpen]);
+    // AI Lab State
+    const [aiPrompt, setAiPrompt] = useState('');
+    const [aiLoading, setAiLoading] = useState(false);
+    const [aiResult, setAiResult] = useState<any>(null);
+    const [selectedFile, setSelectedFile] = useState<File | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-      if (initialEditingItem) {
-          setItemForm(initialEditingItem);
-          if(initialEditingItem.style?.fontFamily) loadFontPreview(initialEditingItem.style.fontFamily);
-          setIsEditingItem(true);
-          setActiveTab('creator');
-      } else {
-          resetItemForm();
-      }
-  }, [initialEditingItem, isOpen]);
+    // Backup Tab State
+    const importFileRef = useRef<HTMLInputElement>(null);
+    const [importStatus, setImportStatus] = useState('');
+    const [importProgress, setImportProgress] = useState(0);
 
-  // Sync config when panel opens
-  useEffect(() => {
-      if (isOpen) {
-          setEditedConfig(globalConfig);
-          setSchedules(globalConfig.schedules || []);
-          setEditedSectors(sectors);
-      }
-  }, [isOpen, globalConfig, sectors]); 
+    // --- EFFECTS ---
+    useEffect(() => {
+        if (initialTab) setActiveTab(initialTab);
+    }, [initialTab, isOpen]);
 
-  useEffect(() => {
-      if(activeTab === 'users' && isAdmin) fetchUsers();
-      if(activeTab === 'visitors' && isAdmin) fetchVisitors();
-      if(activeTab === 'logs' && isAdmin) fetchAuditLogs();
-  }, [activeTab, isAdmin]);
+    useEffect(() => {
+        if (initialEditingItem) {
+            setItemForm(initialEditingItem);
+            if (initialEditingItem.style?.fontFamily) loadFontPreview(initialEditingItem.style.fontFamily);
+            setIsEditingItem(true);
+            setActiveTab('creator');
+        } else {
+            resetItemForm();
+        }
+    }, [initialEditingItem, isOpen]);
 
-  const resetItemForm = () => {
-      setItemForm({
-          id: crypto.randomUUID(), title: '', content: '', date: new Date().toISOString().split('T')[0].replace(/-/g, '.'),
-          type: 'announcement', sector: defaultSector, subject: 'General', isUnread: true, isPinned: false, likes: 0,
-          fileUrl: '',
-          image: '',
-          style: { titleColor: '#ffffff', titleColorEnd: '', contentColor: '#e4e4e7', fontFamily: 'sans', isGradient: false }
-      });
-      setIsEditingItem(false);
-      setIsCustomSubject(false);
-  };
+    // Sync config when panel opens
+    useEffect(() => {
+        if (isOpen) {
+            setEditedConfig(globalConfig);
+            setSchedules(globalConfig.schedules || []);
+            setEditedSectors(sectors);
+        }
+    }, [isOpen, globalConfig, sectors]);
 
-  // --- API HANDLERS ---
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError('');
-    try {
-      const res = await fetch(`${API_URL}/api/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: loginUser, password: loginPass }),
-        credentials: 'include'
-      });
-      
-      const text = await res.text();
-      let data;
-      try { data = JSON.parse(text); } catch (e) { throw new Error(`Server Error (${res.status}). Connection failed.`); }
+    useEffect(() => {
+        if (activeTab === 'users' && isAdmin) fetchUsers();
+        if (activeTab === 'visitors' && isAdmin) fetchVisitors();
+        if (activeTab === 'logs' && isAdmin) fetchAuditLogs();
+    }, [activeTab, isAdmin]);
 
-      if (!res.ok) throw new Error(data.error || 'Authentication Failed');
-      onLogin(data.csrfToken, data.permissions);
-      setLoginPass(''); setLoginUser('');
-    } catch (err: any) { setError(err.message || 'Login Failed'); } 
-    finally { setIsLoading(false); }
-  };
+    const resetItemForm = () => {
+        setItemForm({
+            id: crypto.randomUUID(), title: '', content: '', date: new Date().toISOString().split('T')[0].replace(/-/g, '.'),
+            type: 'announcement', sector: defaultSector, subject: 'General', isUnread: true, isPinned: false, likes: 0,
+            fileUrl: '',
+            image: '',
+            style: { titleColor: '#ffffff', titleColorEnd: '', contentColor: '#e4e4e7', fontFamily: 'sans', isGradient: false }
+        });
+        setIsEditingItem(false);
+        setIsCustomSubject(false);
+    };
 
-  const fetchUsers = async () => {
-      try {
-          const res = await fetch(`${API_URL}/api/admin/users`, { headers: { 'x-csrf-token': csrfToken }, credentials: 'include' });
-          const data = await res.json();
-          if(res.ok) setUsers(data);
-      } catch(e) {}
-  };
+    // --- API HANDLERS ---
+    const handleLogin = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsLoading(true);
+        setError('');
+        try {
+            const res = await fetch(`${API_URL}/api/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: loginUser, password: loginPass }),
+                credentials: 'include'
+            });
 
-  const handleCreateUser = async () => {
-      if(!newUser || !newUserPass) return;
-      try {
-          const res = await fetch(`${API_URL}/api/admin/users/add`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrfToken },
-              body: JSON.stringify({ username: newUser, password: newUserPass, permissions: newPermissions }),
-              credentials: 'include'
-          });
-          if(res.ok) { fetchUsers(); setNewUser(''); setNewUserPass(''); alert('User created'); }
-          else { const d = await res.json(); alert(d.error); }
-      } catch(e) {}
-  };
+            const text = await res.text();
+            let data;
+            try { data = JSON.parse(text); } catch (e) { throw new Error(`Server Error (${res.status}). Connection failed.`); }
 
-  const handleDeleteUser = async (username: string) => {
-      if(!confirm(`Delete user ${username}?`)) return;
-      try {
-          const res = await fetch(`${API_URL}/api/admin/users/delete`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrfToken },
-              body: JSON.stringify({ targetUser: username }),
-              credentials: 'include'
-          });
-          if(res.ok) fetchUsers();
-          else { const d = await res.json(); alert(d.error); }
-      } catch(e) {}
-  };
+            if (!res.ok) throw new Error(data.error || 'Authentication Failed');
+            onLogin(data.csrfToken, data.permissions);
+            setLoginPass(''); setLoginUser('');
+        } catch (err: any) { setError(err.message || 'Login Failed'); }
+        finally { setIsLoading(false); }
+    };
 
-  const handleChangePassword = async () => {
-      if (!changePassData.current || !changePassData.new || !changePassData.confirm) {
-          alert("Please fill all password fields.");
-          return;
-      }
-      if (changePassData.new !== changePassData.confirm) {
-          alert("New passwords do not match.");
-          return;
-      }
-      setIsLoading(true);
-      try {
-          const res = await fetch(`${API_URL}/api/admin/change-password`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrfToken },
-              body: JSON.stringify({ 
-                  currentPassword: changePassData.current, 
-                  newPassword: changePassData.new 
-              }),
-              credentials: 'include'
-          });
-          const data = await res.json();
-          if (res.ok) {
-              alert("Password changed successfully.");
-              setChangePassData({ current: '', new: '', confirm: '' });
-          } else {
-              alert(data.error || "Failed to change password.");
-          }
-      } catch (e) {
-          alert("Network error.");
-      } finally {
-          setIsLoading(false);
-      }
-  };
+    const fetchUsers = async () => {
+        try {
+            const res = await fetch(`${API_URL}/api/admin/users`, { headers: { 'x-csrf-token': csrfToken }, credentials: 'include' });
+            const data = await res.json();
+            if (res.ok) setUsers(data);
+        } catch (e) { }
+    };
 
-  const fetchVisitors = async () => {
-      try {
-          const res = await fetch(`${API_URL}/api/admin/visitors`, { headers: { 'x-csrf-token': csrfToken }, credentials: 'include' });
-          const data = await res.json();
-          if(res.ok) setVisitors(data);
-      } catch(e) {}
-  };
+    const handleCreateUser = async () => {
+        if (!newUser || !newUserPass) return;
+        try {
+            const res = await fetch(`${API_URL}/api/admin/users/add`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrfToken },
+                body: JSON.stringify({ username: newUser, password: newUserPass, permissions: newPermissions }),
+                credentials: 'include'
+            });
+            if (res.ok) { fetchUsers(); setNewUser(''); setNewUserPass(''); alert('User created'); }
+            else { const d = await res.json(); alert(d.error); }
+        } catch (e) { }
+    };
 
-  const fetchVisitorDetails = async (visitorId: string) => {
-      setLoadingDetails(true);
-      setVisitorDetails(null);
-      try {
-          const res = await fetch(`${API_URL}/api/admin/visitor-details/${visitorId}`, { 
-              headers: { 'x-csrf-token': csrfToken }, 
-              credentials: 'include' 
-          });
-          const data = await res.json();
-          if(res.ok) setVisitorDetails(data);
-      } catch(e) {} finally { setLoadingDetails(false); }
-  };
+    const handleDeleteUser = async (username: string) => {
+        if (!confirm(`Delete user ${username}?`)) return;
+        try {
+            const res = await fetch(`${API_URL}/api/admin/users/delete`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrfToken },
+                body: JSON.stringify({ targetUser: username }),
+                credentials: 'include'
+            });
+            if (res.ok) fetchUsers();
+            else { const d = await res.json(); alert(d.error); }
+        } catch (e) { }
+    };
 
-  const handleVisitorSelect = (visitor: VisitorLog) => {
-      setSelectedVisitor(visitor);
-      fetchVisitorDetails(visitor.visitor_id);
-  };
+    const handleChangePassword = async () => {
+        if (!changePassData.current || !changePassData.new || !changePassData.confirm) {
+            alert("Please fill all password fields.");
+            return;
+        }
+        if (changePassData.new !== changePassData.confirm) {
+            alert("New passwords do not match.");
+            return;
+        }
+        setIsLoading(true);
+        try {
+            const res = await fetch(`${API_URL}/api/admin/change-password`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrfToken },
+                body: JSON.stringify({
+                    currentPassword: changePassData.current,
+                    newPassword: changePassData.new
+                }),
+                credentials: 'include'
+            });
+            const data = await res.json();
+            if (res.ok) {
+                alert("Password changed successfully.");
+                setChangePassData({ current: '', new: '', confirm: '' });
+            } else {
+                alert(data.error || "Failed to change password.");
+            }
+        } catch (e) {
+            alert("Network error.");
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
-  const fetchAuditLogs = async () => {
-      try {
-          const res = await fetch(`${API_URL}/api/admin/logs`, { headers: { 'x-csrf-token': csrfToken }, credentials: 'include' });
-          const data = await res.json();
-          if(res.ok) setAuditLogs(data);
-      } catch(e) {}
-  };
+    const fetchVisitors = async () => {
+        try {
+            const res = await fetch(`${API_URL}/api/admin/visitors`, { headers: { 'x-csrf-token': csrfToken }, credentials: 'include' });
+            const data = await res.json();
+            if (res.ok) setVisitors(data);
+        } catch (e) { }
+    };
 
-  // --- CREATOR LOGIC ---
-  const handleSaveItem = () => {
-      const itemToSave = { ...itemForm };
+    const fetchVisitorDetails = async (visitorId: string) => {
+        setLoadingDetails(true);
+        setVisitorDetails(null);
+        try {
+            const res = await fetch(`${API_URL}/api/admin/visitor-details/${visitorId}`, {
+                headers: { 'x-csrf-token': csrfToken },
+                credentials: 'include'
+            });
+            const data = await res.json();
+            if (res.ok) setVisitorDetails(data);
+        } catch (e) { } finally { setLoadingDetails(false); }
+    };
 
-      // Auto-extract title if missing
-      if (!itemToSave.title) {
-          const parser = new DOMParser();
-          const doc = parser.parseFromString(itemToSave.content, 'text/html');
-          const h1 = doc.querySelector('h1');
-          const strong = doc.querySelector('strong');
-          const firstLine = doc.body.textContent?.split('\n')[0];
-          let extractedTitle = h1?.textContent || strong?.textContent || firstLine || 'Untitled Item';
-          if (extractedTitle.length > 50) extractedTitle = extractedTitle.substring(0, 50) + '...';
-          itemToSave.title = extractedTitle;
-      }
-      
-      if (isEditingItem) {
-          onUpdateItem(itemToSave);
-      } else {
-          onAddItem({...itemToSave, id: crypto.randomUUID()});
-      }
-      resetItemForm();
-      setActiveTab('database');
-  };
+    const handleVisitorSelect = (visitor: VisitorLog) => {
+        setSelectedVisitor(visitor);
+        fetchVisitorDetails(visitor.visitor_id);
+    };
 
-  const insertTag = (tag: string) => {
-      if (!contentRef.current) return;
-      const start = contentRef.current.selectionStart;
-      const end = contentRef.current.selectionEnd;
-      const text = itemForm.content;
-      const before = text.substring(0, start);
-      const after = text.substring(end);
-      const insert = `<${tag}>${text.substring(start, end)}</${tag}>`;
-      setItemForm({ ...itemForm, content: before + insert + after });
-  };
+    const fetchAuditLogs = async () => {
+        try {
+            const res = await fetch(`${API_URL}/api/admin/logs`, { headers: { 'x-csrf-token': csrfToken }, credentials: 'include' });
+            const data = await res.json();
+            if (res.ok) setAuditLogs(data);
+        } catch (e) { }
+    };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, field: 'image' | 'fileUrl' | 'wizardLogoUrl' | 'muggleLogoUrl' | 'wizardImage' | 'muggleImage') => {
-      const file = e.target.files?.[0];
-      if (!file) return;
+    // --- CREATOR LOGIC ---
+    const handleSaveItem = () => {
+        const itemToSave = { ...itemForm };
 
-      const formData = new FormData();
-      formData.append('file', file);
+        // Auto-extract title if missing
+        if (!itemToSave.title) {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(itemToSave.content, 'text/html');
+            const h1 = doc.querySelector('h1');
+            const strong = doc.querySelector('strong');
+            const firstLine = doc.body.textContent?.split('\n')[0];
+            let extractedTitle = h1?.textContent || strong?.textContent || firstLine || 'Untitled Item';
+            if (extractedTitle.length > 50) extractedTitle = extractedTitle.substring(0, 50) + '...';
+            itemToSave.title = extractedTitle;
+        }
 
-      try {
-          const res = await fetch(`${API_URL}/api/admin/upload`, {
-              method: 'POST',
-              headers: { 'x-csrf-token': csrfToken },
-              body: formData,
-              credentials: 'include'
-          });
-          const data = await res.json();
-          if (res.ok) {
-              if (field === 'wizardLogoUrl' || field === 'muggleLogoUrl' || field === 'wizardImage' || field === 'muggleImage') {
-                  setEditedConfig(prev => ({ ...prev, [field]: data.url }));
-              } else {
-                  setItemForm(prev => ({ ...prev, [field]: data.url }));
-              }
-          } else {
-              alert('Upload failed: ' + data.error);
-          }
-      } catch (e) {
-          alert('Upload failed');
-      }
-  };
+        if (isEditingItem) {
+            onUpdateItem(itemToSave);
+        } else {
+            onAddItem({ ...itemToSave, id: crypto.randomUUID() });
+        }
+        resetItemForm();
+        setActiveTab('database');
+    };
 
-  // --- DRIVE IMPORT LOGIC ---
-  const handleDriveImport = async () => {
-      if (!driveLink) return;
-      setDriveImportLoading(true);
-      setDriveImportStatus('Initializing scan...');
-      
-      try {
-          // Send request to server to fetch files
-          const res = await fetch(`${API_URL}/api/admin/drive-scan`, {
-              method: 'POST',
-              headers: { 
-                  'Content-Type': 'application/json',
-                  'x-csrf-token': csrfToken 
-              },
-              body: JSON.stringify({ 
-                  folderLink: driveLink,
-                  sector: driveSector,
-                  subject: driveSubject || 'Imported Drive Files'
-              }),
-              credentials: 'include'
-          });
+    const insertTag = (tag: string) => {
+        if (!contentRef.current) return;
+        const start = contentRef.current.selectionStart;
+        const end = contentRef.current.selectionEnd;
+        const text = itemForm.content;
+        const before = text.substring(0, start);
+        const after = text.substring(end);
+        const insert = `<${tag}>${text.substring(start, end)}</${tag}>`;
+        setItemForm({ ...itemForm, content: before + insert + after });
+    };
 
-          const data = await res.json();
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, field: 'image' | 'fileUrl' | 'wizardLogoUrl' | 'muggleLogoUrl' | 'wizardImage' | 'muggleImage') => {
+        const file = e.target.files?.[0];
+        if (!file) return;
 
-          if (!res.ok) {
-              throw new Error(data.error || `Error ${res.status}: Failed to scan Drive.`);
-          }
+        const formData = new FormData();
+        formData.append('file', file);
 
-          if (data.items && Array.isArray(data.items)) {
-              setDriveImportStatus(`Found ${data.items.length} files. Creating items...`);
-              // Add fetched items to state
-              data.items.forEach((newItem: CarouselItem) => onAddItem(newItem));
-              setDriveImportStatus(`Success! Imported ${data.items.length} files.`);
-              setTimeout(() => {
-                  setDriveImportStatus('');
-                  setDriveLink('');
-              }, 3000);
-          } else {
-              setDriveImportStatus('No files found or folder is empty/private.');
-          }
+        try {
+            const res = await fetch(`${API_URL}/api/admin/upload`, {
+                method: 'POST',
+                headers: { 'x-csrf-token': csrfToken },
+                body: formData,
+                credentials: 'include'
+            });
+            const data = await res.json();
+            if (res.ok) {
+                if (field === 'wizardLogoUrl' || field === 'muggleLogoUrl' || field === 'wizardImage' || field === 'muggleImage') {
+                    setEditedConfig(prev => ({ ...prev, [field]: data.url }));
+                } else {
+                    setItemForm(prev => ({ ...prev, [field]: data.url }));
+                }
+            } else {
+                alert('Upload failed: ' + data.error);
+            }
+        } catch (e) {
+            alert('Upload failed');
+        }
+    };
 
-      } catch (e: any) {
-          setDriveImportStatus('');
-          alert(`Drive Import Failed:\n${e.message}`);
-      } finally {
-          setDriveImportLoading(false);
-      }
-  };
+    // --- DRIVE IMPORT LOGIC ---
+    const handleDriveImport = async () => {
+        if (!driveLink) return;
+        setDriveImportLoading(true);
+        setDriveImportStatus('Initializing scan...');
 
-  // --- DATABASE LOGIC ---
-  const filteredItems = allItems.filter(item => {
-      const matchSearch = item.title.toLowerCase().includes(itemSearch.toLowerCase()) || 
-                          item.content.toLowerCase().includes(itemSearch.toLowerCase());
-      const matchType = typeFilter === 'all' || item.type === typeFilter;
-      return matchSearch && matchType;
-  });
+        try {
+            // Send request to server to fetch files
+            const res = await fetch(`${API_URL}/api/admin/drive-scan`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-csrf-token': csrfToken
+                },
+                body: JSON.stringify({
+                    folderLink: driveLink,
+                    sector: driveSector,
+                    subject: driveSubject || 'Imported Drive Files'
+                }),
+                credentials: 'include'
+            });
 
-  const scanForMatches = () => {
-      if(!findText) return;
-      const matches = allItems.filter(i => i.content.includes(findText) || i.title.includes(findText))
-          .map(i => ({ id: i.id, title: i.title, context: 'Content/Title' }));
-      setFoundMatches(matches);
-  };
+            const data = await res.json();
 
-  const executeReplaceAll = () => {
-      if (!findText) return;
-      if (!confirm(`Replace "${findText}" with "${replaceText}" in ${foundMatches.length} items?`)) return;
-      
-      foundMatches.forEach(match => {
-          const item = allItems.find(i => i.id === match.id);
-          if (item) {
-              const updated = {
-                  ...item,
-                  title: item.title.replace(new RegExp(findText, 'g'), replaceText),
-                  content: item.content.replace(new RegExp(findText, 'g'), replaceText)
-              };
-              onUpdateItem(updated);
-          }
-      });
-      setFoundMatches([]);
-      setFindText('');
-  };
-  
-  const startEditItem = (item: CarouselItem) => {
-      setItemForm(item);
-      setIsEditingItem(true);
-      setActiveTab('creator');
-  };
+            if (!res.ok) {
+                throw new Error(data.error || `Error ${res.status}: Failed to scan Drive.`);
+            }
 
-  // --- SCHEDULER LOGIC ---
-  const handleAddRule = () => {
-      if(!newRule.subject) return;
-      const rule: LectureRule = { ...newRule, id: crypto.randomUUID() };
-      const updated = [...schedules, rule];
-      setSchedules(updated);
-      setEditedConfig({ ...editedConfig, schedules: updated });
-  };
+            if (data.items && Array.isArray(data.items)) {
+                setDriveImportStatus(`Found ${data.items.length} files. Creating items...`);
+                // Add fetched items to state
+                data.items.forEach((newItem: CarouselItem) => onAddItem(newItem));
+                setDriveImportStatus(`Success! Imported ${data.items.length} files.`);
+                setTimeout(() => {
+                    setDriveImportStatus('');
+                    setDriveLink('');
+                }, 3000);
+            } else {
+                setDriveImportStatus('No files found or folder is empty/private.');
+            }
 
-  const handleDeleteRule = (id: string) => {
-      const updated = schedules.filter(s => s.id !== id);
-      setSchedules(updated);
-      setEditedConfig({ ...editedConfig, schedules: updated });
-  };
+        } catch (e: any) {
+            setDriveImportStatus('');
+            alert(`Drive Import Failed:\n${e.message}`);
+        } finally {
+            setDriveImportLoading(false);
+        }
+    };
 
-  // --- AI LAB LOGIC ---
-  const handleAiParse = async () => {
-      setAiLoading(true);
-      setAiResult(null);
-      try {
-          const formData = new FormData();
-          formData.append('prompt', aiPrompt);
-          if (selectedFile) formData.append('file', selectedFile);
+    // --- DATABASE LOGIC ---
+    const filteredItems = allItems.filter(item => {
+        const matchSearch = item.title.toLowerCase().includes(itemSearch.toLowerCase()) ||
+            item.content.toLowerCase().includes(itemSearch.toLowerCase());
+        const matchType = typeFilter === 'all' || item.type === typeFilter;
+        return matchSearch && matchType;
+    });
 
-          const res = await fetch(`${API_URL}/api/ai/parse`, {
-              method: 'POST',
-              headers: { 'x-csrf-token': csrfToken },
-              body: formData,
-              credentials: 'include'
-          });
-          const data = await res.json();
-          if (res.ok) setAiResult(data);
-          else alert(data.error);
-      } catch (e) { alert('AI Error'); }
-      finally { setAiLoading(false); }
-  };
+    const scanForMatches = () => {
+        if (!findText) return;
+        const matches = allItems.filter(i => i.content.includes(findText) || i.title.includes(findText))
+            .map(i => ({ id: i.id, title: i.title, context: 'Content/Title' }));
+        setFoundMatches(matches);
+    };
 
-  const transferAiToForm = () => {
-      if (!aiResult) return;
-      setItemForm(prev => ({
-          ...prev,
-          title: aiResult.title || prev.title,
-          content: aiResult.content || prev.content,
-          date: aiResult.date ? aiResult.date.replace(/-/g, '.') : prev.date,
-          type: aiResult.type || prev.type,
-          subject: aiResult.subject || prev.subject
-      }));
-      setActiveTab('creator');
-  };
+    const executeReplaceAll = () => {
+        if (!findText) return;
+        if (!confirm(`Replace "${findText}" with "${replaceText}" in ${foundMatches.length} items?`)) return;
 
-  // --- CONFIG LOGIC ---
-  const handleSaveConfig = async () => {
-      setIsSavingConfig(true);
-      try {
-          await onUpdateConfig(editedConfig);
-      } finally {
-          setIsSavingConfig(false);
-      }
-  };
+        foundMatches.forEach(match => {
+            const item = allItems.find(i => i.id === match.id);
+            if (item) {
+                const updated = {
+                    ...item,
+                    title: item.title.replace(new RegExp(findText, 'g'), replaceText),
+                    content: item.content.replace(new RegExp(findText, 'g'), replaceText)
+                };
+                onUpdateItem(updated);
+            }
+        });
+        setFoundMatches([]);
+        setFindText('');
+    };
 
-  // --- STRUCTURE LOGIC ---
-  const handleUpdateSector = (idx: number, field: keyof Sector, value: string) => {
-      const updated = [...editedSectors];
-      // @ts-ignore
-      updated[idx] = { ...updated[idx], [field]: value };
-      setEditedSectors(updated);
-  };
+    const startEditItem = (item: CarouselItem) => {
+        setItemForm(item);
+        setIsEditingItem(true);
+        setActiveTab('creator');
+    };
 
-  const handleSaveSectors = async () => {
-      setIsSavingSectors(true);
-      setSectorSaveStatus('');
-      try {
-          await onUpdateSectors(editedSectors);
-          setSectorSaveStatus('success');
-          setTimeout(() => setSectorSaveStatus(''), 3000);
-      } catch (e) {
-          setSectorSaveStatus('error');
-      } finally {
-          setIsSavingSectors(false);
-      }
-  };
+    // --- SCHEDULER LOGIC ---
+    const handleAddRule = () => {
+        if (!newRule.subject) return;
+        const rule: LectureRule = { ...newRule, id: crypto.randomUUID() };
+        const updated = [...schedules, rule];
+        setSchedules(updated);
+        setEditedConfig({ ...editedConfig, schedules: updated });
+    };
 
-  // --- EXPORT/IMPORT ---
-  const handleExportData = async () => {
-      setIsLoading(true);
-      try {
-          const [logsRes, visitorsRes] = await Promise.all([
-              fetch(`${API_URL}/api/admin/logs`, { headers: { 'x-csrf-token': csrfToken }, credentials: 'include' }).catch(() => ({ ok: false, json: async () => [] })),
-              fetch(`${API_URL}/api/admin/visitors`, { headers: { 'x-csrf-token': csrfToken }, credentials: 'include' }).catch(() => ({ ok: false, json: async () => [] }))
-          ]);
-          
-          const logs = logsRes.ok ? await logsRes.json() : [];
-          const visitors = visitorsRes.ok ? await visitorsRes.json() : [];
+    const handleDeleteRule = (id: string) => {
+        const updated = schedules.filter(s => s.id !== id);
+        setSchedules(updated);
+        setEditedConfig({ ...editedConfig, schedules: updated });
+    };
 
-          const backup = { 
-              data: { 
-                  items: allItems, 
-                  global_config: [editedConfig], 
-                  sectors: editedSectors, 
-                  visitor_logs: Array.isArray(visitors) ? visitors : [],
-                  audit_logs: Array.isArray(logs) ? logs : []
-              }, 
-              timestamp: new Date().toISOString(),
-              version: "2.0"
-          };
-          
-          const blob = new Blob([JSON.stringify(backup, null, 2)], {type: 'application/json'});
-          const url = window.URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `core_connect_backup_${new Date().toISOString().split('T')[0]}.json`;
-          a.click();
-      } catch (e) { alert("Export failed partially. Check console."); } finally { setIsLoading(false); }
-  };
+    // --- AI LAB LOGIC ---
+    const handleAiParse = async () => {
+        setAiLoading(true);
+        setAiResult(null);
+        try {
+            const formData = new FormData();
+            formData.append('prompt', aiPrompt);
+            if (selectedFile) formData.append('file', selectedFile);
 
-  const handleImportData = async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      setIsLoading(true);
-      setImportStatus('Reading file...');
-      setImportProgress(10);
-      
-      const reader = new FileReader();
-      reader.onload = async (evt) => {
-          try {
-              const json = JSON.parse(evt.target?.result as string);
-              setImportStatus('Uploading to server...');
-              setImportProgress(50);
-              
-              const res = await fetch(`${API_URL}/api/admin/import`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrfToken },
-                  body: JSON.stringify(json),
-                  credentials: 'include'
-              });
-              
-              if (res.ok) {
-                  setImportStatus('Complete! Reloading...');
-                  setImportProgress(100);
-                  setTimeout(() => window.location.reload(), 1000);
-              } else {
-                  const d = await res.json();
-                  alert(d.error);
-                  setImportStatus('Failed');
-              }
-          } catch (e) {
-              alert("Invalid Backup File");
-              setImportStatus('Error');
-          } finally {
-              setIsLoading(false);
-          }
-      };
-      reader.readAsText(file);
-  };
+            const res = await fetch(`${API_URL}/api/ai/parse`, {
+                method: 'POST',
+                headers: { 'x-csrf-token': csrfToken },
+                body: formData,
+                credentials: 'include'
+            });
+            const data = await res.json();
+            if (res.ok) setAiResult(data);
+            else alert(data.error);
+        } catch (e) { alert('AI Error'); }
+        finally { setAiLoading(false); }
+    };
 
-  // --- RENDER HELPERS ---
-  const uniqueSubjects = Array.from(new Set(allItems.map(i => i.subject || 'General'))).sort();
-  
-  const selectedFont = FONT_LIBRARY.find(f => f.id === itemForm.style?.fontFamily);
-  const previewTitleStyle = itemForm.style?.isGradient ? {
+    const transferAiToForm = () => {
+        if (!aiResult) return;
+        setItemForm(prev => ({
+            ...prev,
+            title: aiResult.title || prev.title,
+            content: aiResult.content || prev.content,
+            date: aiResult.date ? aiResult.date.replace(/-/g, '.') : prev.date,
+            type: aiResult.type || prev.type,
+            subject: aiResult.subject || prev.subject
+        }));
+        setActiveTab('creator');
+    };
+
+    // --- CONFIG LOGIC ---
+    const handleSaveConfig = async () => {
+        setIsSavingConfig(true);
+        try {
+            await onUpdateConfig(editedConfig);
+        } finally {
+            setIsSavingConfig(false);
+        }
+    };
+
+    // --- STRUCTURE LOGIC ---
+    const handleUpdateSector = (idx: number, field: keyof Sector, value: string) => {
+        const updated = [...editedSectors];
+        // @ts-ignore
+        updated[idx] = { ...updated[idx], [field]: value };
+        setEditedSectors(updated);
+    };
+
+    const handleSaveSectors = async () => {
+        setIsSavingSectors(true);
+        setSectorSaveStatus('');
+        try {
+            await onUpdateSectors(editedSectors);
+            setSectorSaveStatus('success');
+            setTimeout(() => setSectorSaveStatus(''), 3000);
+        } catch (e) {
+            setSectorSaveStatus('error');
+        } finally {
+            setIsSavingSectors(false);
+        }
+    };
+
+    // --- EXPORT/IMPORT ---
+    const handleExportData = async () => {
+        setIsLoading(true);
+        try {
+            const [logsRes, visitorsRes] = await Promise.all([
+                fetch(`${API_URL}/api/admin/logs`, { headers: { 'x-csrf-token': csrfToken }, credentials: 'include' }).catch(() => ({ ok: false, json: async () => [] })),
+                fetch(`${API_URL}/api/admin/visitors`, { headers: { 'x-csrf-token': csrfToken }, credentials: 'include' }).catch(() => ({ ok: false, json: async () => [] }))
+            ]);
+
+            const logs = logsRes.ok ? await logsRes.json() : [];
+            const visitors = visitorsRes.ok ? await visitorsRes.json() : [];
+
+            const backup = {
+                data: {
+                    items: allItems,
+                    global_config: [editedConfig],
+                    sectors: editedSectors,
+                    visitor_logs: Array.isArray(visitors) ? visitors : [],
+                    audit_logs: Array.isArray(logs) ? logs : []
+                },
+                timestamp: new Date().toISOString(),
+                version: "2.0"
+            };
+
+            const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `core_connect_backup_${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+        } catch (e) { alert("Export failed partially. Check console."); } finally { setIsLoading(false); }
+    };
+
+    const handleImportData = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setIsLoading(true);
+        setImportStatus('Reading file...');
+        setImportProgress(10);
+
+        const reader = new FileReader();
+        reader.onload = async (evt) => {
+            try {
+                const json = JSON.parse(evt.target?.result as string);
+                setImportStatus('Uploading to server...');
+                setImportProgress(50);
+
+                const res = await fetch(`${API_URL}/api/admin/import`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'x-csrf-token': csrfToken },
+                    body: JSON.stringify(json),
+                    credentials: 'include'
+                });
+
+                if (res.ok) {
+                    setImportStatus('Complete! Reloading...');
+                    setImportProgress(100);
+                    setTimeout(() => window.location.reload(), 1000);
+                } else {
+                    const d = await res.json();
+                    alert(d.error);
+                    setImportStatus('Failed');
+                }
+            } catch (e) {
+                alert("Invalid Backup File");
+                setImportStatus('Error');
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        reader.readAsText(file);
+    };
+
+    // --- RENDER HELPERS ---
+    const uniqueSubjects = Array.from(new Set(allItems.map(i => i.subject || 'General'))).sort();
+
+    const selectedFont = FONT_LIBRARY.find(f => f.id === itemForm.style?.fontFamily);
+    const previewTitleStyle = itemForm.style?.isGradient ? {
         backgroundImage: `linear-gradient(to right, ${itemForm.style.titleColor}, ${itemForm.style.titleColorEnd || itemForm.style.titleColor})`,
         WebkitBackgroundClip: 'text',
         WebkitTextFillColor: 'transparent',
@@ -627,120 +628,120 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
         fontFamily: selectedFont?.family
     };
 
-  const previewContentHtml = DOMPurify.sanitize(itemForm.content, {
-      ADD_TAGS: ['style', 'img', 'b', 'i', 'em', 'strong', 'a', 'p', 'br', 'ul', 'li', 'ol', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'code', 'pre', 'div', 'span', 'table', 'thead', 'tbody', 'tr', 'td', 'th', 'hr'],
-      ADD_ATTR: ['target', 'href', 'src', 'frameborder', 'allow', 'allowfullscreen', 'style', 'class', 'id', 'width', 'height', 'align']
-  });
+    const previewContentHtml = DOMPurify.sanitize(itemForm.content, {
+        ADD_TAGS: ['style', 'img', 'b', 'i', 'em', 'strong', 'a', 'p', 'br', 'ul', 'li', 'ol', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'code', 'pre', 'div', 'span', 'table', 'thead', 'tbody', 'tr', 'td', 'th', 'hr'],
+        ADD_ATTR: ['target', 'href', 'src', 'frameborder', 'allow', 'allowfullscreen', 'style', 'class', 'id', 'width', 'height', 'align']
+    });
 
-  if (!isOpen) return null;
+    if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/95 p-2 sm:p-4 animate-[fade-in_0.2s_ease-out]">
-      <div className={`w-full max-w-7xl rounded-xl border shadow-2xl overflow-hidden flex flex-col relative h-[100dvh] sm:h-full sm:max-h-[95vh] text-zinc-200 transition-colors duration-500
+    return (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/95 p-2 sm:p-4 animate-[fade-in_0.2s_ease-out]">
+            <div className={`w-full max-w-7xl rounded-xl border shadow-2xl overflow-hidden flex flex-col relative h-[100dvh] sm:h-full sm:max-h-[95vh] text-zinc-200 transition-colors duration-500
         ${isWizard ? 'bg-[#0a0505] border-red-900/50 shadow-red-900/30' : 'bg-[#050510] border-blue-900/50 shadow-blue-900/30'}
       `}>
-        <button onClick={onClose} className="absolute top-4 right-4 text-white/50 hover:text-white z-30 p-2 hover:bg-white/10 rounded-full transition-colors">
-          <X size={24} />
-        </button>
+                <button onClick={onClose} className="absolute top-4 right-4 text-white/50 hover:text-white z-30 p-2 hover:bg-white/10 rounded-full transition-colors">
+                    <X size={24} />
+                </button>
 
-        {isAdmin && (
-            <div className={`p-4 sm:p-6 border-b flex items-center gap-4 shrink-0 z-20 relative
+                {isAdmin && (
+                    <div className={`p-4 sm:p-6 border-b flex items-center gap-4 shrink-0 z-20 relative
                 ${isWizard ? 'border-red-900/50 bg-[#0a0505]' : 'border-blue-900/50 bg-[#050510]'} 
             `}>
-            <Unlock size={32} className={isWizard ? "text-red-500 shrink-0" : "text-blue-500 shrink-0"} />
-            <div className="min-w-0 flex-1 pr-12">
-                <h2 className={`text-xl sm:text-2xl font-bold truncate ${isWizard ? 'font-wizardTitle text-red-100' : 'font-muggle text-blue-100'}`}>
-                {permissions?.isGod ? 'GOD MODE ACCESS' : `ADMIN: ${currentUser.toUpperCase()}`}
-                </h2>
-            </div>
-            </div>
-        )}
+                        <Unlock size={32} className={isWizard ? "text-red-500 shrink-0" : "text-blue-500 shrink-0"} />
+                        <div className="min-w-0 flex-1 pr-12">
+                            <h2 className={`text-xl sm:text-2xl font-bold truncate ${isWizard ? 'font-wizardTitle text-red-100' : 'font-muggle text-blue-100'}`}>
+                                {permissions?.isGod ? 'GOD MODE ACCESS' : `ADMIN: ${currentUser.toUpperCase()}`}
+                            </h2>
+                        </div>
+                    </div>
+                )}
 
-        {!isAdmin ? (
-          <div className="flex-1 flex items-center justify-center p-6 w-full relative overflow-hidden h-full">
-             {/* ... (Login Form) ... */}
-             <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-30">
-                <div className={`w-[600px] h-[600px] border-[2px] rounded-full absolute animate-spin-slow ${isWizard ? 'border-red-600/20' : 'border-blue-600/20'}`}></div>
-                <div className={`w-[500px] h-[500px] border-[4px] border-dashed rounded-full absolute animate-reverse-spin ${isWizard ? 'border-red-500/30' : 'border-blue-500/30'}`}></div>
-                <div className={`w-[400px] h-[400px] border-[1px] rounded-full absolute animate-pulse ${isWizard ? 'border-red-400/40' : 'border-blue-400/40'}`}></div>
-             </div>
+                {!isAdmin ? (
+                    <div className="flex-1 flex items-center justify-center p-6 w-full relative overflow-hidden h-full">
+                        {/* ... (Login Form) ... */}
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-30">
+                            <div className={`w-[600px] h-[600px] border-[2px] rounded-full absolute animate-spin-slow ${isWizard ? 'border-red-600/20' : 'border-blue-600/20'}`}></div>
+                            <div className={`w-[500px] h-[500px] border-[4px] border-dashed rounded-full absolute animate-reverse-spin ${isWizard ? 'border-red-500/30' : 'border-blue-500/30'}`}></div>
+                            <div className={`w-[400px] h-[400px] border-[1px] rounded-full absolute animate-pulse ${isWizard ? 'border-red-400/40' : 'border-blue-400/40'}`}></div>
+                        </div>
 
-             <div className="z-10 w-full max-w-sm relative group">
-                <div className={`absolute -inset-1 rounded-2xl blur opacity-25 group-hover:opacity-50 transition duration-1000 ${isWizard ? 'bg-red-600' : 'bg-blue-600'}`}></div>
-                <form onSubmit={handleLogin} className={`relative p-8 rounded-2xl border backdrop-blur-xl shadow-2xl flex flex-col gap-6
+                        <div className="z-10 w-full max-w-sm relative group">
+                            <div className={`absolute -inset-1 rounded-2xl blur opacity-25 group-hover:opacity-50 transition duration-1000 ${isWizard ? 'bg-red-600' : 'bg-blue-600'}`}></div>
+                            <form onSubmit={handleLogin} className={`relative p-8 rounded-2xl border backdrop-blur-xl shadow-2xl flex flex-col gap-6
                     ${isWizard ? 'bg-black/90 border-red-900/50' : 'bg-black/90 border-blue-900/50'}
                 `}>
-                    <div className="text-center">
-                        <div className={`mx-auto mb-4 w-16 h-16 rounded-full flex items-center justify-center border-2 ${isWizard ? 'border-red-500 text-red-500 shadow-[0_0_20px_rgba(220,38,38,0.5)]' : 'border-blue-500 text-blue-500 shadow-[0_0_20px_rgba(37,99,235,0.5)]'}`}>
-                            <Lock size={32} />
-                        </div>
-                        <h2 className={`text-2xl font-bold tracking-widest ${isWizard ? 'text-red-100 font-wizardTitle' : 'text-blue-100 font-muggle'}`}>RESTRICTED</h2>
-                    </div>
+                                <div className="text-center">
+                                    <div className={`mx-auto mb-4 w-16 h-16 rounded-full flex items-center justify-center border-2 ${isWizard ? 'border-red-500 text-red-500 shadow-[0_0_20px_rgba(220,38,38,0.5)]' : 'border-blue-500 text-blue-500 shadow-[0_0_20px_rgba(37,99,235,0.5)]'}`}>
+                                        <Lock size={32} />
+                                    </div>
+                                    <h2 className={`text-2xl font-bold tracking-widest ${isWizard ? 'text-red-100 font-wizardTitle' : 'text-blue-100 font-muggle'}`}>RESTRICTED</h2>
+                                </div>
 
-                    <div className="space-y-4">
-                        <div className="relative">
-                            <input 
-                                type="text" value={loginUser} onChange={(e) => setLoginUser(e.target.value)}
-                                placeholder="IDENTIFIER"
-                                className={`w-full bg-black/50 border rounded-lg p-4 text-center outline-none focus:scale-105 transition-transform tracking-widest
+                                <div className="space-y-4">
+                                    <div className="relative">
+                                        <input
+                                            type="text" value={loginUser} onChange={(e) => setLoginUser(e.target.value)}
+                                            placeholder="IDENTIFIER"
+                                            className={`w-full bg-black/50 border rounded-lg p-4 text-center outline-none focus:scale-105 transition-transform tracking-widest
                                     ${isWizard ? 'border-red-900 focus:border-red-500 text-red-100' : 'border-blue-900 focus:border-blue-500 text-blue-100'}
                                 `}
-                            />
-                        </div>
-                        <div className="relative">
-                            <input 
-                                type="password" value={loginPass} onChange={(e) => setLoginPass(e.target.value)}
-                                placeholder="Passkey"
-                                className={`w-full bg-black/50 border rounded-lg p-4 text-center outline-none focus:scale-105 transition-transform tracking-widest
+                                        />
+                                    </div>
+                                    <div className="relative">
+                                        <input
+                                            type="password" value={loginPass} onChange={(e) => setLoginPass(e.target.value)}
+                                            placeholder="Passkey"
+                                            className={`w-full bg-black/50 border rounded-lg p-4 text-center outline-none focus:scale-105 transition-transform tracking-widest
                                     ${isWizard ? 'border-red-900 focus:border-red-500 text-red-100' : 'border-blue-900 focus:border-blue-500 text-blue-100'}
                                 `}
-                            />
-                        </div>
-                        {error && (
-                            <div className="p-3 bg-red-900/30 border border-red-500/50 rounded text-red-300 text-xs text-center font-bold animate-pulse">
-                                {error}
-                            </div>
-                        )}
-                        <button 
-                            type="submit" disabled={isLoading}
-                            className={`w-full py-4 rounded-lg font-bold tracking-[0.2em] transition-all hover:scale-105 hover:shadow-lg flex items-center justify-center gap-2
+                                        />
+                                    </div>
+                                    {error && (
+                                        <div className="p-3 bg-red-900/30 border border-red-500/50 rounded text-red-300 text-xs text-center font-bold animate-pulse">
+                                            {error}
+                                        </div>
+                                    )}
+                                    <button
+                                        type="submit" disabled={isLoading}
+                                        className={`w-full py-4 rounded-lg font-bold tracking-[0.2em] transition-all hover:scale-105 hover:shadow-lg flex items-center justify-center gap-2
                                 ${isWizard ? 'bg-gradient-to-r from-red-900 to-red-800 text-white' : 'bg-gradient-to-r from-blue-900 to-blue-800 text-white'}
                             `}
-                        >
-                            {isLoading ? <Loader2 className="animate-spin" /> : 'INITIALIZE'}
-                        </button>
+                                    >
+                                        {isLoading ? <Loader2 className="animate-spin" /> : 'INITIALIZE'}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
                     </div>
-                </form>
-             </div>
-          </div>
-        ) : (
-          <div className="flex-1 flex flex-col sm:flex-row overflow-hidden relative">
-            {/* Sidebar */}
-            <nav className={`sm:w-64 shrink-0 overflow-y-auto border-b sm:border-b-0 sm:border-r flex sm:flex-col ${isWizard ? 'bg-red-950/10 border-red-900/30' : 'bg-blue-950/10 border-blue-900/30'}`}>
-                <div className="p-2 sm:p-4 flex sm:flex-col gap-2 overflow-x-auto sm:overflow-x-visible">
-                    {[
-                        { id: 'database', icon: Database, label: 'Database' },
-                        { id: 'creator', icon: PenTool, label: 'Creator' },
-                        { id: 'scheduler', icon: CalendarDays, label: 'Scheduler' },
-                        { id: 'backup', icon: HardDrive, label: 'System Backup' },
-                        { id: 'ai-lab', icon: BrainCircuit, label: 'AI Magic' },
-                        { id: 'visitors', icon: ScanFace, label: 'Visitors' },
-                        { id: 'users', icon: Users, label: 'Admins' },
-                        { id: 'logs', icon: Activity, label: 'Audit Logs' },
-                        { id: 'config', icon: Settings, label: 'Config' },
-                        { id: 'structure', icon: LayoutTemplate, label: 'Sectors' },
-                    ].map(tab => (
-                        <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`p-3 rounded-lg flex items-center gap-3 transition-all whitespace-nowrap ${activeTab === tab.id ? (isWizard ? 'bg-red-900/30 text-red-100' : 'bg-blue-900/30 text-blue-100') : 'opacity-50 hover:opacity-100 hover:bg-white/5'}`}>
-                            <tab.icon size={18} /> <span className="font-bold text-sm">{tab.label}</span>
-                        </button>
-                    ))}
-                    <button onClick={onLogout} className="mt-auto p-3 rounded-lg flex items-center gap-3 text-red-400 opacity-50 hover:opacity-100 hover:bg-red-900/20">
-                        <Lock size={18} /> <span className="font-bold text-sm">Logout</span>
-                    </button>
-                </div>
-            </nav>
+                ) : (
+                    <div className="flex-1 flex flex-col sm:flex-row overflow-hidden relative">
+                        {/* Sidebar */}
+                        <nav className={`sm:w-64 shrink-0 overflow-y-auto border-b sm:border-b-0 sm:border-r flex sm:flex-col ${isWizard ? 'bg-red-950/10 border-red-900/30' : 'bg-blue-950/10 border-blue-900/30'}`}>
+                            <div className="p-2 sm:p-4 flex sm:flex-col gap-2 overflow-x-auto sm:overflow-x-visible">
+                                {[
+                                    { id: 'database', icon: Database, label: 'Database' },
+                                    { id: 'creator', icon: PenTool, label: 'Creator' },
+                                    { id: 'scheduler', icon: CalendarDays, label: 'Scheduler' },
+                                    { id: 'backup', icon: HardDrive, label: 'System Backup' },
+                                    { id: 'ai-lab', icon: BrainCircuit, label: 'AI Magic' },
+                                    { id: 'visitors', icon: ScanFace, label: 'Visitors' },
+                                    { id: 'users', icon: Users, label: 'Admins' },
+                                    { id: 'logs', icon: Activity, label: 'Audit Logs' },
+                                    { id: 'config', icon: Settings, label: 'Config' },
+                                    { id: 'structure', icon: LayoutTemplate, label: 'Sectors' },
+                                ].map(tab => (
+                                    <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`p-3 rounded-lg flex items-center gap-3 transition-all whitespace-nowrap ${activeTab === tab.id ? (isWizard ? 'bg-red-900/30 text-red-100' : 'bg-blue-900/30 text-blue-100') : 'opacity-50 hover:opacity-100 hover:bg-white/5'}`}>
+                                        <tab.icon size={18} /> <span className="font-bold text-sm">{tab.label}</span>
+                                    </button>
+                                ))}
+                                <button onClick={onLogout} className="mt-auto p-3 rounded-lg flex items-center gap-3 text-red-400 opacity-50 hover:opacity-100 hover:bg-red-900/20">
+                                    <Lock size={18} /> <span className="font-bold text-sm">Logout</span>
+                                </button>
+                            </div>
+                        </nav>
 
-            <main className="flex-1 overflow-y-auto min-h-0 p-4 sm:p-8 relative custom-scrollbar pb-24">
+                        <main className="flex-1 overflow-y-auto min-h-0 p-4 sm:p-8 relative custom-scrollbar pb-24">
 
                             {/* DATABASE TAB */}
                             {activeTab === 'database' && (
@@ -1114,65 +1115,188 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                 </div>
                             )}
 
-                            {/* SCHEDULER TAB */}
+                            {/* SCHEDULER TAB - ENHANCED */}
                             {activeTab === 'scheduler' && (
-                                <div className="space-y-8">
-                                    {/* New Rule Form */}
-                                    <div className="p-6 rounded border bg-white/5 border-white/10">
-                                        <h3 className="font-bold mb-4 flex items-center gap-2"><CalendarDays size={18} /> Add Lecture Rule</h3>
-                                        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
-                                            <div className="md:col-span-1">
-                                                <label className="text-xs opacity-50 block mb-1">Subject</label>
-                                                <input value={newRule.subject} onChange={e => setNewRule({ ...newRule, subject: e.target.value })} className="w-full p-2 bg-black/40 border border-white/10 rounded outline-none text-sm text-white" placeholder="e.g. CSDA" />
-                                            </div>
+                                <div className="space-y-6 h-full flex flex-col">
+
+                                    {/* Header & Controls */}
+                                    <div className="flex flex-col md:flex-row justify-between items-center bg-white/5 p-4 rounded-xl border border-white/10 gap-4">
+                                        <div className="flex items-center gap-3">
+                                            <CalendarDays className={isWizard ? 'text-emerald-400' : 'text-fuchsia-400'} size={28} />
                                             <div>
-                                                <label className="text-xs opacity-50 block mb-1">Day</label>
-                                                <select value={newRule.dayOfWeek} onChange={e => setNewRule({ ...newRule, dayOfWeek: e.target.value })} className="w-full p-2 bg-black/40 border border-white/10 rounded outline-none text-sm text-white">
-                                                    {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(d => <option key={d} value={d} className="bg-black">{d}</option>)}
-                                                </select>
+                                                <h3 className="font-bold text-lg leading-tight">Academic Timetable</h3>
+                                                <p className="text-xs opacity-50">Manage lectures for AICS & CSDA</p>
                                             </div>
-                                            <div>
-                                                <label className="text-xs opacity-50 block mb-1">Time</label>
-                                                <input type="time" value={newRule.startTime} onChange={e => setNewRule({ ...newRule, startTime: e.target.value })} className="w-full p-2 bg-black/40 border border-white/10 rounded outline-none text-sm text-white" />
-                                            </div>
-                                            <div className="md:col-span-1">
-                                                <label className="text-xs opacity-50 block mb-1">Join Link</label>
-                                                <input value={newRule.link} onChange={e => setNewRule({ ...newRule, link: e.target.value })} className="w-full p-2 bg-black/40 border border-white/10 rounded outline-none text-sm text-white" placeholder="https://..." />
-                                            </div>
-                                            <button onClick={handleAddRule} className="p-2 bg-green-600 rounded text-black font-bold text-sm hover:bg-green-500">ADD RULE</button>
+                                        </div>
+
+                                        {/* Batch Toggle */}
+                                        <div className="flex bg-black/40 rounded-lg p-1 border border-white/10">
+                                            <button
+                                                onClick={() => setSelectedBatch('AICS')}
+                                                className={`px-6 py-2 rounded-md text-sm font-bold transition-all ${selectedBatch === 'AICS' ? (isWizard ? 'bg-emerald-600 text-black' : 'bg-fuchsia-600 text-black') : 'text-white/50 hover:text-white'}`}
+                                            >
+                                                AICS
+                                            </button>
+                                            <button
+                                                onClick={() => setSelectedBatch('CSDA')}
+                                                className={`px-6 py-2 rounded-md text-sm font-bold transition-all ${selectedBatch === 'CSDA' ? (isWizard ? 'bg-emerald-600 text-black' : 'bg-fuchsia-600 text-black') : 'text-white/50 hover:text-white'}`}
+                                            >
+                                                CSDA
+                                            </button>
                                         </div>
                                     </div>
 
-                                    {/* Active Schedules List */}
-                                    <div className="space-y-2">
-                                        {schedules.map(rule => (
-                                            <div key={rule.id} className="flex items-center justify-between p-4 rounded bg-white/5 border border-white/10">
-                                                <div className="flex items-center gap-4">
-                                                    <div className={`w-2 h-2 rounded-full ${rule.isActive ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                                                    <div>
-                                                        <div className="font-bold">{rule.subject}</div>
-                                                        <div className="text-xs opacity-50">{rule.dayOfWeek} at {rule.startTime} • {rule.recurrence}</div>
-                                                    </div>
-                                                </div>
-                                                <div className="flex gap-2">
-                                                    <button onClick={() => handleDeleteRule(rule.id)} className="p-2 hover:bg-red-900/30 text-red-400 rounded"><Trash2 size={16} /></button>
-                                                </div>
-                                            </div>
-                                        ))}
-                                        {schedules.length === 0 && <div className="text-center opacity-50 py-4">No schedules defined.</div>}
+                                    {/* Weekly Grid */}
+                                    <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                                            {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => {
+                                                const daysClasses = schedules
+                                                    .filter(s => s.dayOfWeek === day && (s.batch === selectedBatch || !s.batch)) // Fallback for old data
+                                                    .sort((a, b) => a.startTime.localeCompare(b.startTime));
 
-                                        {schedules.length > 0 && (
-                                            <div className="pt-4 flex justify-end">
-                                                <button onClick={handleSaveConfig} disabled={isSavingConfig} className="px-6 py-2 bg-blue-600 rounded font-bold text-sm hover:bg-blue-500 flex items-center gap-2">
-                                                    {isSavingConfig ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} SAVE SCHEDULES
+                                                return (
+                                                    <div key={day} className={`rounded-xl border flex flex-col overflow-hidden transition-all hover:border-opacity-50 ${isWizard ? 'bg-[#0f1510] border-emerald-900' : 'bg-[#150f1a] border-fuchsia-900'}`}>
+                                                        {/* Day Header */}
+                                                        <div className={`p-3 text-center font-bold text-sm tracking-widest uppercase border-b ${isWizard ? 'bg-emerald-900/20 border-emerald-900/50 text-emerald-100' : 'bg-fuchsia-900/20 border-fuchsia-900/50 text-fuchsia-100'}`}>
+                                                            {day}
+                                                        </div>
+
+                                                        {/* Class List */}
+                                                        <div className="p-3 space-y-3 flex-1 min-h-[100px]">
+                                                            {daysClasses.length > 0 ? (
+                                                                daysClasses.map(rule => (
+                                                                    <div key={rule.id} className="group relative p-3 rounded-lg bg-white/5 border border-white/5 hover:border-white/20 transition-all hover:bg-white/10">
+                                                                        <div className="flex justify-between items-start">
+                                                                            <div>
+                                                                                <div className={`text-lg font-bold ${isWizard ? 'text-emerald-300' : 'text-fuchsia-300'}`}>
+                                                                                    {rule.subject}
+                                                                                </div>
+                                                                                <div className="flex items-center gap-2 text-xs opacity-70 mt-1">
+                                                                                    <span className="font-mono bg-black/30 px-1.5 py-0.5 rounded">{rule.startTime}</span>
+                                                                                    {rule.recurrence === 'weekly' && <span className="opacity-50">Weekly</span>}
+                                                                                </div>
+
+                                                                                {rule.link && (
+                                                                                    <a
+                                                                                        href={rule.link}
+                                                                                        target="_blank"
+                                                                                        rel="noopener noreferrer"
+                                                                                        className="mt-2 inline-flex items-center gap-1 text-[10px] text-blue-400 hover:text-blue-300 hover:underline"
+                                                                                        onClick={(e) => e.stopPropagation()}
+                                                                                    >
+                                                                                        <LinkIcon size={10} /> OPEN LINK
+                                                                                    </a>
+                                                                                )}
+                                                                            </div>
+
+                                                                            <button
+                                                                                onClick={() => handleDeleteRule(rule.id)}
+                                                                                className="opacity-0 group-hover:opacity-100 p-1.5 text-red-400 hover:bg-red-900/50 rounded transition-all"
+                                                                                title="Remove Class"
+                                                                            >
+                                                                                <Trash2 size={14} />
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+                                                                ))
+                                                            ) : (
+                                                                <div className="h-full flex flex-col items-center justify-center text-white/10">
+                                                                    <div className="text-2xl font-bold opacity-20">---</div>
+                                                                    <div className="text-[10px] uppercase">Free Day</div>
+                                                                </div>
+                                                            )}
+                                                        </div>
+
+                                                        {/* Add Button for specific day */}
+                                                        <button
+                                                            onClick={() => setNewRule({ ...newRule, dayOfWeek: day, batch: selectedBatch })}
+                                                            className={`w-full py-2 text-xs font-bold uppercase transition-colors flex items-center justify-center gap-2
+                                    ${isWizard ? 'bg-emerald-900/10 hover:bg-emerald-900/30 text-emerald-500' : 'bg-fuchsia-900/10 hover:bg-fuchsia-900/30 text-fuchsia-500'}`}
+                                                        >
+                                                            <Plus size={12} /> Add Class
+                                                        </button>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+
+                                    {/* Add/Edit Section (Floating or Fixed Bottom) */}
+                                    <div className={`p-4 rounded-xl border ${isWizard ? 'bg-emerald-950/30 border-emerald-500/30' : 'bg-fuchsia-950/30 border-fuchsia-500/30'}`}>
+                                        <h4 className="text-sm font-bold uppercase mb-3 flex items-center gap-2 opacity-80">
+                                            <Plus size={16} /> Create Schedule Entry
+                                        </h4>
+                                        <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+                                            <div className="md:col-span-2">
+                                                <label className="text-[10px] uppercase opacity-50 block mb-1">Batch</label>
+                                                <select
+                                                    value={newRule.batch}
+                                                    onChange={e => setNewRule({ ...newRule, batch: e.target.value as 'AICS' | 'CSDA' })}
+                                                    className="w-full p-2 bg-black/50 border border-white/10 rounded text-sm text-white outline-none focus:border-white/30"
+                                                >
+                                                    <option value="AICS">AICS</option>
+                                                    <option value="CSDA">CSDA</option>
+                                                </select>
+                                            </div>
+                                            <div className="md:col-span-3">
+                                                <label className="text-[10px] uppercase opacity-50 block mb-1">Subject</label>
+                                                <input
+                                                    value={newRule.subject}
+                                                    onChange={e => setNewRule({ ...newRule, subject: e.target.value })}
+                                                    className="w-full p-2 bg-black/50 border border-white/10 rounded text-sm text-white outline-none focus:border-white/30"
+                                                    placeholder="e.g. Data Structures"
+                                                />
+                                            </div>
+                                            <div className="md:col-span-2">
+                                                <label className="text-[10px] uppercase opacity-50 block mb-1">Day</label>
+                                                <select
+                                                    value={newRule.dayOfWeek}
+                                                    onChange={e => setNewRule({ ...newRule, dayOfWeek: e.target.value })}
+                                                    className="w-full p-2 bg-black/50 border border-white/10 rounded text-sm text-white outline-none focus:border-white/30"
+                                                >
+                                                    {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(d => <option key={d} value={d}>{d}</option>)}
+                                                </select>
+                                            </div>
+                                            <div className="md:col-span-2">
+                                                <label className="text-[10px] uppercase opacity-50 block mb-1">Time</label>
+                                                <input
+                                                    type="time"
+                                                    value={newRule.startTime}
+                                                    onChange={e => setNewRule({ ...newRule, startTime: e.target.value })}
+                                                    className="w-full p-2 bg-black/50 border border-white/10 rounded text-sm text-white outline-none focus:border-white/30"
+                                                />
+                                            </div>
+                                            <div className="md:col-span-3">
+                                                <label className="text-[10px] uppercase opacity-50 block mb-1">Join Link</label>
+                                                <input
+                                                    value={newRule.link}
+                                                    onChange={e => setNewRule({ ...newRule, link: e.target.value })}
+                                                    className="w-full p-2 bg-black/50 border border-white/10 rounded text-sm text-white outline-none focus:border-white/30"
+                                                    placeholder="https://zoom.us/..."
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="mt-4 flex justify-between items-center">
+                                            <div className="text-[10px] opacity-40">
+                                                * Links will open in a new tab automatically.
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <button
+                                                    onClick={handleAddRule}
+                                                    className={`px-8 py-2 rounded font-bold text-xs uppercase tracking-wider transition-all hover:scale-105 active:scale-95 text-black ${isWizard ? 'bg-emerald-500 hover:bg-emerald-400' : 'bg-fuchsia-500 hover:bg-fuchsia-400'}`}
+                                                >
+                                                    Add to Schedule
+                                                </button>
+                                                <button onClick={handleSaveConfig} disabled={isSavingConfig} className="px-4 py-2 bg-blue-600 rounded font-bold text-xs hover:bg-blue-500 flex items-center gap-2">
+                                                    {isSavingConfig ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} SAVE CHANGES
                                                 </button>
                                             </div>
-                                        )}
+                                        </div>
                                     </div>
                                 </div>
                             )}
 
-{/* VISITOR SURVEILLANCE TAB START */}
+                            {/* VISITOR SURVEILLANCE TAB START */}
                             {activeTab === 'visitors' && (
                                 <div className="space-y-6 h-full flex flex-col">
                                     {!selectedVisitor ? (
@@ -1186,12 +1310,12 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                                         <p className="text-[10px] text-white/50 uppercase tracking-widest">Real-time Tracking</p>
                                                     </div>
                                                 </div>
-                                                
+
                                                 <div className="flex gap-2 w-full md:w-auto">
                                                     <div className="relative flex-1 md:w-64">
                                                         <Search className="absolute left-3 top-2.5 text-white/30" size={14} />
-                                                        <input 
-                                                            placeholder="Search Name or ID..." 
+                                                        <input
+                                                            placeholder="Search Name or ID..."
                                                             className="w-full pl-9 pr-4 py-2 bg-white/5 border border-white/10 rounded-lg text-xs text-white outline-none focus:border-blue-500/50 transition-colors"
                                                             onChange={(e) => {
                                                                 const term = e.target.value.toLowerCase();
@@ -1225,11 +1349,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                                             <tr key={v.visitor_id} className="visitor-row border-b border-white/5 hover:bg-white/5 group transition-colors">
                                                                 <td className="p-4">
                                                                     <div className="flex items-center gap-3">
-                                                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg border shadow-lg ${
-                                                                            v.display_name === 'Guest' 
-                                                                            ? 'bg-zinc-800 border-zinc-600 text-zinc-400' 
-                                                                            : 'bg-blue-900/30 border-blue-500 text-blue-400'
-                                                                        }`}>
+                                                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg border shadow-lg ${v.display_name === 'Guest'
+                                                                                ? 'bg-zinc-800 border-zinc-600 text-zinc-400'
+                                                                                : 'bg-blue-900/30 border-blue-500 text-blue-400'
+                                                                            }`}>
                                                                             {v.display_name.charAt(0).toUpperCase()}
                                                                         </div>
                                                                         <div>
@@ -1261,29 +1384,29 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                                                 </td>
                                                                 <td className="p-4 text-right">
                                                                     <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                        <button 
+                                                                        <button
                                                                             onClick={() => handleVisitorSelect(v)}
                                                                             className="px-3 py-1.5 rounded bg-blue-600/20 border border-blue-500/30 text-blue-300 text-xs font-bold hover:bg-blue-600 hover:text-white transition-all"
                                                                         >
                                                                             DOSSIER
                                                                         </button>
-                                                                        <button 
+                                                                        <button
                                                                             onClick={async (e) => {
                                                                                 e.stopPropagation();
-                                                                                if(!confirm(`PERMANENTLY DELETE records for ${v.display_name}?`)) return;
-                                                                                
+                                                                                if (!confirm(`PERMANENTLY DELETE records for ${v.display_name}?`)) return;
+
                                                                                 try {
                                                                                     const res = await fetch(`${API_URL}/api/admin/visitors/${v.visitor_id}`, {
                                                                                         method: 'DELETE',
                                                                                         headers: { 'x-csrf-token': csrfToken },
                                                                                         credentials: 'include'
                                                                                     });
-                                                                                    if(res.ok) {
+                                                                                    if (res.ok) {
                                                                                         fetchVisitors();
                                                                                     } else {
                                                                                         alert("Delete failed");
                                                                                     }
-                                                                                } catch(err) { alert("Error deleting"); }
+                                                                                } catch (err) { alert("Error deleting"); }
                                                                             }}
                                                                             className="p-1.5 rounded bg-red-900/20 border border-red-500/30 text-red-400 hover:bg-red-600 hover:text-white transition-all"
                                                                             title="Delete Visitor Log"
@@ -1326,7 +1449,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                                             visitorDetails?.activity && visitorDetails.activity.length > 0 ? (
                                                                 visitorDetails.activity.map((act, i) => (
                                                                     <div key={i} className="flex gap-3 text-xs border-b border-white/5 pb-2">
-                                                                        <div className="opacity-50 font-mono whitespace-nowrap w-16 text-right">{new Date(act.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
+                                                                        <div className="opacity-50 font-mono whitespace-nowrap w-16 text-right">{new Date(act.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
                                                                         <div>
                                                                             <div className="font-bold text-white mb-0.5">{act.activity_type.replace('_', ' ')}</div>
                                                                             <div className="opacity-70">{act.resource_title || act.resource_id}</div>
@@ -1612,7 +1735,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                     </div>
                                 </div>
                             )}
-                        
+
 
                             {/* STRUCTURE TAB - EXPANDED */}
                             {activeTab === 'structure' && (

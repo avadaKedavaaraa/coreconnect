@@ -23,13 +23,16 @@ export interface ItemStyle {
   isGradient?: boolean;   // <--- MUST BE PRESENT
 }
 
+// In types.ts
+
 export interface LectureRule {
   id: string;
   subject: string;
-  dayOfWeek: string; // "Monday", "Tuesday", etc.
-  startTime: string; // "10:00"
-  link: string; // The join link
-  endDate?: string; // ISO date string
+  batch: 'AICS' | 'CSDA'; // <--- NEW FIELD
+  dayOfWeek: string;
+  startTime: string; 
+  link: string;
+  endDate?: string;
   recurrence: 'weekly' | 'monthly';
   isActive: boolean;
 }
