@@ -1491,25 +1491,35 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                             </div>
 
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-1 min-h-0">
-                                                {/* ACTIVITY LOG */}
+                                                {/* ACTIVITY LOG - UPDATED TO HIDE HEARTBEATS */}
                                                 <div className="bg-white/5 border border-white/10 rounded-xl flex flex-col overflow-hidden">
                                                     <div className="p-3 bg-black/20 border-b border-white/10 font-bold flex items-center gap-2 text-sm text-blue-300">
                                                         <Activity size={16} /> Activity History
                                                     </div>
                                                     <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
                                                         {loadingDetails ? <div className="text-center p-4"><Loader2 className="animate-spin mx-auto" /></div> :
-                                                            visitorDetails?.activity && visitorDetails.activity.length > 0 ? (
-                                                                visitorDetails.activity.map((act, i) => (
-                                                                    <div key={i} className="flex gap-3 text-xs border-b border-white/5 pb-2">
-                                                                        <div className="opacity-50 font-mono whitespace-nowrap w-16 text-right">{new Date(act.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
-                                                                        <div>
-                                                                            <div className="font-bold text-white mb-0.5">{act.activity_type.replace('_', ' ')}</div>
-                                                                            <div className="opacity-70">{act.resource_title || act.resource_id}</div>
-                                                                            {act.duration_seconds > 0 && <div className="text-[10px] text-green-400 mt-1">{act.duration_seconds}s duration</div>}
-                                                                        </div>
-                                                                    </div>
-                                                                ))
-                                                            ) : <div className="opacity-50 text-center text-xs">No activity recorded.</div>}
+                                                            visitorDetails?.activity ? (
+                                                                (() => {
+                                                                    // --- FILTER LOGIC APPLIED HERE ---
+                                                                    const visibleActivity = visitorDetails.activity.filter(a => a.activity_type !== 'HEARTBEAT');
+                                                                    
+                                                                    if (visibleActivity.length > 0) {
+                                                                        return visibleActivity.map((act, i) => (
+                                                                            <div key={i} className="flex gap-3 text-xs border-b border-white/5 pb-2">
+                                                                                <div className="opacity-50 font-mono whitespace-nowrap w-16 text-right">{new Date(act.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
+                                                                                <div>
+                                                                                    <div className="font-bold text-white mb-0.5">{act.activity_type.replace('_', ' ')}</div>
+                                                                                    <div className="opacity-70">{act.resource_title || act.resource_id}</div>
+                                                                                    {act.duration_seconds > 0 && <div className="text-[10px] text-green-400 mt-1">{act.duration_seconds}s duration</div>}
+                                                                                </div>
+                                                                            </div>
+                                                                        ));
+                                                                    } else {
+                                                                        return <div className="opacity-50 text-center text-xs">No significant activity recorded (Heartbeats hidden).</div>;
+                                                                    }
+                                                                })()
+                                                            ) : <div className="opacity-50 text-center text-xs">No data found.</div>
+                                                        }
                                                     </div>
                                                 </div>
 
