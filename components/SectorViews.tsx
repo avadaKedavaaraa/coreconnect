@@ -550,24 +550,8 @@ export const SectorView: React.FC<SectorViewProps> = ({
                 </>
             )}
             <style dangerouslySetInnerHTML={{ __html: `@keyframes fade-in-up { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }` }} />
-        </div>
+            <style dangerouslySetInnerHTML={{__html: `@import url('https://fonts.googleapis.com/css2?family=ITC+Benguiat&display=swap'); /* Note: You might need a close match if ITC Benguiat isn't free, e.g., 'Merriweather' or use system serif */.stranger-things-title {text-shadow: 0 0 5px rgba(220, 38, 38, 0.5),0 0 10px rgba(220, 38, 38, 0.3),3px 3px 0px #000;}@keyframes fade-in-up { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }`}} /></div>
     );
 };
-<style dangerouslySetInnerHTML={{
-    __html: `
-        @import url('https://fonts.googleapis.com/css2?family=ITC+Benguiat&display=swap'); /* Note: You might need a close match if ITC Benguiat isn't free, e.g., 'Merriweather' or use system serif */
-        
-        .stranger-things-title {
-            text-shadow: 
-                0 0 5px rgba(220, 38, 38, 0.5),
-                0 0 10px rgba(220, 38, 38, 0.3),
-                3px 3px 0px #000;
-        }
-        
-        @keyframes fade-in-up { 
-            from { opacity: 0; transform: translateY(10px); } 
-            to { opacity: 1; transform: translateY(0); } 
-        }
-      `}} />
 
 export default SectorView;
