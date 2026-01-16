@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Lineage, type UserProfile, SECTORS, GlobalConfig, FONT_LIBRARY } from '../types';
-import { X, Clock, ClipboardList, User, Palette, Save, Type, PaintBucket, LayoutTemplate, Plus, Link as LinkIcon, Eye, Sun, Moon, Accessibility, Activity, RotateCw, Download, Search, CheckSquare, Square } from 'lucide-react';
+import { X, Clock, ClipboardList, User, Palette, Save, Type, PaintBucket, LayoutTemplate, Plus, Link as LinkIcon, Eye, Sun, Moon, Accessibility, Activity, RotateCw, Download, Search, CheckSquare, Square, Zap } from 'lucide-react';
 import Pomodoro from './Pomodoro';
 import Kanban from './Kanban';
 import StudentID from './StudentID';
@@ -224,7 +223,8 @@ const ToolsModal: React.FC<ToolsModalProps> = ({ lineage, onClose, profile, setP
         editProfile.themeGradient !== profile.themeGradient || // Check gradient change
         editProfile.highContrast !== profile.highContrast ||
         editProfile.brightness !== profile.brightness ||
-        editProfile.contrast !== profile.contrast;
+        editProfile.contrast !== profile.contrast ||
+        editProfile.skipIntro !== profile.skipIntro; // <-- ADDED: Check skipIntro change
     setHasChanges(isDifferent);
   }, [editProfile, profile]);
 
@@ -237,8 +237,17 @@ const ToolsModal: React.FC<ToolsModalProps> = ({ lineage, onClose, profile, setP
         themeGradient: editProfile.themeGradient,
         highContrast: editProfile.highContrast,
         brightness: editProfile.brightness,
-        contrast: editProfile.contrast
+        contrast: editProfile.contrast,
+        skipIntro: editProfile.skipIntro // <-- ADDED: Save skipIntro
     }));
+
+    // Update localStorage immediately so next reload works even if they don't navigate
+    const saved = localStorage.getItem('core_connect_profile');
+    if (saved) {
+        const p = JSON.parse(saved);
+        localStorage.setItem('core_connect_profile', JSON.stringify({ ...p, skipIntro: editProfile.skipIntro }));
+    }
+
     setHasChanges(false);
     const btn = document.getElementById('save-btn');
     if(btn) {
@@ -381,6 +390,24 @@ const ToolsModal: React.FC<ToolsModalProps> = ({ lineage, onClose, profile, setP
                                    <div className={`w-4 h-4 rounded-full bg-white transition-transform ${editProfile.highContrast ? 'translate-x-6' : 'translate-x-0'}`}></div>
                                </button>
                            </div>
+
+                           {/* --- STARTUP TOGGLE (NEW) --- */}
+                           <div className="flex justify-between items-center pt-2 border-t border-white/10">
+                               <div>
+                                   <label className="text-sm font-bold text-white flex items-center gap-2">
+                                       <Zap size={14} className={editProfile.skipIntro ? "text-yellow-400" : ""} />
+                                       Skip Intro & Gate
+                                   </label>
+                                   <p className="text-xs opacity-60 text-white/70">Bypass loading screen.</p>
+                               </div>
+                               <button 
+                                 onClick={() => setEditProfile(prev => ({...prev, skipIntro: !prev.skipIntro}))}
+                                 className={`w-12 h-6 rounded-full p-1 transition-colors relative ${editProfile.skipIntro ? (isWizard ? 'bg-emerald-500' : 'bg-fuchsia-500') : 'bg-zinc-700'}`}
+                               >
+                                   <div className={`w-4 h-4 rounded-full bg-white transition-transform ${editProfile.skipIntro ? 'translate-x-6' : 'translate-x-0'}`}></div>
+                               </button>
+                           </div>
+                           {/* --- END STARTUP TOGGLE --- */}
 
                            <div>
                                <div className="flex justify-between text-xs mb-1 opacity-80 text-white">

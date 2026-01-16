@@ -1,4 +1,3 @@
-
 export enum Lineage {
   WIZARD = 'WIZARD',
   MUGGLE = 'MUGGLE'
@@ -14,7 +13,6 @@ export interface Sector {
   sortOrder?: 'newest' | 'oldest' | 'alphabetical' | 'manual';
 }
 
-// Inside types.ts
 export interface ItemStyle {
   titleColor?: string;
   titleColorEnd?: string;
@@ -22,8 +20,6 @@ export interface ItemStyle {
   fontFamily?: string;
   isGradient?: boolean;
 }
-
-// In types.ts
 
 export interface LectureRule {
   id: string;
@@ -80,6 +76,9 @@ export interface UserProfile {
   visitCount: number;
   totalTimeSpent: number; // Seconds
   lastActive: string; // ISO String
+  // --- NEW FIELDS ---
+  skipIntro?: boolean;      // If true, skips LoadingScanner and IdentityGate
+  lastLineage?: Lineage;    // Remembers if you were Wizard/Muggle
 }
 
 export interface VisitorLog {

@@ -202,14 +202,31 @@ const LoadingScanner: React.FC = () => {
     );
 };
 
+// --- HELPER FOR SYNC LOAD (Syncs Profile Before Render) ---
+const getSavedProfile = () => {
+  try {
+      const s = localStorage.getItem('core_connect_profile');
+      return s ? JSON.parse(s) : null;
+  } catch (e) { return null; }
+};
+
 function App() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [csrfToken, setCsrfToken] = useState('');
   const [permissions, setPermissions] = useState<AdminPermissions | null>(null);
   const [currentUser, setCurrentUser] = useState('');
   
-  const [configLoaded, setConfigLoaded] = useState(false);
-  const [lineage, setLineage] = useState<Lineage | null>(null);
+  // 1. Synchronously check preferences before first render
+  const savedProfile = getSavedProfile();
+  const shouldSkip = !!savedProfile?.skipIntro;
+  const savedLineage = savedProfile?.lastLineage || null;
+
+  // 2. Initialize states based on preferences
+  // If shouldSkip is true, we set configLoaded to true immediately
+  const [configLoaded, setConfigLoaded] = useState(() => shouldSkip);
+  // If shouldSkip is true, we attempt to restore the last used lineage immediately
+  const [lineage, setLineage] = useState<Lineage | null>(() => shouldSkip && savedLineage ? savedLineage : null);
+
   const [activeSectorId, setActiveSectorId] = useState<string>('announcements');
   const [sectors, setSectors] = useState<Sector[]>(DEFAULT_SECTORS);
   const [globalConfig, setGlobalConfig] = useState<GlobalConfig>({
@@ -240,30 +257,26 @@ function App() {
   const [viewingItem, setViewingItem] = useState<CarouselItem | null>(null);
   const [announcementViewMode, setAnnouncementViewMode] = useState<'carousel' | 'list'>('carousel');
   const [editingItem, setEditingItem] = useState<CarouselItem | null>(null);
-  // --- HEARTBEAT FIX (Option 2) ---
-  // 1. Create a "box" (ref) to hold the latest profile
+  
   const profileRef = useRef(profile);
 
-  // 2. Whenever profile changes (e.g. user logs in), update the box
+  // Keep Ref synced for Heartbeat
   useEffect(() => {
       profileRef.current = profile;
   }, [profile]);
 
-  // 3. The Heartbeat Timer
+  // Heartbeat Timer
   useEffect(() => {
       const interval = setInterval(() => {
-          // Always grab the FRESH profile from the box
           const p = profileRef.current; 
-          
           if (p.id && p.id !== 'guest') {
               trackActivity(p.id, 'HEARTBEAT', '', '', 0, p.displayName);
           }
-      }, 10000); // Runs every 10 seconds
-
+      }, 10000); 
       return () => clearInterval(interval);
-  }, []); // Empty dependency array = Timer never resets, never glitches
+  }, []); 
 
-  // Data
+  // Data Normalization (for Telegram/Local Files)
   const normalizedLocalFiles: CarouselItem[] = (MY_FILES as any[]).map(f => ({
       ...f,
       content: f.content || f.description || '',
@@ -317,11 +330,11 @@ function App() {
   useEffect(() => {
      const loadData = async () => {
          try {
-             const savedProfile = localStorage.getItem('core_connect_profile');
+             const localSaved = localStorage.getItem('core_connect_profile');
              let currentProfile = profile;
              
-             if (savedProfile) {
-                 currentProfile = JSON.parse(savedProfile);
+             if (localSaved) {
+                 currentProfile = JSON.parse(localSaved);
                  setProfile(currentProfile);
              } else {
                  const newId = crypto.randomUUID();
@@ -331,7 +344,7 @@ function App() {
                  currentProfile = newProfile;
              }
 
-             // Start Heartbeat
+             // Start Heartbeat immediately
              trackActivity(currentProfile.id, 'HEARTBEAT', '', '', 0, currentProfile.displayName);
 
              await fetchData();
@@ -355,7 +368,10 @@ function App() {
              if (dbItems.length === 0) setShowOfflineAlert(true);
          }
          finally { 
-             setTimeout(() => setConfigLoaded(true), 4500); 
+             // Only run the artificial loading delay if we are NOT skipping intro
+             if (!shouldSkip) {
+                setTimeout(() => setConfigLoaded(true), 4500); 
+             }
          }
      };
      loadData();
@@ -368,7 +384,7 @@ function App() {
      };
      window.addEventListener('keydown', handleKeyDown);
      return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [fetchData]);
+  }, [fetchData, shouldSkip]); // Added shouldSkip dependency so it knows how to behave
 
   useEffect(() => {
       if (adminPanelOpen) return;
@@ -380,7 +396,6 @@ function App() {
 
   useEffect(() => {
       if (profile.id && activeSectorId && profile.id !== 'guest') {
-          // Push name to server every time they move
           trackActivity(profile.id, 'ENTER_SECTOR', activeSectorId, activeSectorId, 0, profile.displayName);
       }
   }, [activeSectorId, profile.id, profile.displayName]);
@@ -428,26 +443,30 @@ function App() {
       if (!visitorId || visitorId === 'guest') {
           visitorId = crypto.randomUUID();
       }
-      
-      // Name from Input OR existing Profile
       const finalName = name || profile.displayName; 
       
-      const newProfile = { ...profile, displayName: finalName, id: visitorId };
+      // Save lastLineage so we can skip next time
+      const newProfile = { ...profile, displayName: finalName, id: visitorId, lastLineage: l };
       setProfile(newProfile);
       
-      // 1. Save to Phone Storage First
       localStorage.setItem('core_connect_profile', JSON.stringify(newProfile));
-
-      // 2. FORCE UPDATE SERVER immediately
       trackActivity(newProfile.id, 'LOGIN', '', '', 0, finalName);
   };
+  
   const toggleLineage = () => {
-      setLineage(l => l === Lineage.WIZARD ? Lineage.MUGGLE : Lineage.WIZARD);
+      const newLineage = lineage === Lineage.WIZARD ? Lineage.MUGGLE : Lineage.WIZARD;
+      setLineage(newLineage);
+      
+      // Update profile with new choice so we remember it if skipping next time
+      setProfile(prev => {
+          const updated = { ...prev, lastLineage: newLineage };
+          localStorage.setItem('core_connect_profile', JSON.stringify(updated));
+          return updated;
+      });
   };
 
   const handleCreateItem = async (item: CarouselItem) => {
       setDbItems(prev => [item, ...prev]);
-      
       if (isAdmin && csrfToken) {
           try {
               const { isUnread, isLiked, likes, ...dbItem } = item;
@@ -490,7 +509,6 @@ function App() {
   const handleUpdateSubject = async (oldName: string, newName: string, newImage?: string) => {
       const updatedItems = dbItems.map(i => i.subject === oldName ? { ...i, subject: newName, image: (newImage && i.image === '') ? newImage : i.image } : i);
       setDbItems(updatedItems);
-      
       if (isAdmin && csrfToken) {
           const itemsToUpdate = dbItems.filter(i => i.subject === oldName);
           for (const item of itemsToUpdate) {
@@ -515,7 +533,6 @@ function App() {
           }
           return item;
       }));
-
       if (isAdmin && csrfToken) {
           try {
               await safeFetch(`${API_URL}/api/admin/reorder`, {
@@ -566,7 +583,6 @@ function App() {
       try {
           await safeFetch(`${API_URL}/api/logout`, { method: 'POST' });
       } catch (e) {}
-      
       setIsAdmin(false);
       setCsrfToken('');
       setPermissions(null);
@@ -574,21 +590,12 @@ function App() {
       setAdminPanelOpen(false);
   };
 
-  // --- UPDATED PDF DETECTION LOGIC ---
   const isPDF = (item: CarouselItem | null) => {
       if (!item || !item.fileUrl) return false;
       const url = item.fileUrl.toLowerCase();
-      
-      // Check content, NOT just the item type.
-      // 1. Google Drive Links
-      // 2. Standard .pdf files
       const isDrive = url.includes('drive.google.com');
       const isPdfExtension = url.endsWith('.pdf');
-      
-      // If it's a Drive link or PDF, use internal viewer.
       if (isDrive || isPdfExtension) return true;
-      
-      // Otherwise (Zoom, Meet, YouTube, etc.) return false so it uses standard viewer/link behavior
       return false;
   };
 
@@ -605,50 +612,46 @@ function App() {
   const handleTouchEnd = (e: React.TouchEvent) => {
       if (!touchStart) return;
       if ((e.target as HTMLElement).closest('.no-swipe')) return;
-
       const touchEnd = e.changedTouches[0].clientX;
-      if (touchStart - touchEnd > 100) { 
-          setSidebarOpen(false); 
-      }
-      if (touchEnd - touchStart > 100) { 
-          setSidebarOpen(true);
-      }
+      if (touchStart - touchEnd > 100) setSidebarOpen(false); 
+      if (touchEnd - touchStart > 100) setSidebarOpen(true);
       setTouchStart(null);
   };
 
-  // --- URL SYNC LOGIC (NEW) ---
-  // 1. LISTEN: When the app loads or user hits "Back", update the active sector from the URL
+  // --- URL SYNC LOGIC ---
   useEffect(() => {
     const handleLocationChange = () => {
-        // Get path without slash (e.g., "mysite.com/lectures" -> "lectures")
         const path = window.location.pathname.substring(1);
-        
-        // Allow valid sectors or system pages
         const validIds = sectors.map(s => s.id);
         if (validIds.includes(path) || path === 'system_info') {
             setActiveSectorId(path);
         }
     };
-
-    // Check on initial load
     handleLocationChange();
-
-    // Listen for browser navigation (Back/Forward buttons)
     window.addEventListener('popstate', handleLocationChange);
     return () => window.removeEventListener('popstate', handleLocationChange);
-  }, [sectors]); // Re-run if sector list changes
+  }, [sectors]);
 
-  // 2. PUSH: When you click a menu item (changing activeSectorId), update the URL
   useEffect(() => {
+    // If not loaded yet (or not skipped), do not touch URL
+    if (!configLoaded) return;
+    
     const currentPath = window.location.pathname.substring(1);
     
-    // Only push if the URL is different from the state (prevents loops)
+    // If we have no lineage yet (e.g. at IdentityGate), show /identity
+    if (!lineage) {
+        if (currentPath !== 'identity') window.history.pushState(null, '', '/identity');
+        return;
+    }
+    
+    // If inside, push the sector path
     if (currentPath !== activeSectorId) {
         window.history.pushState(null, '', `/${activeSectorId}`);
     }
-  }, [activeSectorId]);
-  // --- END URL SYNC LOGIC ---
+  }, [activeSectorId, configLoaded, lineage]); 
 
+  // --- RENDER CONDITIONALS ---
+  
   if (!configLoaded) return <LoadingScanner />;
 
   if (!lineage) return <IdentityGate onSelect={handleLineageSelect} config={globalConfig} />;
@@ -658,7 +661,6 @@ function App() {
   
   const cursorStyle = globalConfig.cursorStyle || 'classic';
   const cursorClass = `cursor-${cursorStyle}-${isWizard ? 'wizard' : 'muggle'}`;
-
   const visualFilter = `brightness(${profile.brightness || 100}%) contrast(${profile.contrast || 100}%)`;
   const a11yClass = profile.highContrast ? 'contrast-125 brightness-110 saturate-150' : '';
   const accentColor = profile.themeColor || (isWizard ? '#10b981' : '#d946ef');
@@ -775,58 +777,17 @@ function App() {
                             The archives are currently offline. This usually means the database keys are missing or the server is down. <br/><br/>
                             Application is running in <b>Local Mode</b>.
                         </p>
-                        <button 
-                            onClick={() => setShowOfflineAlert(false)}
-                            className="px-6 py-2 bg-red-600 hover:bg-red-500 text-white font-bold rounded-lg transition-colors"
-                        >
-                            ACKNOWLEDGE
-                        </button>
+                        <button onClick={() => setShowOfflineAlert(false)} className="px-6 py-2 bg-red-600 hover:bg-red-500 text-white font-bold rounded-lg transition-colors">ACKNOWLEDGE</button>
                     </div>
                 </div>
             )}
-
             {toolsOpen && (
-                <ToolsModal 
-                    lineage={lineage} 
-                    onClose={() => setToolsOpen(false)} 
-                    profile={profile} 
-                    setProfile={setProfile} 
-                    config={globalConfig} 
-                    onToggleLineage={toggleLineage}
-                />
+                <ToolsModal lineage={lineage} onClose={() => setToolsOpen(false)} profile={profile} setProfile={setProfile} config={globalConfig} onToggleLineage={toggleLineage} />
             )}
             <CommandCenter lineage={lineage} isOpen={commandCenterOpen} onClose={() => setCommandCenterOpen(false)} onImportItems={(items) => items.forEach(i => handleCreateItem(i))} />
             <OracleInterface lineage={lineage} isOpen={oracleOpen} onClose={() => setOracleOpen(false)} items={dbItems} profile={profile} />
-            <AdminPanel 
-                lineage={lineage} 
-                isOpen={adminPanelOpen} 
-                onClose={() => { setAdminPanelOpen(false); setEditingItem(null); }} 
-                initialTab={adminInitialTab}
-                isAdmin={isAdmin} 
-                csrfToken={csrfToken} 
-                currentUser={currentUser} 
-                permissions={permissions} 
-                onLogin={handleLoginSuccess} 
-                onLogout={handleLogout} 
-                allItems={dbItems} 
-                sectors={sectors} 
-                globalConfig={globalConfig} 
-                initialEditingItem={editingItem} 
-                defaultSector={activeSectorId} 
-                onAddItem={handleCreateItem} 
-                onUpdateItem={handleUpdateItem} 
-                onDeleteItem={handleDeleteItem} 
-                onUpdateSectors={saveSectors} 
-                onUpdateConfig={saveGlobalConfig} 
-                onClearData={() => { localStorage.clear(); window.location.reload(); }} 
-            />
-            {viewingItem && (
-                isPDF(viewingItem) ? (
-                    <PDFViewer item={viewingItem} lineage={lineage} onClose={() => setViewingItem(null)} />
-                ) : (
-                    <ItemViewer item={viewingItem} lineage={lineage} onClose={() => setViewingItem(null)} />
-                )
-            )}
+            <AdminPanel lineage={lineage} isOpen={adminPanelOpen} onClose={() => { setAdminPanelOpen(false); setEditingItem(null); }} initialTab={adminInitialTab} isAdmin={isAdmin} csrfToken={csrfToken} currentUser={currentUser} permissions={permissions} onLogin={handleLoginSuccess} onLogout={handleLogout} allItems={dbItems} sectors={sectors} globalConfig={globalConfig} initialEditingItem={editingItem} defaultSector={activeSectorId} onAddItem={handleCreateItem} onUpdateItem={handleUpdateItem} onDeleteItem={handleDeleteItem} onUpdateSectors={saveSectors} onUpdateConfig={saveGlobalConfig} onClearData={() => { localStorage.clear(); window.location.reload(); }} />
+            {viewingItem && (isPDF(viewingItem) ? <PDFViewer item={viewingItem} lineage={lineage} onClose={() => setViewingItem(null)} /> : <ItemViewer item={viewingItem} lineage={lineage} onClose={() => setViewingItem(null)} />)}
             <CommandPalette lineage={lineage} isOpen={cmdOpen} onClose={() => setCmdOpen(false)} onNavigate={setActiveSectorId} />
         </Suspense>
       </main>
