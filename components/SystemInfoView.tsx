@@ -1,10 +1,9 @@
-
 import React from 'react';
 import { Lineage, SECTORS } from '../types';
 import { 
   Shield, Server, Database, Lock, Eye, Activity, Cpu, Scroll, Info, AlertTriangle, 
   Terminal, Code, Globe, GraduationCap, Megaphone, BookOpen, Clock, PenTool, 
-  Wrench, Palette, User, Sparkles, Wand2, Fingerprint, Search 
+  Wrench, Palette, User, Sparkles, Wand2, Fingerprint, Search, Zap, Link as LinkIcon, FileText 
 } from 'lucide-react';
 
 interface SystemInfoViewProps {
@@ -20,6 +19,31 @@ const SystemInfoView: React.FC<SystemInfoViewProps> = ({ lineage, isAdmin }) => 
   const aboutText = isWizard
     ? "Welcome, Apprentice, to the digital mirror of 'Core Connect'. This enchanted archive mimics the great scroll-network (Telegram) utilized by the scholars of the 2nd Semester (CSDA & AICS) at the Grand Academy of IIT Patna. It serves as a nexus for all knowledge, edicts, and schedules required for your magical studies."
     : "System initialized. This platform is a full-stack web replica of the 'Core Connect' Telegram channel, designed specifically for 2nd Semester CSDA & AICS students at IIT Patna. It aggregates academic resources, announcements, and scheduling data into a unified, interactive dashboard.";
+
+  // NEW: Update Highlights
+  const updates = [
+      {
+          icon: LinkIcon,
+          title: isWizard ? "Portal Anchors (Deep Links)" : "URL Deep Linking",
+          desc: isWizard 
+            ? "The fabric of reality now remembers where you stand. Bookmarking a specific hall (e.g., /lectures) allows you to teleport there directly." 
+            : "Navigation state is now synced with the browser URL. You can share or bookmark direct links to specific pages (e.g., /lectures)."
+      },
+      {
+          icon: Zap,
+          title: isWizard ? "Instant Apparition" : "Skip Intro Logic",
+          desc: isWizard
+            ? "For the swift sorcerer. A new spell in your Satchel (Tools) allows you to bypass the castle gates and materialize instantly."
+            : "New Accessibility setting added. Enable 'Skip Intro & Gate' in the Tools menu to bypass the loading animation on startup."
+      },
+      {
+           icon: FileText,
+           title: isWizard ? "Restored Ancient Scrolls" : "PDF Core Upgrade",
+           desc: isWizard
+             ? "The magical lens has been polished. Google Drive artifacts and PDF scrolls now open reliably within the castle walls."
+             : "Internal PDF viewer engine updated. Fixed compatibility issues with Google Drive links and embedded document rendering."
+      }
+  ];
 
   const userCapabilities = [
     {
@@ -119,6 +143,39 @@ const SystemInfoView: React.FC<SystemInfoViewProps> = ({ lineage, isAdmin }) => 
          </div>
          {/* Background Decor */}
          <div className={`absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none ${isWizard ? 'bg-[radial-gradient(circle_at_50%_50%,_#10b981_0%,_transparent_50%)]' : 'bg-[radial-gradient(circle_at_50%_50%,_#d946ef_0%,_transparent_50%)]'}`}></div>
+      </div>
+
+      {/* --- NEW UPDATES SECTION --- */}
+      <div className="space-y-8">
+         <div className="flex items-center gap-4">
+             <div className={`h-px flex-1 ${isWizard ? 'bg-emerald-800' : 'bg-fuchsia-800'}`}></div>
+             <h2 className={`text-2xl font-bold flex items-center gap-3 ${isWizard ? 'font-wizardTitle text-emerald-100' : 'font-muggle text-fuchsia-100'}`}>
+               <Sparkles size={24}/> {isWizard ? "New Magic Discovered (v2.4.0)" : "System Patch Notes (v2.4.0)"}
+             </h2>
+             <div className={`h-px flex-1 ${isWizard ? 'bg-emerald-800' : 'bg-fuchsia-800'}`}></div>
+         </div>
+
+         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {updates.map((update, idx) => (
+               <div key={idx} className={`p-6 rounded-xl border backdrop-blur-sm group hover:-translate-y-2 transition-all duration-300
+                  ${isWizard 
+                    ? 'bg-[#0f1510]/60 border-emerald-900/50 hover:border-emerald-500/50 hover:bg-emerald-900/20' 
+                    : 'bg-[#150f1a]/60 border-fuchsia-900/50 hover:border-fuchsia-500/50 hover:bg-fuchsia-900/20'}
+               `}>
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-4
+                     ${isWizard ? 'bg-emerald-500/20 text-emerald-400' : 'bg-fuchsia-500/20 text-fuchsia-400'}
+                  `}>
+                      <update.icon size={20} />
+                  </div>
+                  <h3 className={`text-lg font-bold mb-3 ${isWizard ? 'font-wizardTitle text-emerald-200' : 'font-muggle text-fuchsia-200'}`}>
+                     {update.title}
+                  </h3>
+                  <p className={`text-sm leading-relaxed ${isWizard ? 'font-wizard text-zinc-400' : 'font-muggle text-zinc-400'}`}>
+                     {update.desc}
+                  </p>
+               </div>
+            ))}
+         </div>
       </div>
 
       {/* SECTOR GUIDE */}

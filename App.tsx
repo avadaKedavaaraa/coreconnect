@@ -17,7 +17,7 @@ import PDFViewer from './components/PDFViewer';
 import ItemViewer from './components/ItemViewer';
 import CommandPalette from './components/CommandPalette';
 import LiveBackground from './components/LiveBackground';
-import { Menu, LayoutList, Briefcase, AlertTriangle } from 'lucide-react';
+import { Menu, LayoutList, Briefcase, AlertTriangle, X, Sparkles, Zap, Link as LinkIcon, FileText } from 'lucide-react';
 import { MY_FILES } from './telegramData';
 import { API_URL } from './lib/config';
 import { trackActivity } from './services/tracking';
@@ -202,13 +202,92 @@ const LoadingScanner: React.FC = () => {
     );
 };
 
-// --- HELPER FOR SYNC LOAD (Syncs Profile Before Render) ---
+// --- HELPER FOR SYNC LOAD ---
 const getSavedProfile = () => {
   try {
       const s = localStorage.getItem('core_connect_profile');
       return s ? JSON.parse(s) : null;
   } catch (e) { return null; }
 };
+
+// --- NEW UPDATE POPUP COMPONENT ---
+const UpdatePopup = ({ onClose, isWizard, accentColor }: { onClose: () => void, isWizard: boolean, accentColor: string }) => {
+    return (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-[fade-in_0.5s]">
+            <div className={`relative max-w-md w-full p-1 rounded-xl shadow-2xl overflow-hidden bg-gradient-to-br ${isWizard ? 'from-emerald-900 to-black' : 'from-fuchsia-900 to-black'}`}>
+                {/* Glow Border Effect */}
+                <div className={`absolute inset-0 opacity-50 blur-xl ${isWizard ? 'bg-emerald-500' : 'bg-fuchsia-500'}`}></div>
+                
+                <div className={`relative bg-[#050505] rounded-lg p-6 border ${isWizard ? 'border-emerald-500/50' : 'border-fuchsia-500/50'}`}>
+                    {/* Header */}
+                    <div className="flex justify-between items-start mb-6">
+                        <div className="flex items-center gap-3">
+                            <div className={`p-3 rounded-full ${isWizard ? 'bg-emerald-500/20 text-emerald-400' : 'bg-fuchsia-500/20 text-fuchsia-400'} animate-pulse`}>
+                                <Sparkles size={24} />
+                            </div>
+                            <div>
+                                <h3 className={`text-xl font-bold ${isWizard ? 'text-emerald-100 font-wizardTitle' : 'text-fuchsia-100 font-muggle'}`}>
+                                    SYSTEM UPGRADE
+                                </h3>
+                                <p className="text-xs text-zinc-400 uppercase tracking-widest">Version 2.4.0 Live</p>
+                            </div>
+                        </div>
+                        <button onClick={onClose} className="text-zinc-500 hover:text-white transition-colors">
+                            <X size={24} />
+                        </button>
+                    </div>
+
+                    {/* Update List */}
+                    <div className="space-y-4 mb-8">
+                         {/* Feature 1 */}
+                        <div className="flex gap-3">
+                            <LinkIcon size={20} className={isWizard ? 'text-emerald-500' : 'text-fuchsia-500'} />
+                            <div>
+                                <h4 className="text-white font-bold text-sm">Deep Link Navigation</h4>
+                                <p className="text-zinc-400 text-xs leading-relaxed">
+                                    URLs now sync with your location (e.g., <b>/lectures</b>). You can bookmark specific pages and share direct links.
+                                </p>
+                            </div>
+                        </div>
+                        
+                        {/* Feature 2 */}
+                        <div className="flex gap-3">
+                            <Zap size={20} className="text-yellow-400" />
+                            <div>
+                                <h4 className="text-white font-bold text-sm">Skip Intro Feature</h4>
+                                <p className="text-zinc-400 text-xs leading-relaxed">
+                                    Tired of waiting? Enable <b>"Skip Intro & Gate"</b> in the Tools (Accessibility) menu to load instantly.
+                                </p>
+                            </div>
+                        </div>
+
+                         {/* Feature 3 */}
+                         <div className="flex gap-3">
+                            <FileText size={20} className="text-blue-400" />
+                            <div>
+                                <h4 className="text-white font-bold text-sm">Enhanced PDF Core</h4>
+                                <p className="text-zinc-400 text-xs leading-relaxed">
+                                    Google Drive links and PDF files now open reliably within the secure internal viewer.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Footer Button */}
+                    <button 
+                        onClick={onClose}
+                        className={`w-full py-3 rounded-lg font-bold text-black transition-all hover:scale-[1.02] active:scale-95 shadow-lg
+                            ${isWizard ? 'bg-emerald-500 hover:bg-emerald-400' : 'bg-fuchsia-500 hover:bg-fuchsia-400'}
+                        `}
+                    >
+                        ACKNOWLEDGE UPDATE
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 
 function App() {
   const [isAdmin, setIsAdmin] = useState(false);
@@ -222,9 +301,7 @@ function App() {
   const savedLineage = savedProfile?.lastLineage || null;
 
   // 2. Initialize states based on preferences
-  // If shouldSkip is true, we set configLoaded to true immediately
-  const [configLoaded, setConfigLoaded] = useState(() => shouldSkip);
-  // If shouldSkip is true, we attempt to restore the last used lineage immediately
+  const [configLoaded, setConfigLoaded] = useState(() => shouldSkip); 
   const [lineage, setLineage] = useState<Lineage | null>(() => shouldSkip && savedLineage ? savedLineage : null);
 
   const [activeSectorId, setActiveSectorId] = useState<string>('announcements');
@@ -244,6 +321,9 @@ function App() {
   });
   const [isOffline, setIsOffline] = useState(false);
   const [showOfflineAlert, setShowOfflineAlert] = useState(false);
+  
+  // Update Popup State
+  const [showUpdatePopup, setShowUpdatePopup] = useState(false);
 
   // UI State
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -260,7 +340,7 @@ function App() {
   
   const profileRef = useRef(profile);
 
-  // Keep Ref synced for Heartbeat
+  // Profile Sync Ref
   useEffect(() => {
       profileRef.current = profile;
   }, [profile]);
@@ -276,7 +356,27 @@ function App() {
       return () => clearInterval(interval);
   }, []); 
 
-  // Data Normalization (for Telegram/Local Files)
+  // --- CHECK FOR UPDATE POPUP ---
+  useEffect(() => {
+      // Only check once config is loaded (i.e. user is in the app)
+      if (configLoaded) {
+          const updateKey = 'core_connect_update_v2_4'; // Unique key for THIS update
+          const hasSeen = localStorage.getItem(updateKey);
+          
+          if (!hasSeen) {
+              // Small delay so it doesn't pop immediately over the intro fade-out
+              const timer = setTimeout(() => setShowUpdatePopup(true), 2000);
+              return () => clearTimeout(timer);
+          }
+      }
+  }, [configLoaded]);
+
+  const handleDismissUpdate = () => {
+      localStorage.setItem('core_connect_update_v2_4', 'true');
+      setShowUpdatePopup(false);
+  };
+
+  // Data Normalization
   const normalizedLocalFiles: CarouselItem[] = (MY_FILES as any[]).map(f => ({
       ...f,
       content: f.content || f.description || '',
@@ -344,7 +444,6 @@ function App() {
                  currentProfile = newProfile;
              }
 
-             // Start Heartbeat immediately
              trackActivity(currentProfile.id, 'HEARTBEAT', '', '', 0, currentProfile.displayName);
 
              await fetchData();
@@ -368,7 +467,7 @@ function App() {
              if (dbItems.length === 0) setShowOfflineAlert(true);
          }
          finally { 
-             // Only run the artificial loading delay if we are NOT skipping intro
+             // Only run timeout if NOT skipping
              if (!shouldSkip) {
                 setTimeout(() => setConfigLoaded(true), 4500); 
              }
@@ -384,7 +483,7 @@ function App() {
      };
      window.addEventListener('keydown', handleKeyDown);
      return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [fetchData, shouldSkip]); // Added shouldSkip dependency so it knows how to behave
+  }, [fetchData, shouldSkip]); 
 
   useEffect(() => {
       if (adminPanelOpen) return;
@@ -445,7 +544,6 @@ function App() {
       }
       const finalName = name || profile.displayName; 
       
-      // Save lastLineage so we can skip next time
       const newProfile = { ...profile, displayName: finalName, id: visitorId, lastLineage: l };
       setProfile(newProfile);
       
@@ -457,7 +555,6 @@ function App() {
       const newLineage = lineage === Lineage.WIZARD ? Lineage.MUGGLE : Lineage.WIZARD;
       setLineage(newLineage);
       
-      // Update profile with new choice so we remember it if skipping next time
       setProfile(prev => {
           const updated = { ...prev, lastLineage: newLineage };
           localStorage.setItem('core_connect_profile', JSON.stringify(updated));
@@ -633,18 +730,14 @@ function App() {
   }, [sectors]);
 
   useEffect(() => {
-    // If not loaded yet (or not skipped), do not touch URL
     if (!configLoaded) return;
-    
     const currentPath = window.location.pathname.substring(1);
     
-    // If we have no lineage yet (e.g. at IdentityGate), show /identity
     if (!lineage) {
         if (currentPath !== 'identity') window.history.pushState(null, '', '/identity');
         return;
     }
     
-    // If inside, push the sector path
     if (currentPath !== activeSectorId) {
         window.history.pushState(null, '', `/${activeSectorId}`);
     }
@@ -764,6 +857,11 @@ function App() {
 
         {/* MODALS */}
         <Suspense fallback={null}>
+            {/* NEW UPDATE POPUP */}
+            {showUpdatePopup && (
+                <UpdatePopup onClose={handleDismissUpdate} isWizard={isWizard} accentColor={accentColor} />
+            )}
+
             {showOfflineAlert && (
                 <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-[fade-in_0.3s]">
                     <div className={`relative max-w-sm w-full p-6 rounded-xl border-2 shadow-2xl text-center ${isWizard ? 'bg-[#0a0f0a] border-red-500' : 'bg-[#0f0a15] border-red-500'}`}>
