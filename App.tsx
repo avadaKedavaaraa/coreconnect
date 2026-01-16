@@ -616,6 +616,39 @@ function App() {
       setTouchStart(null);
   };
 
+  // --- URL SYNC LOGIC (NEW) ---
+  // 1. LISTEN: When the app loads or user hits "Back", update the active sector from the URL
+  useEffect(() => {
+    const handleLocationChange = () => {
+        // Get path without slash (e.g., "mysite.com/lectures" -> "lectures")
+        const path = window.location.pathname.substring(1);
+        
+        // Allow valid sectors or system pages
+        const validIds = sectors.map(s => s.id);
+        if (validIds.includes(path) || path === 'system_info') {
+            setActiveSectorId(path);
+        }
+    };
+
+    // Check on initial load
+    handleLocationChange();
+
+    // Listen for browser navigation (Back/Forward buttons)
+    window.addEventListener('popstate', handleLocationChange);
+    return () => window.removeEventListener('popstate', handleLocationChange);
+  }, [sectors]); // Re-run if sector list changes
+
+  // 2. PUSH: When you click a menu item (changing activeSectorId), update the URL
+  useEffect(() => {
+    const currentPath = window.location.pathname.substring(1);
+    
+    // Only push if the URL is different from the state (prevents loops)
+    if (currentPath !== activeSectorId) {
+        window.history.pushState(null, '', `/${activeSectorId}`);
+    }
+  }, [activeSectorId]);
+  // --- END URL SYNC LOGIC ---
+
   if (!configLoaded) return <LoadingScanner />;
 
   if (!lineage) return <IdentityGate onSelect={handleLineageSelect} config={globalConfig} />;
