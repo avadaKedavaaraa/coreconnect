@@ -38,6 +38,8 @@ export interface LectureRule {
   customMessage?: string;  // Description
   
   // --- UPDATED SCHEDULING FIELDS ---
+  type?: 'class' | 'holiday'; // New field for Holiday/No Class status
+  
   days: string[];          // Changed from single 'dayOfWeek' to array ['Monday', 'Wednesday']
   startDate?: string;      // ISO Date (YYYY-MM-DD) - When does this course start?
   endDate?: string;        // ISO Date (YYYY-MM-DD) - When does it end?

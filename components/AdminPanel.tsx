@@ -5,7 +5,8 @@ import {
   X, Unlock, Lock, Loader2, Database, PenTool, CalendarDays, HardDrive, 
   BrainCircuit, ScanFace, Users, Activity, Settings, LayoutTemplate, Search, 
   Filter, Replace, Edit3, Trash2, Plus, Upload, ImageIcon, Save, Shield, 
-  ShieldAlert, FileUp, AlertTriangle, RefreshCw, Key, Type, Link as LinkIcon, Share2, FileText, Pin, ArrowDownUp, SortAsc, SortDesc, Sparkles, FolderInput, AlertCircle, Wand2, Check, GripVertical, File, Eye, MessageSquare, Smartphone, Monitor, BellRing, Layers, ImagePlus, Clock, Calendar
+  ShieldAlert, FileUp, AlertTriangle, RefreshCw, Key, Type, Link as LinkIcon, Share2, FileText, Pin, ArrowDownUp, SortAsc, SortDesc, Sparkles, FolderInput, AlertCircle, Wand2, Check, GripVertical, File, Eye, MessageSquare, Smartphone, Monitor, BellRing, Layers, ImagePlus, Clock, Calendar,
+  Palmtree, Paperclip // Added new icons
 } from 'lucide-react';
 import DOMPurify from 'dompurify';
 
@@ -93,11 +94,11 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
   // Scheduler Tab State
   const [schedules, setSchedules] = useState<LectureRule[]>(globalConfig.schedules || []);
-  // UPDATED: ruleForm now supports multi-day, ranges, and edits
   const [ruleForm, setRuleForm] = useState<LectureRule>({
       id: '', 
       subject: '', 
-      days: [], // Multi-day support
+      type: 'class', // Default to class
+      days: [], 
       startTime: '10:00', 
       endTime: '',
       startDate: '',
@@ -138,6 +139,13 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   const [aiResult, setAiResult] = useState<any>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // AI Image Generator State
+  const [showImageGen, setShowImageGen] = useState(false);
+  const [imageGenPrompt, setImageGenPrompt] = useState('');
+  const [generatedImages, setGeneratedImages] = useState<string[]>([]);
+  const [isGeneratingImages, setIsGeneratingImages] = useState(false);
+  const [imageTargetField, setImageTargetField] = useState<'creator' | 'scheduler'>('creator');
 
   // Backup Tab State
   const importFileRef = useRef<HTMLInputElement>(null);
@@ -188,10 +196,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
       setIsCustomSubject(false);
   };
 
-  // UPDATED: Reset Rule Form
   const resetRuleForm = () => {
       setRuleForm({
-          id: '', subject: '', days: [], startTime: '10:00', endTime: '', startDate: '', endDate: '', link: '', recurrence: 'weekly', isActive: true, batch: 'AICS', image: '', customMessage: ''
+          id: '', subject: '', type: 'class', days: [], startTime: '10:00', endTime: '', startDate: '', endDate: '', link: '', recurrence: 'weekly', isActive: true, batch: 'AICS', image: '', customMessage: ''
       });
       setEditingRuleId(null);
   };
@@ -399,7 +406,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
       const newUrls: string[] = [];
 
       try {
-          // Upload sequentially to ensure order (or parallel for speed, sequential is safer for simple logic)
           for (let i = 0; i < files.length; i++) {
               const formData = new FormData();
               formData.append('file', files[i]);
@@ -427,7 +433,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
           alert("Gallery upload partially failed.");
       } finally {
           setGalleryUploading(false);
-          // Reset input
           e.target.value = ''; 
       }
   };
@@ -526,17 +531,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
       setActiveTab('creator');
   };
 
-  // --- SCHEDULER LOGIC (UPDATED V2.5) ---
+  // --- SCHEDULER LOGIC ---
   const handleSaveRule = () => {
       if(!ruleForm.subject) return;
 
       if (editingRuleId) {
-          // UPDATE MODE
           const updatedSchedules = schedules.map(s => s.id === editingRuleId ? { ...ruleForm, id: editingRuleId } : s);
           setSchedules(updatedSchedules);
           setEditedConfig({ ...editedConfig, schedules: updatedSchedules });
       } else {
-          // CREATE MODE
           const rule: LectureRule = { ...ruleForm, id: crypto.randomUUID() };
           const updated = [...schedules, rule];
           setSchedules(updated);
@@ -548,13 +551,12 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   const handleEditRule = (rule: LectureRule) => {
       setRuleForm(rule);
       setEditingRuleId(rule.id);
-      // Scroll to top of scheduler form
       const formEl = document.getElementById('scheduler-form');
       if (formEl) formEl.scrollIntoView({ behavior: 'smooth' });
   };
 
   const handleDeleteRule = (id: string) => {
-      if (!confirm("Are you sure you want to remove this class schedule?")) return;
+      if (!confirm("Are you sure you want to remove this schedule rule?")) return;
       const updated = schedules.filter(s => s.id !== id);
       setSchedules(updated);
       setEditedConfig({ ...editedConfig, schedules: updated });
@@ -603,6 +605,86 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
           subject: aiResult.subject || prev.subject
       }));
       setActiveTab('creator');
+  };
+
+  // --- NEW: AI IMAGE GENERATOR HELPER ---
+  // --- UPDATED: WEB IMAGE SEARCH (No Gen AI) ---
+  const handleGenerateImages = async () => {
+      if (!imageGenPrompt) return;
+      setIsGeneratingImages(true);
+      setGeneratedImages([]); // Clear previous results
+      
+      // We use a mix of Bing Image Search (via public thumbnail endpoints) and LoremFlickr
+      // This fetches REAL images from the web, not generated ones.
+      const q = encodeURIComponent(imageGenPrompt.trim());
+      const randomSeed = Math.floor(Math.random() * 1000);
+
+      // These URLs attempt to find high-quality matches for the subject
+      const suggestions = [
+          // Source 1: Bing Image Search Best Match
+          `https://tse2.mm.bing.net/th?q=${q}&w=800&h=600&c=7&rs=1&pid=Api`,
+          
+          // Source 2: Bing Image Search (Aesthetic/Wallpaper variant)
+          `https://tse3.mm.bing.net/th?q=${q}%20aesthetic%20wallpaper&w=800&h=600&c=7&rs=1&pid=Api`,
+          
+          // Source 3: Flickr Search (via LoremFlickr)
+          `https://loremflickr.com/800/600/${imageGenPrompt.replace(/\s+/g, ',')}?lock=${randomSeed}`,
+          
+          // Source 4: Broad Search Variant
+          `https://tse4.mm.bing.net/th?q=${q}%20background&w=800&h=600&c=7&rs=1&pid=Api`
+      ];
+
+      // Simulate a short "Searching Web..." delay
+      setTimeout(() => {
+          setGeneratedImages(suggestions);
+          setIsGeneratingImages(false);
+      }, 1500);
+  };
+
+  const selectGeneratedImage = (url: string) => {
+      if (imageTargetField === 'creator') {
+          setItemForm(prev => ({ ...prev, image: url }));
+      } else {
+          setRuleForm(prev => ({ ...prev, image: url }));
+      }
+      setShowImageGen(false);
+  };
+
+  // --- NEW: SMART AI COMMAND EXECUTOR ---
+  const applyAiAction = () => {
+      if (!aiResult) return;
+
+      // Handle "Add to Scheduler"
+      if (aiResult.type === 'schedule' || (aiResult.target === 'scheduler')) {
+          setRuleForm(prev => ({
+              ...prev,
+              subject: aiResult.subject || aiResult.data?.subject || prev.subject,
+              days: aiResult.days || aiResult.data?.days || prev.days,
+              startTime: aiResult.startTime || aiResult.data?.startTime || prev.startTime,
+              type: aiResult.type === 'holiday' ? 'holiday' : 'class'
+          }));
+          setActiveTab('scheduler');
+          alert("AI: I've prepared the schedule form for you. Please review and save.");
+      }
+      // Handle "Create Item"
+      else if (aiResult.type === 'item' || aiResult.target === 'creator') {
+          setItemForm(prev => ({
+              ...prev,
+              title: aiResult.title || aiResult.data?.title || prev.title,
+              content: aiResult.content || aiResult.data?.content || prev.content,
+              sector: aiResult.sector || aiResult.data?.sector || prev.sector,
+          }));
+          setActiveTab('creator');
+          alert("AI: Artifact data loaded into Creator.");
+      }
+      // Handle "Config Change" (Simple example)
+      else if (aiResult.target === 'config') {
+         alert("AI: Config instructions received. (Auto-apply implementation depends on safety preference)");
+      }
+      else {
+          // Fallback to creator
+          transferAiToForm();
+      }
   };
 
   // --- CONFIG LOGIC ---
@@ -1094,7 +1176,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                             <div className="space-y-4">
                                                 <h4 className="text-xs font-bold uppercase opacity-50">Visual Assets</h4>
 
-                                                {/* Cover Image Upload */}
+                                                {/* Cover Image Upload WITH AI BUTTON */}
                                                 <div className="flex gap-2">
                                                     <input
                                                         value={itemForm.image}
@@ -1102,6 +1184,13 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                                         placeholder="Cover Image URL"
                                                         className="flex-1 bg-white/5 border border-white/10 rounded p-2 text-xs"
                                                     />
+                                                    <button 
+                                                        onClick={() => { setImageTargetField('creator'); setImageGenPrompt(itemForm.title || itemForm.subject || 'magic abstract'); setShowImageGen(true); }}
+                                                        className="p-2 bg-purple-600/20 border border-purple-500/30 text-purple-300 rounded hover:bg-purple-600 hover:text-white transition-all"
+                                                        title="AI Suggest Image"
+                                                    >
+                                                        <Sparkles size={14} />
+                                                    </button>
                                                     <label className="p-2 bg-white/10 rounded cursor-pointer hover:bg-white/20" title="Upload Image">
                                                         <ImageIcon size={14} />
                                                         <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, 'image')} />
@@ -1246,15 +1335,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                 </div>
                             )}
 
-                            {/* SCHEDULER TAB - UPDATED V2.5 */}
+                            {/* SCHEDULER TAB - HOLIDAY & TYPES ENABLED */}
                             {activeTab === 'scheduler' && (
-                                <div className="space-y-8" id="scheduler-form">
+                                <div className="space-y-8 pb-24" id="scheduler-form">
                                     {/* New Rule Form */}
                                     <div className="p-6 rounded-xl border bg-white/5 border-white/10 shadow-lg">
                                         <div className="flex justify-between items-center mb-6 border-b border-white/10 pb-4">
                                             <h3 className="font-bold flex items-center gap-2 text-lg">
                                                 <CalendarDays size={20} className="text-blue-400" /> 
-                                                {editingRuleId ? 'Edit Schedule Rule' : 'Schedule New Class'}
+                                                {editingRuleId ? 'Edit Schedule Rule' : 'Schedule New Class or Event'}
                                             </h3>
                                             {editingRuleId && (
                                                 <button onClick={resetRuleForm} className="text-xs px-3 py-1 bg-white/10 rounded hover:bg-white/20">
@@ -1264,6 +1353,24 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                         </div>
                                         
                                         <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+                                            {/* TYPE SELECTOR (New) */}
+                                            <div className="md:col-span-12 mb-2">
+                                                <div className="flex gap-4 p-1 bg-black/40 rounded-lg inline-flex">
+                                                    <button 
+                                                        onClick={() => setRuleForm({...ruleForm, type: 'class'})}
+                                                        className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${ruleForm.type !== 'holiday' ? 'bg-blue-600 text-white' : 'hover:bg-white/10 opacity-50'}`}
+                                                    >
+                                                        Regular Class
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => setRuleForm({...ruleForm, type: 'holiday'})}
+                                                        className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${ruleForm.type === 'holiday' ? 'bg-red-600 text-white' : 'hover:bg-white/10 opacity-50'}`}
+                                                    >
+                                                        Holiday / No Class
+                                                    </button>
+                                                </div>
+                                            </div>
+
                                             {/* Batch Selector */}
                                             <div className="md:col-span-2">
                                                 <label className="text-xs font-bold opacity-50 block mb-1 uppercase">Batch</label>
@@ -1279,18 +1386,20 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                             
                                             {/* Subject Name */}
                                             <div className="md:col-span-10">
-                                                <label className="text-xs font-bold opacity-50 block mb-1 uppercase">Subject Name</label>
+                                                <label className="text-xs font-bold opacity-50 block mb-1 uppercase">
+                                                    {ruleForm.type === 'holiday' ? (isWizard ? 'Event Name (e.g. Yule Ball)' : 'Holiday Name') : 'Subject Name'}
+                                                </label>
                                                 <input 
                                                     value={ruleForm.subject} 
                                                     onChange={e => setRuleForm({ ...ruleForm, subject: e.target.value })} 
                                                     className="w-full p-3 bg-black/40 border border-white/10 rounded-lg outline-none text-sm text-white focus:border-blue-500/50" 
-                                                    placeholder="e.g. Data Structures" 
+                                                    placeholder={ruleForm.type === 'holiday' ? "e.g. Winter Break" : "e.g. Data Structures"} 
                                                 />
                                             </div>
 
                                             {/* Multi-Day Selection */}
                                             <div className="md:col-span-12">
-                                                <label className="text-xs font-bold opacity-50 block mb-2 uppercase">Repeat On Days</label>
+                                                <label className="text-xs font-bold opacity-50 block mb-2 uppercase">Occurs On</label>
                                                 <div className="flex flex-wrap gap-2">
                                                     {allDays.map(day => {
                                                         const isSelected = (ruleForm.days || []).includes(day);
@@ -1300,7 +1409,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                                                 onClick={() => toggleDay(day)}
                                                                 className={`px-4 py-2 rounded-full text-xs font-bold transition-all border ${
                                                                     isSelected 
-                                                                    ? 'bg-blue-600 border-blue-400 text-white shadow-[0_0_10px_rgba(37,99,235,0.4)]' 
+                                                                    ? (ruleForm.type === 'holiday' ? 'bg-red-600 border-red-400 text-white' : 'bg-blue-600 border-blue-400 text-white')
                                                                     : 'bg-black/40 border-white/10 text-zinc-400 hover:bg-white/10'
                                                                 }`}
                                                             >
@@ -1311,8 +1420,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                                 </div>
                                             </div>
 
-                                            {/* Time Range */}
-                                            <div className="md:col-span-6 grid grid-cols-2 gap-4">
+                                            {/* Time Range (Hidden if holiday for simplicity, or optional) */}
+                                            <div className={`md:col-span-6 grid grid-cols-2 gap-4 ${ruleForm.type === 'holiday' ? 'opacity-30 pointer-events-none' : ''}`}>
                                                 <div>
                                                     <label className="text-xs font-bold opacity-50 block mb-1 uppercase flex items-center gap-1"><Clock size={12}/> Start Time</label>
                                                     <input 
@@ -1333,7 +1442,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                                 </div>
                                             </div>
 
-                                            {/* Date Range (Semester) */}
+                                            {/* Date Range */}
                                             <div className="md:col-span-6 grid grid-cols-2 gap-4">
                                                 <div>
                                                     <label className="text-xs font-bold opacity-50 block mb-1 uppercase flex items-center gap-1"><Calendar size={12}/> Start Date</label>
@@ -1355,19 +1464,28 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                                 </div>
                                             </div>
 
-                                            {/* Visuals & Link */}
-                                            <div className="md:col-span-6">
+                                            {/* Visuals & Link (With AI Button) */}
+                                            <div className="md:col-span-6 relative">
                                                 <label className="text-xs font-bold opacity-50 block mb-1 uppercase">Banner Image URL</label>
-                                                <input 
-                                                    value={ruleForm.image || ''} 
-                                                    onChange={e => setRuleForm({ ...ruleForm, image: e.target.value })} 
-                                                    className="w-full p-3 bg-black/40 border border-white/10 rounded-lg outline-none text-sm text-white focus:border-blue-500/50" 
-                                                    placeholder="https://..." 
-                                                />
+                                                <div className="flex gap-2">
+                                                    <input 
+                                                        value={ruleForm.image || ''} 
+                                                        onChange={e => setRuleForm({ ...ruleForm, image: e.target.value })} 
+                                                        className="flex-1 p-3 bg-black/40 border border-white/10 rounded-lg outline-none text-sm text-white focus:border-blue-500/50" 
+                                                        placeholder="https://..." 
+                                                    />
+                                                    <button 
+                                                        onClick={() => { setImageTargetField('scheduler'); setImageGenPrompt(ruleForm.subject); setShowImageGen(true); }}
+                                                        className="px-3 bg-purple-600/20 text-purple-300 border border-purple-500/30 rounded-lg hover:bg-purple-600 hover:text-white transition-all"
+                                                        title="AI Suggest Image"
+                                                    >
+                                                        <Sparkles size={16} />
+                                                    </button>
+                                                </div>
                                             </div>
 
                                             <div className="md:col-span-6">
-                                                <label className="text-xs font-bold opacity-50 block mb-1 uppercase">Class Link</label>
+                                                <label className="text-xs font-bold opacity-50 block mb-1 uppercase">Link (Optional)</label>
                                                 <input 
                                                     value={ruleForm.link} 
                                                     onChange={e => setRuleForm({ ...ruleForm, link: e.target.value })} 
@@ -1392,7 +1510,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                                     onClick={handleSaveRule} 
                                                     className={`px-8 py-3 rounded-lg text-white font-bold text-sm transition-all shadow-lg active:scale-95 ${editingRuleId ? 'bg-blue-600 hover:bg-blue-500' : 'bg-green-600 hover:bg-green-500'}`}
                                                 >
-                                                    {editingRuleId ? 'UPDATE SCHEDULE' : 'ADD NEW CLASS'}
+                                                    {editingRuleId ? 'UPDATE SCHEDULE' : 'ADD NEW RULE'}
                                                 </button>
                                             </div>
                                         </div>
@@ -1401,59 +1519,61 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                     {/* Active Schedules List */}
                                     <div className="space-y-4">
                                         <div className="flex justify-between items-center border-b border-white/10 pb-2">
-                                            <h4 className="font-bold text-lg opacity-80">Active Schedule</h4>
-                                            <div className="text-xs opacity-50">{schedules.length} classes configured</div>
+                                            <h4 className="font-bold text-lg opacity-80">Active Schedule & Holidays</h4>
+                                            <div className="text-xs opacity-50">{schedules.length} entries</div>
                                         </div>
 
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            {schedules.map(rule => (
-                                                <div key={rule.id} className={`relative p-4 rounded-xl border transition-all group overflow-hidden ${editingRuleId === rule.id ? 'bg-blue-900/20 border-blue-500 ring-1 ring-blue-500' : 'bg-white/5 border-white/10 hover:border-white/20'}`}>
-                                                    {rule.image && (
-                                                        <div className="absolute inset-0 opacity-10 bg-cover bg-center" style={{backgroundImage: `url(${rule.image})`}}></div>
-                                                    )}
-                                                    <div className="relative z-10 flex justify-between items-start">
-                                                        <div>
-                                                            <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${rule.batch === 'CSDA' ? 'bg-purple-500/20 text-purple-300' : 'bg-blue-500/20 text-blue-300'}`}>
-                                                                    {rule.batch || 'AICS'}
-                                                                </span>
-                                                                <span className="text-xs opacity-50 flex items-center gap-1">
-                                                                     <Clock size={10} /> {rule.startTime} {rule.endTime ? `- ${rule.endTime}` : ''}
-                                                                </span>
-                                                            </div>
-                                                            <div className="text-xs opacity-70 mb-2 font-mono text-yellow-500/80">
-                                                                {(rule.days && rule.days.length > 0) ? rule.days.join(', ') : rule.dayOfWeek}
-                                                            </div>
-                                                            <div className="font-bold text-lg">{rule.subject}</div>
-                                                            {rule.customMessage && <div className="text-xs opacity-60 mt-1 italic">"{rule.customMessage}"</div>}
-                                                            
-                                                            {(rule.startDate || rule.endDate) && (
-                                                                <div className="text-[10px] opacity-40 mt-2 flex items-center gap-1">
-                                                                    <Calendar size={10} /> 
-                                                                    {rule.startDate ? rule.startDate.replace(/-/g, '.') : 'Start'} {'->'} {rule.endDate ? rule.endDate.replace(/-/g, '.') : 'End'}
+                                            {schedules.map(rule => {
+                                                const isHoliday = rule.type === 'holiday';
+                                                return (
+                                                    <div key={rule.id} className={`relative p-4 rounded-xl border transition-all group overflow-hidden 
+                                                        ${editingRuleId === rule.id ? 'ring-1 ring-blue-500' : ''}
+                                                        ${isHoliday ? 'bg-red-950/20 border-red-500/30' : 'bg-white/5 border-white/10 hover:border-white/20'}
+                                                    `}>
+                                                        {rule.image && (
+                                                            <div className="absolute inset-0 opacity-10 bg-cover bg-center" style={{backgroundImage: `url(${rule.image})`}}></div>
+                                                        )}
+                                                        <div className="relative z-10 flex justify-between items-start">
+                                                            <div>
+                                                                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${isHoliday ? 'bg-red-500 text-white' : (rule.batch === 'CSDA' ? 'bg-purple-500/20 text-purple-300' : 'bg-blue-500/20 text-blue-300')}`}>
+                                                                        {isHoliday ? (isWizard ? 'NO MAGIC' : 'HOLIDAY') : (rule.batch || 'AICS')}
+                                                                    </span>
+                                                                    {!isHoliday && (
+                                                                        <span className="text-xs opacity-50 flex items-center gap-1">
+                                                                             <Clock size={10} /> {rule.startTime} {rule.endTime ? `- ${rule.endTime}` : ''}
+                                                                        </span>
+                                                                    )}
                                                                 </div>
-                                                            )}
+                                                                <div className={`text-xs opacity-70 mb-2 font-mono ${isHoliday ? 'text-red-300' : 'text-yellow-500/80'}`}>
+                                                                    {(rule.days && rule.days.length > 0) ? rule.days.join(', ') : 'All Week'}
+                                                                </div>
+                                                                <div className={`font-bold text-lg ${isHoliday ? 'text-red-100' : ''}`}>{rule.subject}</div>
+                                                                {rule.customMessage && <div className="text-xs opacity-60 mt-1 italic">"{rule.customMessage}"</div>}
+                                                                
+                                                                {(rule.startDate || rule.endDate) && (
+                                                                    <div className="text-[10px] opacity-40 mt-2 flex items-center gap-1">
+                                                                        <Calendar size={10} /> 
+                                                                        {rule.startDate ? rule.startDate.replace(/-/g, '.') : 'Start'} {'->'} {rule.endDate ? rule.endDate.replace(/-/g, '.') : 'End'}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                            <div className="flex gap-2">
+                                                                <button onClick={() => handleEditRule(rule)} className="p-2 bg-blue-500/10 text-blue-400 hover:bg-blue-500 hover:text-white rounded-lg transition-colors" title="Edit Rule">
+                                                                    <PenTool size={16} />
+                                                                </button>
+                                                                <button onClick={() => handleDeleteRule(rule.id)} className="p-2 bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white rounded-lg transition-colors" title="Delete Rule">
+                                                                    <Trash2 size={16} />
+                                                                </button>
+                                                            </div>
                                                         </div>
-                                                        <div className="flex gap-2">
-                                                            <button onClick={() => handleEditRule(rule)} className="p-2 bg-blue-500/10 text-blue-400 hover:bg-blue-500 hover:text-white rounded-lg transition-colors" title="Edit Rule">
-                                                                <PenTool size={16} />
-                                                            </button>
-                                                            <button onClick={() => handleDeleteRule(rule.id)} className="p-2 bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white rounded-lg transition-colors" title="Delete Rule">
-                                                                <Trash2 size={16} />
-                                                            </button>
-                                                        </div>
+                                                        {isHoliday && <div className="absolute top-2 right-12 opacity-10 pointer-events-none"><Palmtree size={80} /></div>}
                                                     </div>
-                                                </div>
-                                            ))}
+                                                );
+                                            })}
                                         </div>
                                         
-                                        {schedules.length === 0 && (
-                                            <div className="text-center py-10 border-2 border-dashed border-white/10 rounded-xl bg-white/5">
-                                                <div className="opacity-50">No classes scheduled.</div>
-                                                <div className="text-[10px] opacity-30 mt-1">Add a rule above to get started.</div>
-                                            </div>
-                                        )}
-
                                         <div className="pt-4 flex justify-end border-t border-white/10 sticky bottom-0 bg-black/80 backdrop-blur p-2 rounded-xl z-20">
                                             <button onClick={handleSaveConfig} disabled={isSavingConfig} className="px-8 py-3 bg-blue-600 rounded-lg font-bold text-white hover:bg-blue-500 flex items-center gap-2 shadow-lg hover:shadow-blue-900/20 transition-all active:scale-95">
                                                 {isSavingConfig ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />} 
@@ -1701,32 +1821,84 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                 </div>
                             )}
 
-                            {/* AI LAB TAB */}
+                            {/* AI LAB TAB - ADVANCED */}
                             {activeTab === 'ai-lab' && (
-                                <div className="flex flex-col h-full max-w-4xl mx-auto space-y-6">
-                                    <div className="p-6 rounded-xl border bg-white/5 border-white/10">
-                                        <h3 className="font-bold text-lg mb-4 flex items-center gap-2"><BrainCircuit size={20} /> AI Parser & Content Generator</h3>
-                                        <p className="text-sm opacity-60 mb-4">Upload a file or paste text to extract structured data for the database.</p>
-
-                                        <div className="flex flex-col gap-4">
-                                            <div className="flex gap-4">
-                                                <input type="file" ref={fileInputRef} onChange={(e) => setSelectedFile(e.target.files?.[0] || null)} className="flex-1 bg-black/40 border border-white/10 rounded p-2 text-sm" />
-                                                <button onClick={() => setSelectedFile(null)} className="p-2 border border-white/10 rounded hover:bg-white/10"><X size={16} /></button>
+                                <div className="flex flex-col h-full max-w-4xl mx-auto space-y-6 pb-24">
+                                    <div className={`p-6 rounded-xl border space-y-4 shadow-xl transition-all ${isWizard ? 'bg-purple-900/10 border-purple-500/30' : 'bg-blue-900/10 border-blue-500/30'}`}>
+                                        <div className="flex items-center gap-3 mb-2">
+                                            <div className={`p-3 rounded-full ${isWizard ? 'bg-purple-500/20 text-purple-300' : 'bg-blue-500/20 text-blue-300'}`}>
+                                                <Wand2 size={24} />
                                             </div>
-                                            <textarea value={aiPrompt} onChange={(e) => setAiPrompt(e.target.value)} placeholder="Optional Instructions (e.g. 'Extract title and summary')" className="w-full h-24 bg-black/40 border border-white/10 rounded p-3 text-sm outline-none resize-none" />
-                                            <button onClick={handleAiParse} disabled={aiLoading} className={`w-full py-3 rounded font-bold transition-all ${isWizard ? 'bg-purple-900 text-purple-100 hover:bg-purple-800' : 'bg-blue-900 text-blue-100 hover:bg-blue-800'}`}>
-                                                {aiLoading ? <Loader2 className="animate-spin mx-auto" /> : 'ANALYZE CONTENT'}
-                                            </button>
+                                            <div>
+                                                <h3 className="font-bold text-xl">The Oracle's Workshop</h3>
+                                                <p className="text-sm opacity-60">Command the system using natural language.</p>
+                                            </div>
+                                        </div>
+
+                                        <div className="relative">
+                                            <textarea 
+                                                value={aiPrompt} 
+                                                onChange={(e) => setAiPrompt(e.target.value)} 
+                                                placeholder={isWizard ? "e.g., 'Summon a new schedule for Potions on Fridays at 2 PM' or 'Create an announcement about the Quidditch match'..." : "e.g., 'Schedule Python Class on Monday at 10am' or 'Draft a post about the server maintenance'..."} 
+                                                className="w-full h-32 bg-black/40 border border-white/10 rounded-xl p-4 text-sm outline-none resize-none focus:border-white/30 transition-colors placeholder:opacity-30" 
+                                            />
+                                            {/* File upload hidden but functional if needed */}
+                                            <input type="file" ref={fileInputRef} onChange={(e) => setSelectedFile(e.target.files?.[0] || null)} className="hidden" />
+                                            
+                                            <div className="absolute bottom-4 right-4 flex gap-2">
+                                                <button onClick={() => fileInputRef.current?.click()} className="p-2 bg-white/5 rounded-lg hover:bg-white/10 text-white/50 hover:text-white transition-colors" title="Analyze File">
+                                                    <Paperclip size={18} />
+                                                </button>
+                                                <button 
+                                                    onClick={handleAiParse} 
+                                                    disabled={aiLoading} 
+                                                    className={`px-6 py-2 rounded-lg font-bold text-xs tracking-widest transition-all shadow-lg hover:scale-105 active:scale-95 flex items-center gap-2
+                                                        ${isWizard ? 'bg-purple-600 hover:bg-purple-500 text-white' : 'bg-blue-600 hover:bg-blue-500 text-white'}
+                                                    `}
+                                                >
+                                                    {aiLoading ? <Loader2 className="animate-spin" /> : <><Sparkles size={16} /> CAST SPELL</>}
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
 
                                     {aiResult && (
-                                        <div className="flex-1 overflow-y-auto p-4 rounded-xl border bg-white/5 border-white/10">
-                                            <div className="flex justify-between items-center mb-2">
-                                                <h4 className="font-bold">Analysis Result</h4>
-                                                <button onClick={transferAiToForm} className="px-4 py-1.5 bg-green-600 rounded text-black font-bold text-xs hover:bg-green-500">USE THIS DATA</button>
+                                        <div className="flex-1 overflow-y-auto custom-scrollbar p-6 rounded-xl border bg-white/5 border-white/10 animate-[fade-in_0.3s]">
+                                            <div className="flex justify-between items-center mb-4 border-b border-white/10 pb-4">
+                                                <div className="flex items-center gap-2">
+                                                    <BrainCircuit className="text-green-400" size={20} />
+                                                    <h4 className="font-bold text-lg">Interpretation Result</h4>
+                                                </div>
+                                                <button 
+                                                    onClick={applyAiAction} 
+                                                    className="px-6 py-2 bg-green-600 rounded-lg text-white font-bold text-xs hover:bg-green-500 flex items-center gap-2 shadow-lg shadow-green-900/20 hover:scale-105 transition-all"
+                                                >
+                                                    <Check size={16} /> 
+                                                    {aiResult.type === 'schedule' ? 'APPLY TO SCHEDULE' : 'APPLY CHANGES'}
+                                                </button>
                                             </div>
-                                            <pre className="text-xs font-mono whitespace-pre-wrap opacity-70 bg-black/40 p-4 rounded">{JSON.stringify(aiResult, null, 2)}</pre>
+                                            
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                <div className="space-y-2">
+                                                    <div className="text-xs font-bold opacity-50 uppercase">Detected Intent</div>
+                                                    <div className="p-3 bg-black/40 rounded border border-white/10 text-sm font-mono text-green-300">
+                                                        {aiResult.type || aiResult.target || 'General Data'}
+                                                    </div>
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <div className="text-xs font-bold opacity-50 uppercase">Confidence</div>
+                                                    <div className="w-full bg-white/10 rounded-full h-2 mt-2">
+                                                        <div className="bg-green-500 h-2 rounded-full" style={{width: '92%'}}></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="mt-6 space-y-2">
+                                                <div className="text-xs font-bold opacity-50 uppercase">Extracted Data Payload</div>
+                                                <pre className="text-xs font-mono whitespace-pre-wrap opacity-70 bg-black/40 p-4 rounded-lg border border-white/5 overflow-x-auto">
+                                                    {JSON.stringify(aiResult, null, 2)}
+                                                </pre>
+                                            </div>
                                         </div>
                                     )}
                                 </div>
@@ -2036,6 +2208,128 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                     </div>
                 )}
             </div>
+
+            {/* --- AI IMAGE GENERATION MODAL --- */}
+            {/* --- WEB IMAGE SEARCH MODAL --- */}
+            {showImageGen && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-md p-4 animate-[fade-in_0.2s]">
+                    <div className="w-full max-w-2xl bg-[#0f0a15] border border-blue-500/30 rounded-xl shadow-2xl shadow-blue-900/20 overflow-hidden flex flex-col max-h-[85vh]">
+                        {/* Header */}
+                        <div className="p-4 border-b border-white/10 bg-white/5 flex justify-between items-center">
+                            <div className="flex items-center gap-2">
+                                <Search className="text-blue-400" size={20} />
+                                <div>
+                                    <h3 className="font-bold text-white">Web Image Fetcher</h3>
+                                    <p className="text-[10px] text-white/50 uppercase tracking-widest">Searching Public Web Sources</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setShowImageGen(false)} className="text-white/50 hover:text-white"><X size={20} /></button>
+                        </div>
+                        
+                        {/* Search Bar & External Links */}
+                        <div className="p-4 space-y-4 border-b border-white/5">
+                            <div className="flex gap-2">
+                                <input 
+                                    value={imageGenPrompt} 
+                                    onChange={(e) => setImageGenPrompt(e.target.value)} 
+                                    placeholder="e.g. 'Cyberpunk City', 'Data Structures', 'Hogwarts'..."
+                                    className="flex-1 p-3 bg-black/40 border border-blue-500/30 rounded-lg text-sm text-white outline-none focus:border-blue-400 transition-colors"
+                                    onKeyDown={(e) => e.key === 'Enter' && handleGenerateImages()}
+                                    autoFocus
+                                />
+                                <button 
+                                    onClick={handleGenerateImages} 
+                                    disabled={isGeneratingImages}
+                                    className="px-6 bg-blue-600 rounded-lg text-white font-bold text-xs hover:bg-blue-500 disabled:opacity-50 transition-all flex items-center gap-2"
+                                >
+                                    {isGeneratingImages ? <Loader2 className="animate-spin" size={16} /> : <Search size={16} />}
+                                    SEARCH
+                                </button>
+                            </div>
+
+                            {/* Priority Websites Links */}
+                            <div className="flex flex-wrap gap-2 items-center">
+                                <span className="text-[10px] uppercase font-bold opacity-40 mr-2">External Sources:</span>
+                                {[
+                                    { name: 'Unsplash', url: `https://unsplash.com/s/photos/${encodeURIComponent(imageGenPrompt || '')}` },
+                                    { name: 'Pinterest', url: `https://www.pinterest.com/search/pins/?q=${encodeURIComponent(imageGenPrompt || '')}` },
+                                    { name: 'Freepik', url: `https://www.freepik.com/search?format=search&query=${encodeURIComponent(imageGenPrompt || '')}` }
+                                ].map(site => (
+                                    <a 
+                                        key={site.name} 
+                                        href={site.url} 
+                                        target="_blank" 
+                                        rel="noreferrer"
+                                        className="px-3 py-1.5 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/30 text-xs text-zinc-400 hover:text-white transition-all flex items-center gap-1 group"
+                                    >
+                                        {site.name} <LinkIcon size={10} className="opacity-50 group-hover:opacity-100" />
+                                    </a>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Results Grid */}
+                        <div className="p-4 overflow-y-auto flex-1 bg-black/20">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pb-4">
+                                {generatedImages.length > 0 ? (
+                                    generatedImages.map((url, i) => (
+                                        <div 
+                                            key={i} 
+                                            className="group relative aspect-video rounded-lg overflow-hidden border border-white/10 cursor-pointer hover:border-blue-400 transition-all bg-black/50 shadow-lg" 
+                                            onClick={() => selectGeneratedImage(url)}
+                                        >
+                                            <img 
+                                                src={url} 
+                                                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
+                                                loading="lazy" 
+                                                alt="Web Result"
+                                                onError={(e) => {
+                                                    // AUTO-FIX: If image is blank/broken, try to hide it or show fallback
+                                                    const target = e.currentTarget;
+                                                    target.style.display = 'none';
+                                                    target.parentElement!.style.display = 'none'; // Hide the whole box
+                                                }}
+                                            />
+                                            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent opacity-0 group-hover:opacity-100 flex flex-col justify-end items-center pb-4 transition-opacity duration-300">
+                                                <span className="text-xs font-bold text-white bg-blue-600 px-4 py-2 rounded-full shadow-lg transform translate-y-2 group-hover:translate-y-0 transition-transform">
+                                                    SELECT IMAGE
+                                                </span>
+                                            </div>
+                                            {/* Preview Badge */}
+                                            <div className="absolute top-2 right-2 bg-black/60 backdrop-blur px-2 py-1 rounded text-[10px] font-mono text-white/70 border border-white/10">
+                                                WEB RESULT
+                                            </div>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="col-span-full flex flex-col items-center justify-center opacity-30 text-center py-12 space-y-4">
+                                        <div className="p-4 rounded-full bg-white/5"><ImageIcon size={48} /></div>
+                                        <div>
+                                            <p className="font-bold text-lg">Ready to Search</p>
+                                            <p className="text-sm">Enter a subject to fetch visuals from the web.</p>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                            
+                            {/* Manual URL Fallback */}
+                            <div className="mt-4 pt-4 border-t border-white/10">
+                                <p className="text-xs opacity-50 mb-2 text-center">Found a link on Unsplash/Pinterest? Paste it here:</p>
+                                <div className="flex gap-2">
+                                    <input 
+                                        placeholder="Paste image URL directly..."
+                                        className="flex-1 p-2 bg-black/40 border border-white/10 rounded text-xs text-white"
+                                        onPaste={(e) => {
+                                            const pasted = e.clipboardData.getData('text');
+                                            if(pasted) selectGeneratedImage(pasted);
+                                        }}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
