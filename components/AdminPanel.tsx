@@ -6,7 +6,7 @@ import {
   BrainCircuit, ScanFace, Users, Activity, Settings, LayoutTemplate, Search, 
   Filter, Replace, Edit3, Trash2, Plus, Upload, ImageIcon, Save, Shield, 
   ShieldAlert, FileUp, AlertTriangle, RefreshCw, Key, Type, Link as LinkIcon, Share2, FileText, Pin, ArrowDownUp, SortAsc, SortDesc, Sparkles, FolderInput, AlertCircle, Wand2, Check, GripVertical, File, Eye, MessageSquare, Smartphone, Monitor, BellRing, Layers, ImagePlus, Clock, Calendar,
-  Palmtree, Paperclip // Added new icons
+  Palmtree, Paperclip, Zap 
 } from 'lucide-react';
 import DOMPurify from 'dompurify';
 
@@ -48,16 +48,14 @@ const loadFontPreview = (fontId: string) => {
         document.head.appendChild(link);
     }
 };
-// PASTE THIS HELPER OUTSIDE THE COMPONENT (Before const AdminPanel...)
+
+// HELPER: Generate Random Bright Color (Visible on Dark)
 const getRandomBrightColor = () => {
     const h = Math.floor(Math.random() * 360);
     const s = 70 + Math.floor(Math.random() * 30); // 70-100% Saturation
     const l = 60 + Math.floor(Math.random() * 20); // 60-80% Lightness
     return `hsl(${h}, ${s}%, ${l}%)`;
 };
-
-// PASTE THIS INSIDE THE COMPONENT (With other states)
-  const [bulkProgress, setBulkProgress] = useState<{current: number, total: number, status: string} | null>(null);
 
 const AdminPanel: React.FC<AdminPanelProps> = ({ 
   lineage, isOpen, onClose, isAdmin, csrfToken, onLogin, onLogout, currentUser, permissions, initialTab = 'database',
@@ -149,6 +147,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   const [aiResult, setAiResult] = useState<any>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // --- NEW: BULK UPDATE PROGRESS STATE ---
+  const [bulkProgress, setBulkProgress] = useState<{current: number, total: number, status: string} | null>(null);
 
   // AI Image Generator State
   const [showImageGen, setShowImageGen] = useState(false);
@@ -617,50 +618,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
       setActiveTab('creator');
   };
 
-  // --- NEW: AI IMAGE GENERATOR HELPER ---
-  // --- UPDATED: WEB IMAGE SEARCH (No Gen AI) ---
-  const handleGenerateImages = async () => {
-      if (!imageGenPrompt) return;
-      setIsGeneratingImages(true);
-      setGeneratedImages([]); // Clear previous results
-      
-      // We use a mix of Bing Image Search (via public thumbnail endpoints) and LoremFlickr
-      // This fetches REAL images from the web, not generated ones.
-      const q = encodeURIComponent(imageGenPrompt.trim());
-      const randomSeed = Math.floor(Math.random() * 1000);
-
-      // These URLs attempt to find high-quality matches for the subject
-      const suggestions = [
-          // Source 1: Bing Image Search Best Match
-          `https://tse2.mm.bing.net/th?q=${q}&w=800&h=600&c=7&rs=1&pid=Api`,
-          
-          // Source 2: Bing Image Search (Aesthetic/Wallpaper variant)
-          `https://tse3.mm.bing.net/th?q=${q}%20aesthetic%20wallpaper&w=800&h=600&c=7&rs=1&pid=Api`,
-          
-          // Source 3: Flickr Search (via LoremFlickr)
-          `https://loremflickr.com/800/600/${imageGenPrompt.replace(/\s+/g, ',')}?lock=${randomSeed}`,
-          
-          // Source 4: Broad Search Variant
-          `https://tse4.mm.bing.net/th?q=${q}%20background&w=800&h=600&c=7&rs=1&pid=Api`
-      ];
-
-      // Simulate a short "Searching Web..." delay
-      setTimeout(() => {
-          setGeneratedImages(suggestions);
-          setIsGeneratingImages(false);
-      }, 1500);
-  };
-
-  const selectGeneratedImage = (url: string) => {
-      if (imageTargetField === 'creator') {
-          setItemForm(prev => ({ ...prev, image: url }));
-      } else {
-          setRuleForm(prev => ({ ...prev, image: url }));
-      }
-      setShowImageGen(false);
-  };
-
-  // --- NEW: SMART AI COMMAND EXECUTOR ---
   // --- SMART AI COMMAND EXECUTOR (ENHANCED) ---
   const applyAiAction = async () => {
       if (!aiResult) return;
@@ -757,6 +714,49 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
       else {
           transferAiToForm();
       }
+  };
+
+  // --- NEW: AI IMAGE GENERATOR HELPER ---
+  // --- UPDATED: WEB IMAGE SEARCH (No Gen AI) ---
+  const handleGenerateImages = async () => {
+      if (!imageGenPrompt) return;
+      setIsGeneratingImages(true);
+      setGeneratedImages([]); // Clear previous results
+      
+      // We use a mix of Bing Image Search (via public thumbnail endpoints) and LoremFlickr
+      // This fetches REAL images from the web, not generated ones.
+      const q = encodeURIComponent(imageGenPrompt.trim());
+      const randomSeed = Math.floor(Math.random() * 1000);
+
+      // These URLs attempt to find high-quality matches for the subject
+      const suggestions = [
+          // Source 1: Bing Image Search Best Match
+          `https://tse2.mm.bing.net/th?q=${q}&w=800&h=600&c=7&rs=1&pid=Api`,
+          
+          // Source 2: Bing Image Search (Aesthetic/Wallpaper variant)
+          `https://tse3.mm.bing.net/th?q=${q}%20aesthetic%20wallpaper&w=800&h=600&c=7&rs=1&pid=Api`,
+          
+          // Source 3: Flickr Search (via LoremFlickr)
+          `https://loremflickr.com/800/600/${imageGenPrompt.replace(/\s+/g, ',')}?lock=${randomSeed}`,
+          
+          // Source 4: Broad Search Variant
+          `https://tse4.mm.bing.net/th?q=${q}%20background&w=800&h=600&c=7&rs=1&pid=Api`
+      ];
+
+      // Simulate a short "Searching Web..." delay
+      setTimeout(() => {
+          setGeneratedImages(suggestions);
+          setIsGeneratingImages(false);
+      }, 1500);
+  };
+
+  const selectGeneratedImage = (url: string) => {
+      if (imageTargetField === 'creator') {
+          setItemForm(prev => ({ ...prev, image: url }));
+      } else {
+          setRuleForm(prev => ({ ...prev, image: url }));
+      }
+      setShowImageGen(false);
   };
 
   // --- CONFIG LOGIC ---
@@ -1911,7 +1911,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                             <textarea 
                                                 value={aiPrompt} 
                                                 onChange={(e) => setAiPrompt(e.target.value)} 
-                                                placeholder={isWizard ? "e.g., 'Summon a new schedule for Potions on Fridays at 2 PM' or 'Create an announcement about the Quidditch match'..." : "e.g., 'Schedule Python Class on Monday at 10am' or 'Draft a post about the server maintenance'..."} 
+                                                placeholder={isWizard ? "e.g. 'Make all Math notes have random visible colors' or 'Cancel class on Friday'..." : "e.g. 'Set all Physics files to pinned' or 'Schedule a holiday'..."} 
                                                 className="w-full h-32 bg-black/40 border border-white/10 rounded-xl p-4 text-sm outline-none resize-none focus:border-white/30 transition-colors placeholder:opacity-30" 
                                             />
                                             {/* File upload hidden but functional if needed */}
@@ -1923,7 +1923,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                                 </button>
                                                 <button 
                                                     onClick={handleAiParse} 
-                                                    disabled={aiLoading} 
+                                                    disabled={aiLoading || (bulkProgress !== null)} 
                                                     className={`px-6 py-2 rounded-lg font-bold text-xs tracking-widest transition-all shadow-lg hover:scale-105 active:scale-95 flex items-center gap-2
                                                         ${isWizard ? 'bg-purple-600 hover:bg-purple-500 text-white' : 'bg-blue-600 hover:bg-blue-500 text-white'}
                                                     `}
@@ -1934,10 +1934,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                         </div>
                                     </div>
 
-                                    // PASTE THIS INSIDE THE 'ai-lab' TAB CONTAINER
                                     {/* BULK PROGRESS BAR */}
                                     {bulkProgress && (
-                                        <div className="p-4 bg-black/60 border border-green-500/50 rounded-xl animate-[fade-in_0.3s] mb-4">
+                                        <div className="p-4 bg-black/60 border border-green-500/50 rounded-xl animate-[fade-in_0.3s]">
                                             <div className="flex justify-between text-xs font-bold mb-2 uppercase tracking-widest text-green-400">
                                                 <span>{bulkProgress.status}</span>
                                                 <span>{Math.round((bulkProgress.current / bulkProgress.total) * 100)}%</span>
@@ -1951,39 +1950,36 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                         </div>
                                     )}
 
-                                    {aiResult && (
+                                    {aiResult && !bulkProgress && (
                                         <div className="flex-1 overflow-y-auto custom-scrollbar p-6 rounded-xl border bg-white/5 border-white/10 animate-[fade-in_0.3s]">
                                             <div className="flex justify-between items-center mb-4 border-b border-white/10 pb-4">
                                                 <div className="flex items-center gap-2">
                                                     <BrainCircuit className="text-green-400" size={20} />
-                                                    <h4 className="font-bold text-lg">Interpretation Result</h4>
+                                                    <h4 className="font-bold text-lg">
+                                                        {aiResult.type === 'bulk_update' ? 'Mass Mutation Plan' : 'Interpretation Result'}
+                                                    </h4>
                                                 </div>
                                                 <button 
                                                     onClick={applyAiAction} 
                                                     className="px-6 py-2 bg-green-600 rounded-lg text-white font-bold text-xs hover:bg-green-500 flex items-center gap-2 shadow-lg shadow-green-900/20 hover:scale-105 transition-all"
                                                 >
-                                                    <Check size={16} /> 
-                                                    {aiResult.type === 'schedule' ? 'APPLY TO SCHEDULE' : 'APPLY CHANGES'}
+                                                    <Zap size={16} /> 
+                                                    {aiResult.type === 'schedule' ? 'FILL SCHEDULE' : (aiResult.type === 'bulk_update' ? 'EXECUTE ALL' : 'APPLY')}
                                                 </button>
                                             </div>
                                             
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                                <div className="space-y-2">
-                                                    <div className="text-xs font-bold opacity-50 uppercase">Detected Intent</div>
-                                                    <div className="p-3 bg-black/40 rounded border border-white/10 text-sm font-mono text-green-300">
-                                                        {aiResult.type || aiResult.target || 'General Data'}
-                                                    </div>
+                                            {/* ... rest of the result display ... */}
+                                            {aiResult.type === 'bulk_update' && (
+                                                <div className="mb-4 p-4 bg-yellow-900/20 border border-yellow-500/30 rounded-lg">
+                                                    <p className="text-yellow-200 text-sm font-bold flex items-center gap-2">
+                                                        <AlertTriangle size={14}/> WARNING: Mass Edit Detected
+                                                    </p>
+                                                    <p className="text-xs text-yellow-100/70 mt-1">{aiResult.summary}</p>
                                                 </div>
-                                                <div className="space-y-2">
-                                                    <div className="text-xs font-bold opacity-50 uppercase">Confidence</div>
-                                                    <div className="w-full bg-white/10 rounded-full h-2 mt-2">
-                                                        <div className="bg-green-500 h-2 rounded-full" style={{width: '92%'}}></div>
-                                                    </div>
-                                                </div>
-                                            </div>
-
+                                            )}
+                                            
                                             <div className="mt-6 space-y-2">
-                                                <div className="text-xs font-bold opacity-50 uppercase">Extracted Data Payload</div>
+                                                <div className="text-xs font-bold opacity-50 uppercase">Payload Data</div>
                                                 <pre className="text-xs font-mono whitespace-pre-wrap opacity-70 bg-black/40 p-4 rounded-lg border border-white/5 overflow-x-auto">
                                                     {JSON.stringify(aiResult, null, 2)}
                                                 </pre>
