@@ -1,10 +1,9 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import { Lineage, type CarouselItem } from '../types';
 import { 
   X, FileText, ExternalLink, Maximize2, Minimize2, ZoomIn, ZoomOut, 
   RotateCw, Moon, Sun, StickyNote, Eye, EyeOff, Layers, 
-  Monitor, Smartphone, PenTool, Save, Trash2, AlignJustify, Loader2, Share2, CornerDownRight, Calendar, User, Tag, ArrowRight
+  Monitor, Smartphone, PenTool, Save, Trash2, AlignJustify, Loader2, Share2, CornerDownRight, Calendar, User, Tag, ArrowRight, AlertTriangle
 } from 'lucide-react';
 import DOMPurify from 'dompurify';
 import { trackActivity } from '../services/tracking';
@@ -22,13 +21,20 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
   const isWizard = lineage === Lineage.WIZARD;
   
   // --- STATE ---
-  const [engine, setEngine] = useState<RenderEngine>('native');
+  // Default to Google (Cloud) for stability, unless it's a local dev file
+  const [engine, setEngine] = useState<RenderEngine>(() => {
+      const url = item.fileUrl || '';
+      if (url.includes('localhost') || url.includes('127.0.0.1')) return 'native';
+      return 'google';
+  });
+
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(100);
   const [rotation, setRotation] = useState(0);
   const [filter, setFilter] = useState<VisualFilter>('none');
   const [showRuler, setShowRuler] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false); // New Error State
   
   // Notebook State
   const [showNotes, setShowNotes] = useState(false);
@@ -42,12 +48,22 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
 
   // --- INIT & TRACKING ---
   useEffect(() => {
-    // Reset loading state on item change
     setIsLoading(true);
+    setLoadError(false);
     
-    // Detect mobile to default to Google Viewer (better compatibility)
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-    if (isMobile) setEngine('google');
+    // Auto-switch engine based on URL type
+    if (item.fileUrl) {
+        const url = item.fileUrl;
+        const isDrive = url.includes('drive.google.com');
+        const isLocal = url.includes('localhost');
+        
+        // Force Google Engine for Drive & External PDFs (Fixes CORS issues)
+        if (isDrive || (!isLocal && !item.fileUrl.endsWith('.pdf'))) { 
+            setEngine('google'); 
+        } else if (isLocal) {
+            setEngine('native');
+        }
+    }
 
     // Load saved notes
     const saved = localStorage.getItem(`core_notes_${item.id}`);
@@ -80,7 +96,6 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
 
   // --- HANDLERS ---
   
-  // URL Logic
   const isValidUrl = (url?: string) => {
     if (!url) return false;
     try {
@@ -94,35 +109,34 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
   const isGoogleDrive = safePdfUrl.includes('drive.google.com');
   const isMediaView = (item.type === 'file' || item.type === 'video' || item.type === 'link') && !!safePdfUrl;
   
-  // Google Drive Link Converter
+  // Robust Embed URL Generator
   const getEmbedUrl = (url: string, engineType: RenderEngine) => {
-      // If Google Drive - ALWAYS return preview link
+      if (!url) return '';
+
+      // 1. Handle Google Drive Links
       if (url.includes('drive.google.com')) {
           let id = '';
-          // Try to find /d/ID
           const parts = url.split('/');
           const dIndex = parts.indexOf('d');
           if (dIndex !== -1 && parts[dIndex + 1]) {
               id = parts[dIndex + 1].split(/[?&]/)[0]; 
           }
-          
-          // Try query param id=ID
           if (!id) {
              try {
                  const urlObj = new URL(url);
                  id = urlObj.searchParams.get('id') || '';
              } catch(e) {}
           }
-
           if (id) return `https://drive.google.com/file/d/${id}/preview`;
-          // Fallback if ID extraction fails but it's drive
           return url.replace(/\/view.*$/, '/preview').replace(/\/edit.*$/, '/preview');
       }
       
-      // Standard PDF
+      // 2. Handle Standard PDFs via Google Viewer (Bypasses CORS)
       if (engineType === 'google') {
           return `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`;
       }
+      
+      // 3. Native (Direct Link)
       return url;
   };
 
@@ -142,7 +156,6 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
       }
   };
 
-  // Reading Ruler Logic
   const handleMouseMove = (e: React.MouseEvent) => {
       if (showRuler && rulerRef.current && containerRef.current) {
           const rect = containerRef.current.getBoundingClientRect();
@@ -215,16 +228,18 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                             <div className="flex gap-2 text-[10px] mt-0.5">
                                 {!isGoogleDrive && (
                                     <button 
-                                        onClick={() => { setEngine('native'); setIsLoading(true); }} 
+                                        onClick={() => { setEngine('native'); setIsLoading(true); setLoadError(false); }} 
                                         className={`flex items-center gap-1 hover:underline ${engine === 'native' ? 'opacity-100 font-bold' : 'opacity-50'}`}
+                                        title="Use built-in browser viewer (Fast, but blocky)"
                                     >
                                         <Monitor size={10}/> Native
                                     </button>
                                 )}
                                 {!isGoogleDrive && <span className="opacity-30">|</span>}
                                 <button 
-                                    onClick={() => { setEngine('google'); setIsLoading(true); }} 
+                                    onClick={() => { setEngine('google'); setIsLoading(true); setLoadError(false); }} 
                                     className={`flex items-center gap-1 hover:underline ${engine === 'google' || isGoogleDrive ? 'opacity-100 font-bold' : 'opacity-50'}`}
+                                    title="Use Cloud Viewer (Compatible, but slower)"
                                 >
                                     <Smartphone size={10}/> Cloud
                                 </button>
@@ -247,7 +262,6 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
 
                             <button onClick={() => setRotation(r => (r + 90) % 360)} className="p-2 hover:bg-white/10 rounded text-white/70" title="Rotate"><RotateCw size={18}/></button>
                             
-                            {/* Filters Dropdownish Toggle */}
                             <div className="flex items-center bg-black/20 rounded p-1">
                                 <button onClick={() => setFilter(f => f === 'invert' ? 'none' : 'invert')} className={`p-1.5 rounded ${filter === 'invert' ? 'bg-white text-black' : 'text-white/70'}`} title="Dark Mode"><Moon size={16}/></button>
                                 <button onClick={() => setFilter(f => f === 'sepia' ? 'none' : 'sepia')} className={`p-1.5 rounded ${filter === 'sepia' ? 'bg-amber-700 text-amber-100' : 'text-white/70'}`} title="Sepia Mode"><Sun size={16}/></button>
@@ -300,8 +314,8 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
             >
                 {isMediaView ? (
                     <>
-                        {/* LOADING OVERLAY - Z-INDEX 20 (Above content) */}
-                        {isLoading && (
+                        {/* LOADING OVERLAY */}
+                        {isLoading && !loadError && (
                             <div className={`absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm transition-opacity duration-300`}>
                                 <Loader2 className={`w-12 h-12 mb-4 animate-spin ${isWizard ? 'text-emerald-500' : 'text-fuchsia-500'}`} />
                                 <div className={`text-sm font-bold tracking-widest animate-pulse ${isWizard ? 'text-emerald-200' : 'text-fuchsia-200'}`}>
@@ -310,46 +324,80 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                             </div>
                         )}
 
-                        {/* Visual Filter Layer */}
-                        <div 
-                            className="w-full h-full transition-all duration-300 origin-center relative z-10 flex-1"
-                            style={{ 
-                                transform: `scale(${zoomLevel / 100}) rotate(${rotation}deg)`,
-                                filter: getFilterStyle()
-                            }}
-                        >
-                            {isVideo ? (
-                                <div className="flex-1 bg-black flex items-center justify-center p-4 w-full h-full">
-                                    <video src={safePdfUrl} controls className="max-w-full max-h-full rounded shadow-lg w-full" onLoadStart={() => setIsLoading(true)} onLoadedData={() => setIsLoading(false)} />
-                                </div>
-                            ) : (engine === 'native' && !isGoogleDrive) ? (
-                                <object
-                                    data={currentSrc}
-                                    type="application/pdf"
-                                    className="w-full h-full"
-                                    onLoad={() => setIsLoading(false)}
-                                    onError={() => setIsLoading(false)} // Stop loading on error so user sees something
+                        {/* ERROR OVERLAY */}
+                        {loadError && (
+                            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/90 p-6 text-center">
+                                <AlertTriangle size={48} className="text-yellow-500 mb-4" />
+                                <h3 className="text-xl font-bold text-white mb-2">Display Error</h3>
+                                <p className="text-zinc-400 text-sm mb-6 max-w-md">
+                                    The embedded viewer could not load this file. This usually happens with secure files or strict browser privacy settings.
+                                </p>
+                                <a 
+                                    href={safePdfUrl} 
+                                    target="_blank" 
+                                    rel="noreferrer"
+                                    className={`px-6 py-3 rounded-full font-bold flex items-center gap-2 ${isWizard ? 'bg-emerald-600 text-black hover:bg-emerald-500' : 'bg-fuchsia-600 text-black hover:bg-fuchsia-500'}`}
                                 >
-                                    {/* Fallback to Google if Object fails */}
-                                    <iframe 
-                                        src={getEmbedUrl(safePdfUrl, 'google')} 
-                                        className="w-full h-full border-0"
-                                        title="PDF Viewer Fallback"
-                                        onLoad={() => setIsLoading(false)}
-                                    />
-                                </object>
-                            ) : (
-                                <iframe 
-                                    src={currentSrc} 
-                                    className="w-full h-full border-0 bg-white"
-                                    title="Cloud Viewer"
-                                    allow="autoplay" 
-                                    onLoad={() => setIsLoading(false)}
-                                />
-                            )}
-                        </div>
+                                    <ExternalLink size={18} /> OPEN FILE EXTERNALLY
+                                </a>
+                                {engine === 'native' && (
+                                     <button 
+                                        onClick={() => { setEngine('google'); setLoadError(false); setIsLoading(true); }}
+                                        className="mt-4 text-xs text-white/50 hover:text-white underline"
+                                     >
+                                         Try switching to Cloud Viewer
+                                     </button>
+                                )}
+                            </div>
+                        )}
 
-                        {/* Reading Ruler Overlay */}
+                        {/* Viewer Area */}
+                        {!loadError && (
+                            <div 
+                                className="w-full h-full transition-all duration-300 origin-center relative z-10 flex-1"
+                                style={{ 
+                                    transform: `scale(${zoomLevel / 100}) rotate(${rotation}deg)`,
+                                    filter: getFilterStyle()
+                                }}
+                            >
+                                {isVideo ? (
+                                    <div className="flex-1 bg-black flex items-center justify-center p-4 w-full h-full">
+                                        <video src={safePdfUrl} controls className="max-w-full max-h-full rounded shadow-lg w-full" onLoadStart={() => setIsLoading(true)} onLoadedData={() => setIsLoading(false)} onError={() => setLoadError(true)} />
+                                    </div>
+                                ) : (engine === 'native' && !isGoogleDrive) ? (
+                                    <object
+                                        data={currentSrc}
+                                        type="application/pdf"
+                                        className="w-full h-full"
+                                        onLoad={() => setIsLoading(false)}
+                                        onError={() => {
+                                            // Fallback to Google if Native fails
+                                            console.warn("Native load failed, switching to Google");
+                                            setEngine('google');
+                                        }}
+                                    >
+                                        <iframe 
+                                            src={getEmbedUrl(safePdfUrl, 'google')} 
+                                            className="w-full h-full border-0"
+                                            title="PDF Viewer Fallback"
+                                            onLoad={() => setIsLoading(false)}
+                                            onError={() => setLoadError(true)}
+                                        />
+                                    </object>
+                                ) : (
+                                    <iframe 
+                                        src={currentSrc} 
+                                        className="w-full h-full border-0 bg-white"
+                                        title="Cloud Viewer"
+                                        allow="autoplay" 
+                                        onLoad={() => setIsLoading(false)}
+                                        onError={() => setLoadError(true)}
+                                    />
+                                )}
+                            </div>
+                        )}
+
+                        {/* Reading Ruler */}
                         {showRuler && (
                             <div 
                                 ref={rulerRef}
@@ -359,13 +407,6 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                                 style={{ top: '50%' }}
                             ></div>
                         )}
-                        
-                        {/* Optional HTML Content Below Media */}
-                        {cleanContent && (
-                            <div className="p-6 border-t border-white/5 bg-black/20 overflow-y-auto max-h-[30vh]">
-                                <div className="prose prose-invert max-w-none text-sm opacity-80 html-content" dangerouslySetInnerHTML={{__html: cleanContent}}></div>
-                            </div>
-                        )}
                     </>
                 ) : (
                     // TEXT-ONLY MODE
@@ -374,11 +415,10 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                             <span className={`px-2 py-1 rounded border flex items-center gap-1 ${isWizard ? 'border-emerald-800 text-emerald-400' : 'border-fuchsia-800 text-fuchsia-400'}`}><CornerDownRight size={10} /> {item.sector || 'ARCHIVE'}</span>
                             <span className="flex items-center gap-1"><Calendar size={10}/> {item.date}</span>
                             <span className="flex items-center gap-1"><User size={10}/> {item.author || 'SYSTEM'}</span>
-                            {item.subject && <span className="flex items-center gap-1 text-white"><Tag size={10}/> {item.subject}</span>}
                         </div>
                         <h2 className="text-2xl md:text-3xl font-bold leading-tight break-words mb-6" style={titleStyle}>{item.title}</h2>
 
-                        {item.image && <div className="rounded-xl overflow-hidden shadow-2xl border border-white/10 relative group"><img src={item.image} alt={item.title} className="w-full h-auto max-h-[500px] object-cover" /><div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-60"></div></div>}
+                        {item.image && <div className="rounded-xl overflow-hidden shadow-2xl border border-white/10 relative group"><img src={item.image} alt={item.title} className="w-full h-auto max-h-[500px] object-cover" /></div>}
                         
                         <div ref={contentRef} className={`prose prose-invert max-w-none safe-font text-lg leading-relaxed html-content ${isWizard ? 'prose-emerald selection:bg-emerald-900/50' : 'prose-fuchsia selection:bg-fuchsia-900/50'}`} style={{ color: customStyle.contentColor || '#e4e4e7', fontFamily: '"Inter", "Segoe UI", sans-serif' }}>
                             {cleanContent ? <div dangerouslySetInnerHTML={{__html: cleanContent}}></div> : <p className="italic opacity-50 text-center py-10">No additional text content provided.</p>}
