@@ -21,17 +21,30 @@ export interface ItemStyle {
   isGradient?: boolean;
 }
 
+// --- NEW INTERFACE FOR UPDATE POPUPS ---
+export interface UpdateAnnouncement {
+  version: string;       // e.g. "2.5" - changing this triggers the popup for users
+  title: string;
+  content: string;       // Supports HTML/Text
+  isActive: boolean;
+  buttonText?: string;   // e.g. "Acknowledge"
+}
+
 export interface LectureRule {
   id: string;
   subject: string;
-  // New Fields
   batch?: 'AICS' | 'CSDA';
   image?: string;          // Banner Image
   customMessage?: string;  // Description
-  dayOfWeek: string;
-  startTime: string;
+  
+  // --- UPDATED SCHEDULING FIELDS ---
+  days: string[];          // Changed from single 'dayOfWeek' to array ['Monday', 'Wednesday']
+  startDate?: string;      // ISO Date (YYYY-MM-DD) - When does this course start?
+  endDate?: string;        // ISO Date (YYYY-MM-DD) - When does it end?
+  startTime: string;       // HH:mm
+  endTime?: string;        // HH:mm - When does the class finish?
+  
   link: string;
-  endDate?: string;
   recurrence: 'weekly' | 'monthly';
   isActive: boolean;
 }
@@ -51,7 +64,7 @@ export interface CarouselItem {
   isLiked?: boolean;
   author?: string;
   image?: string;        // Main Cover Image
-  images?: string[];     // <--- NEW: Gallery Images
+  images?: string[];     // Gallery Images
   fileUrl?: string;
   order_index?: number;
 }
@@ -76,7 +89,6 @@ export interface UserProfile {
   visitCount: number;
   totalTimeSpent: number; // Seconds
   lastActive: string; // ISO String
-  // --- NEW FIELDS ---
   skipIntro?: boolean;      // If true, skips LoadingScanner and IdentityGate
   lastLineage?: Lineage;    // Remembers if you were Wizard/Muggle
 }
@@ -131,6 +143,10 @@ export interface GlobalConfig {
   muggleLogoUrl?: string;
   telegramLink?: string; 
   schedules?: LectureRule[]; 
+  
+  // --- NEW CONFIG FIELD ---
+  updatePopup?: UpdateAnnouncement;
+
   cursorStyle?: 'classic' | 'minimal' | 'blade' | 'enchanted';
   defaultFont?: string;
   sortOrder?: 'newest' | 'oldest' | 'alphabetical' | 'manual'; // Fallback global sort

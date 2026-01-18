@@ -1,7 +1,7 @@
 import React, { useState, useEffect, Suspense, useMemo, useCallback, useRef } from 'react';
 import { 
   Lineage, Sector, GlobalConfig, CarouselItem, UserProfile, AdminPermissions, 
-  SECTORS as DEFAULT_SECTORS, LectureRule, FONT_LIBRARY 
+  SECTORS as DEFAULT_SECTORS, LectureRule, FONT_LIBRARY, UpdateAnnouncement 
 } from './types';
 import IdentityGate from './components/IdentityGate';
 import Carousel from './components/Carousel';
@@ -21,6 +21,7 @@ import { Menu, LayoutList, Briefcase, AlertTriangle, X, Sparkles, Zap, Link as L
 import { MY_FILES } from './telegramData';
 import { API_URL } from './lib/config';
 import { trackActivity } from './services/tracking';
+import DOMPurify from 'dompurify';
 
 const safeFetch = async (url: string, options: RequestInit = {}) => {
   try {
@@ -210,26 +211,27 @@ const getSavedProfile = () => {
   } catch (e) { return null; }
 };
 
-// --- NEW UPDATE POPUP COMPONENT ---
-const UpdatePopup = ({ onClose, isWizard, accentColor }: { onClose: () => void, isWizard: boolean, accentColor: string }) => {
+// --- DYNAMIC UPDATE POPUP COMPONENT (V2.5) ---
+// Now accepts 'updateData' from config instead of being hardcoded
+const UpdatePopup = ({ onClose, isWizard, accentColor, updateData }: { onClose: () => void, isWizard: boolean, accentColor: string, updateData: UpdateAnnouncement }) => {
     return (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-[fade-in_0.5s]">
-            <div className={`relative max-w-md w-full p-1 rounded-xl shadow-2xl overflow-hidden bg-gradient-to-br ${isWizard ? 'from-emerald-900 to-black' : 'from-fuchsia-900 to-black'}`}>
+            <div className={`relative max-w-lg w-full p-1 rounded-xl shadow-2xl overflow-hidden bg-gradient-to-br ${isWizard ? 'from-emerald-900 to-black' : 'from-fuchsia-900 to-black'}`}>
                 {/* Glow Border Effect */}
                 <div className={`absolute inset-0 opacity-50 blur-xl ${isWizard ? 'bg-emerald-500' : 'bg-fuchsia-500'}`}></div>
                 
-                <div className={`relative bg-[#050505] rounded-lg p-6 border ${isWizard ? 'border-emerald-500/50' : 'border-fuchsia-500/50'}`}>
+                <div className={`relative bg-[#050505] rounded-lg p-6 border ${isWizard ? 'border-emerald-500/50' : 'border-fuchsia-500/50'} max-h-[80vh] flex flex-col`}>
                     {/* Header */}
-                    <div className="flex justify-between items-start mb-6">
+                    <div className="flex justify-between items-start mb-6 shrink-0">
                         <div className="flex items-center gap-3">
                             <div className={`p-3 rounded-full ${isWizard ? 'bg-emerald-500/20 text-emerald-400' : 'bg-fuchsia-500/20 text-fuchsia-400'} animate-pulse`}>
                                 <Sparkles size={24} />
                             </div>
                             <div>
                                 <h3 className={`text-xl font-bold ${isWizard ? 'text-emerald-100 font-wizardTitle' : 'text-fuchsia-100 font-muggle'}`}>
-                                    SYSTEM UPGRADE
+                                    {updateData.title || 'SYSTEM UPGRADE'}
                                 </h3>
-                                <p className="text-xs text-zinc-400 uppercase tracking-widest">Version 2.4.0 Live</p>
+                                <p className="text-xs text-zinc-400 uppercase tracking-widest">Version {updateData.version} Live</p>
                             </div>
                         </div>
                         <button onClick={onClose} className="text-zinc-500 hover:text-white transition-colors">
@@ -237,50 +239,24 @@ const UpdatePopup = ({ onClose, isWizard, accentColor }: { onClose: () => void, 
                         </button>
                     </div>
 
-                    {/* Update List */}
-                    <div className="space-y-4 mb-8">
-                         {/* Feature 1 */}
-                        <div className="flex gap-3">
-                            <LinkIcon size={20} className={isWizard ? 'text-emerald-500' : 'text-fuchsia-500'} />
-                            <div>
-                                <h4 className="text-white font-bold text-sm">Deep Link Navigation</h4>
-                                <p className="text-zinc-400 text-xs leading-relaxed">
-                                    URLs now sync with your location (e.g., <b>/lectures</b>). You can bookmark specific pages and share direct links.
-                                </p>
-                            </div>
-                        </div>
-                        
-                        {/* Feature 2 */}
-                        <div className="flex gap-3">
-                            <Zap size={20} className="text-yellow-400" />
-                            <div>
-                                <h4 className="text-white font-bold text-sm">Skip Intro Feature</h4>
-                                <p className="text-zinc-400 text-xs leading-relaxed">
-                                    Tired of waiting? Enable <b>"Skip Intro & Gate"</b> in the Tools (Accessibility) menu to load instantly.
-                                </p>
-                            </div>
-                        </div>
-
-                         {/* Feature 3 */}
-                         <div className="flex gap-3">
-                            <FileText size={20} className="text-blue-400" />
-                            <div>
-                                <h4 className="text-white font-bold text-sm">Enhanced PDF Core</h4>
-                                <p className="text-zinc-400 text-xs leading-relaxed">
-                                    Google Drive links and PDF files now open reliably within the secure internal viewer.
-                                </p>
-                            </div>
-                        </div>
+                    {/* Dynamic Content */}
+                    <div className="space-y-4 mb-8 overflow-y-auto custom-scrollbar flex-1">
+                         <div 
+                            className="text-zinc-300 text-sm leading-relaxed space-y-2 font-sans html-content"
+                            dangerouslySetInnerHTML={{ 
+                                __html: DOMPurify.sanitize(updateData.content || '<p>New features available.</p>') 
+                            }} 
+                         />
                     </div>
 
                     {/* Footer Button */}
                     <button 
                         onClick={onClose}
-                        className={`w-full py-3 rounded-lg font-bold text-black transition-all hover:scale-[1.02] active:scale-95 shadow-lg
+                        className={`w-full py-3 rounded-lg font-bold text-black transition-all hover:scale-[1.02] active:scale-95 shadow-lg shrink-0
                             ${isWizard ? 'bg-emerald-500 hover:bg-emerald-400' : 'bg-fuchsia-500 hover:bg-fuchsia-400'}
                         `}
                     >
-                        ACKNOWLEDGE UPDATE
+                        {updateData.buttonText || 'ACKNOWLEDGE UPDATE'}
                     </button>
                 </div>
             </div>
@@ -312,7 +288,8 @@ function App() {
       wizardGateText: 'Enter the Void', muggleGateText: 'Init System',
       wizardAlarmUrl: '', muggleAlarmUrl: '',
       wizardImage: '', muggleImage: '',
-      defaultFont: 'cinzel'
+      defaultFont: 'cinzel',
+      schedules: [] // Ensure this is initialized
   });
   
   const [profile, setProfile] = useState<UserProfile>({
@@ -356,11 +333,11 @@ function App() {
       return () => clearInterval(interval);
   }, []); 
 
-  // --- CHECK FOR UPDATE POPUP ---
+  // --- DYNAMIC UPDATE CHECKER (V2.5) ---
   useEffect(() => {
-      // Only check once config is loaded (i.e. user is in the app)
-      if (configLoaded) {
-          const updateKey = 'core_connect_update_v2_4'; // Unique key for THIS update
+      // Check if popup is active in config AND if user hasn't seen this specific version
+      if (configLoaded && globalConfig.updatePopup?.isActive && globalConfig.updatePopup.version) {
+          const updateKey = `core_connect_update_v${globalConfig.updatePopup.version}`; // Unique key per version
           const hasSeen = localStorage.getItem(updateKey);
           
           if (!hasSeen) {
@@ -369,10 +346,13 @@ function App() {
               return () => clearTimeout(timer);
           }
       }
-  }, [configLoaded]);
+  }, [configLoaded, globalConfig.updatePopup]);
 
   const handleDismissUpdate = () => {
-      localStorage.setItem('core_connect_update_v2_4', 'true');
+      if (globalConfig.updatePopup?.version) {
+          const updateKey = `core_connect_update_v${globalConfig.updatePopup.version}`;
+          localStorage.setItem(updateKey, 'true');
+      }
       setShowUpdatePopup(false);
   };
 
@@ -857,9 +837,14 @@ function App() {
 
         {/* MODALS */}
         <Suspense fallback={null}>
-            {/* NEW UPDATE POPUP */}
-            {showUpdatePopup && (
-                <UpdatePopup onClose={handleDismissUpdate} isWizard={isWizard} accentColor={accentColor} />
+            {/* NEW UPDATE POPUP - DYNAMIC */}
+            {showUpdatePopup && globalConfig.updatePopup && (
+                <UpdatePopup 
+                    onClose={handleDismissUpdate} 
+                    isWizard={isWizard} 
+                    accentColor={accentColor} 
+                    updateData={globalConfig.updatePopup} 
+                />
             )}
 
             {showOfflineAlert && (
