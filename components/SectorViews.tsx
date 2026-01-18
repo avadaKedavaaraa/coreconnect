@@ -227,12 +227,21 @@ export const SectorView: React.FC<SectorViewProps> = ({
     }, [search, viewMode, isLectures]);
 
     useEffect(() => {
-        setSearch(''); setDateFilter(''); setSubjectFilter(''); setShowPinnedOnly(false);
-        // Default to 'columns' (Side-by-Side) for lectures, 'folders' for others
-        setViewMode(isLectures ? 'columns' : 'folders');
-        // Default date to IST Today for lectures
-        if (isLectures) setDateFilter(getISTDateStr());
-    }, [sectorId, isLectures]);
+      setSearch(''); setDateFilter(''); setSubjectFilter(''); setShowPinnedOnly(false);
+      
+      if (isLectures) {
+          // If on mobile/phone (< 768px), default to GRID view
+          // If on laptop/desktop, default to COLUMNS (Side-by-Side)
+          const isMobile = window.innerWidth < 768;
+          setViewMode(isMobile ? 'grid' : 'columns');
+          
+          // Default date to IST Today
+          setDateFilter(getISTDateStr());
+      } else {
+          setViewMode('folders');
+          setDateFilter('');
+      }
+  }, [sectorId, isLectures]);
 
     // --- ACTIONS ---
     const handleQuickPost = async () => {
