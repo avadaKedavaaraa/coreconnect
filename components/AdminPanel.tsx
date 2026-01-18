@@ -1172,7 +1172,14 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                             <select value={itemForm.sector} onChange={e => setItemForm({ ...itemForm, sector: e.target.value })} className="p-3 bg-white/5 border border-white/10 rounded text-white outline-none">
                                                 {sectors.map(s => <option key={s.id} value={s.id} className="bg-black">{isWizard ? s.wizardName : s.muggleName}</option>)}
                                             </select>
-                                            <input type="date" value={itemForm.date} onChange={e => setItemForm({ ...itemForm, date: e.target.value })} className="p-3 bg-white/5 border border-white/10 rounded text-white outline-none" />
+                                            
+                                            {/* FIXED DATE INPUT: Converts dots to dashes for input, back to dots for state */}
+                                            <input 
+                                                type="date" 
+                                                value={itemForm.date.replace(/\./g, '-')} 
+                                                onChange={e => setItemForm({ ...itemForm, date: e.target.value.replace(/-/g, '.') })} 
+                                                className="p-3 bg-white/5 border border-white/10 rounded text-white outline-none" 
+                                            />
 
                                             {/* Subject Selector - Enhanced */}
                                             <div className="relative">
