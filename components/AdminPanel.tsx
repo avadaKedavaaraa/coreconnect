@@ -1430,7 +1430,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                                             {(rule.startDate || rule.endDate) && (
                                                                 <div className="text-[10px] opacity-40 mt-2 flex items-center gap-1">
                                                                     <Calendar size={10} /> 
-                                                                    {rule.startDate ? rule.startDate.replace(/-/g, '.') : 'Start'} -> {rule.endDate ? rule.endDate.replace(/-/g, '.') : 'End'}
+                                                                    {rule.startDate ? rule.startDate.replace(/-/g, '.') : 'Start'} {'->'} {rule.endDate ? rule.endDate.replace(/-/g, '.') : 'End'}
                                                                 </div>
                                                             )}
                                                         </div>

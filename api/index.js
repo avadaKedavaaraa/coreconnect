@@ -1,4 +1,3 @@
-
 import dotenv from 'dotenv';
 import express from 'express';
 import crypto from 'crypto';
@@ -40,16 +39,20 @@ app.use(hpp());
 const allowedOrigins = [
     'http://localhost:5173',
     'http://localhost:3000',
-    process.env.FRONTEND_URL
+    process.env.FRONTEND_URL,
+    process.env.URL, // Netlify default URL
+    process.env.DEPLOY_URL // Netlify deploy URL
 ].filter(Boolean);
 
 app.use(cors({
   origin: function (origin, callback) {
     if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) !== -1 || !IS_PROD) {
+    // Allow Netlify previews and explicit domains
+    if (allowedOrigins.indexOf(origin) !== -1 || allowedOrigins.some(o => origin.endsWith(o.replace('https://', '')))) {
       callback(null, true);
     } else {
-      callback(null, true);
+      console.warn(`Blocked CORS for origin: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
     }
   },
   credentials: true,
@@ -78,11 +81,13 @@ app.use(cookieParser());
 app.use(limiter);
 
 // --- SUPABASE CLIENT ---
-const supabase = createClient(
-  process.env.VITE_SUPABASE_URL || 'https://placeholder.supabase.co',
-  process.env.SUPABASE_SERVICE_ROLE_KEY || 'placeholder',
-  { auth: { autoRefreshToken: false, persistSession: false } }
-);
+const supabase = (process.env.VITE_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) 
+    ? createClient(
+        process.env.VITE_SUPABASE_URL,
+        process.env.SUPABASE_SERVICE_ROLE_KEY,
+        { auth: { autoRefreshToken: false, persistSession: false } }
+      )
+    : null;
 
 // --- SESSION MANAGEMENT ---
 const memorySessions = new Map();
@@ -91,33 +96,35 @@ const memorySessions = new Map();
 async function createSession(data) {
     const sessionId = crypto.randomBytes(32).toString('hex');
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); 
-    try {
-        const { error } = await supabase.from('admin_sessions').insert({
-            session_id: sessionId,
-            data: data,
-            expires_at: expiresAt.toISOString()
-        });
-        if (error) throw error;
-        return sessionId;
-    } catch (e) {
-        memorySessions.set(sessionId, { ...data, expiresAt: expiresAt.getTime() });
-        return sessionId;
+    if (supabase) {
+        try {
+            const { error } = await supabase.from('admin_sessions').insert({
+                session_id: sessionId,
+                data: data,
+                expires_at: expiresAt.toISOString()
+            });
+            if (!error) return sessionId;
+        } catch (e) {}
     }
+    memorySessions.set(sessionId, { ...data, expiresAt: expiresAt.getTime() });
+    return sessionId;
 }
 
 async function getSession(sessionId) {
     if (!sessionId) return null;
-    try {
-        const { data } = await supabase.from('admin_sessions').select('*').eq('session_id', sessionId).gt('expires_at', new Date().toISOString()).single();
-        if (data) return data.data;
-    } catch (e) {}
+    if (supabase) {
+        try {
+            const { data } = await supabase.from('admin_sessions').select('*').eq('session_id', sessionId).gt('expires_at', new Date().toISOString()).single();
+            if (data) return data.data;
+        } catch (e) {}
+    }
     const memSession = memorySessions.get(sessionId);
     if (memSession && Date.now() < memSession.expiresAt) return memSession;
     return null;
 }
 
 async function deleteSession(sessionId) {
-    try { await supabase.from('admin_sessions').delete().eq('session_id', sessionId); } catch(e) {}
+    if (supabase) try { await supabase.from('admin_sessions').delete().eq('session_id', sessionId); } catch(e) {}
     memorySessions.delete(sessionId);
 }
 
@@ -131,7 +138,7 @@ if (process.env.API_KEY) {
 
 // Initialize Admin User
 async function initAdmin() {
-    if (!process.env.ADMIN_PASSWORD) return;
+    if (!supabase || !process.env.ADMIN_PASSWORD) return;
     try {
         const { data, error } = await supabase.from('admin_users').select('username').eq('username', 'admin').maybeSingle();
         if (!data && (!error || error.code === 'PGRST116')) {
@@ -149,6 +156,7 @@ async function initAdmin() {
 initAdmin();
 
 async function logAction(username, action, details, req) {
+    if (!supabase) return;
     const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
     const safeDetails = xss(details).substring(0, 500);
     try {
@@ -177,25 +185,15 @@ const router = express.Router();
 
 router.get('/health', (req, res) => res.json({ status: 'active', platform: 'netlify' }));
 
-// --- SYSTEM DIAGNOSTICS FOR ADMIN ---
-router.get('/admin/status', requireAuth, async (req, res) => {
-    // Check DB
-    let dbStatus = 'disconnected';
-    try {
-        const { data, error } = await supabase.from('global_config').select('count').limit(1);
-        if (!error) dbStatus = 'connected';
-    } catch(e) {}
-
-    res.json({
-        db: dbStatus
-    });
-});
-
+// --- VISITOR HEARTBEAT ---
 router.post('/visitor/heartbeat', async (req, res) => {
+    if (!supabase) return res.status(503).json({ error: "Database unavailable" });
     const { visitorId, displayName, timeSpent, visitCount, type, resourceId, title } = req.body;
+    
     if (!visitorId) return res.status(400).json({ error: 'Invalid ID' });
+
     try {
-        const { error: logError } = await supabase.from('visitor_logs').upsert({
+        await supabase.from('visitor_logs').upsert({
             visitor_id: xss(visitorId),
             display_name: xss(displayName || 'Guest').substring(0, 50),
             total_time_spent: Number(timeSpent) || 0,
@@ -203,27 +201,25 @@ router.post('/visitor/heartbeat', async (req, res) => {
             last_active: new Date().toISOString()
         }, { onConflict: 'visitor_id' });
 
-        if (logError) throw logError;
-
-        if (type) {
-            const { error: actError } = await supabase.from('visitor_activity').insert({
+        if (type && type !== 'HEARTBEAT') {
+            await supabase.from('visitor_activity').insert({
                 visitor_id: xss(visitorId),
                 activity_type: xss(type),
                 resource_id: resourceId ? xss(resourceId) : null,
                 resource_title: title ? xss(title).substring(0, 100) : null,
                 duration_seconds: Number(timeSpent) || 0
             });
-            if (actError) console.error("Activity Log Error:", actError.message);
         }
-
         res.json({ status: 'logged' });
     } catch (e) { 
         console.error("Heartbeat Error:", e.message);
-        res.status(500).json({ error: "Server error: " + e.message }); 
+        res.status(500).json({ error: "Server error" }); 
     }
 });
 
+// --- PUBLIC DATA ---
 router.get('/config', async (req, res) => {
+    if (!supabase) return res.json({});
     try {
       const { data } = await supabase.from('global_config').select('config').eq('id', 1).maybeSingle();
       res.json(data?.config || {});
@@ -231,6 +227,7 @@ router.get('/config', async (req, res) => {
 });
 
 router.get('/sectors', async (req, res) => {
+    if (!supabase) return res.json([]);
     try {
       const { data } = await supabase.from('global_config').select('config').eq('id', 2).maybeSingle();
       res.json(data?.config || []);
@@ -238,15 +235,14 @@ router.get('/sectors', async (req, res) => {
 });
 
 router.get('/items', async (req, res) => {
+    if (!supabase) return res.json([]);
     try {
       const { data } = await supabase.from('items').select('*').order('order_index', { ascending: true }).order('date', { ascending: false });
-      if (!data) return res.json([]); 
-      res.json(data);
-    } catch(e) { 
-        res.json([]); 
-    }
+      res.json(data || []);
+    } catch(e) { res.status(500).json({ error: "Failed" }); }
 });
 
+// --- ADMIN ITEMS ---
 router.post('/admin/items', requireAuth, async (req, res) => {
     if(!hasPermission(req.user, 'canEdit')) return res.status(403).json({error: "Forbidden"});
     try {
@@ -276,17 +272,17 @@ router.post('/admin/items', requireAuth, async (req, res) => {
       }
 
       await logAction(req.user.username, 'CREATE_ITEM', `Created item ${item.title}`, req);
-      
       res.json({ success: true, item: item });
     } catch(e) { 
         res.status(500).json({ error: "Creation failed: " + e.message }); 
     }
 });
 
+// --- AI ORACLE ---
 router.post('/ai/chat', async (req, res) => {
     try {
       if (!aiClient) return res.status(503).json({ error: "Oracle Disconnected" });
-      const { message, lineage, history, context, visitorId } = req.body;
+      const { message, history, context, visitorId } = req.body;
       
       const safeMessage = xss(message).substring(0, 1000); 
       const securityDirectives = `You are strictly a database assistant. Limit knowledge to CONTEXT.`;
@@ -307,7 +303,7 @@ router.post('/ai/chat', async (req, res) => {
       });
       const botText = response.text;
 
-      if (visitorId) {
+      if (visitorId && supabase) {
           supabase.from('visitor_chats').insert({
               visitor_id: xss(visitorId),
               user_query: safeMessage.substring(0, 500),
@@ -353,6 +349,7 @@ router.post('/admin/upload', requireAuth, uploadMiddleware.single('file'), async
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// --- AUTH ---
 router.post('/login', loginLimiter, async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -365,7 +362,13 @@ router.post('/login', loginLimiter, async (req, res) => {
     const csrfToken = crypto.randomBytes(32).toString('hex');
     const sessionId = await createSession({ username, csrfToken, permissions: user.permissions });
 
-    res.cookie('session_id', sessionId, { httpOnly: true, sameSite: 'lax', secure: IS_PROD, maxAge: 24 * 60 * 60 * 1000 });
+    res.cookie('session_id', sessionId, { 
+        httpOnly: true, 
+        sameSite: 'lax', 
+        secure: IS_PROD, 
+        maxAge: 24 * 60 * 60 * 1000 
+    });
+    
     await logAction(username, 'LOGIN', 'User logged in', req);
     res.json({ success: true, csrfToken, permissions: user.permissions });
   } catch(e) { res.status(500).json({ error: "System Error" }); }
@@ -385,6 +388,7 @@ router.post('/logout', async (req, res) => {
     res.json({ success: true });
 });
 
+// --- ADMIN ROUTES ---
 router.post('/admin/reorder', requireAuth, async (req, res) => {
     if(!hasPermission(req.user, 'canEdit')) return res.status(403).json({error: "Forbidden"});
     try {
@@ -415,6 +419,7 @@ router.delete('/admin/items/:id', requireAuth, async (req, res) => {
     } catch(e) { res.status(500).json({ error: "Delete failed" }); }
 });
 
+// Config & Sectors (V2.5 Support)
 router.post('/admin/config', requireAuth, async (req, res) => {
     if(!hasPermission(req.user, 'canEdit')) return res.status(403).json({error: "Forbidden"});
     try {
@@ -433,6 +438,7 @@ router.post('/admin/sectors', requireAuth, async (req, res) => {
     } catch(e) { res.status(500).json({ error: "Update failed" }); }
 });
 
+// Logs & Visitors
 router.get('/admin/logs', requireAuth, async (req, res) => {
     if(!hasPermission(req.user, 'canViewLogs')) return res.status(403).json({error: "Forbidden"});
     try {
@@ -449,6 +455,7 @@ router.get('/admin/visitors', requireAuth, async (req, res) => {
     } catch(e) { res.status(500).json({ error: "Fetch failed" }); }
 });
 
+// MISSING ROUTE RESTORED: Visitor Details (Dossier)
 router.get('/admin/visitor-details/:id', requireAuth, async (req, res) => {
     if(!hasPermission(req.user, 'canViewLogs')) return res.status(403).json({error: "Forbidden"});
     try {
@@ -465,6 +472,22 @@ router.get('/admin/visitor-details/:id', requireAuth, async (req, res) => {
     } catch(e) { res.status(500).json({ error: "Fetch failed" }); }
 });
 
+router.delete('/admin/visitors/:id', requireAuth, async (req, res) => {
+    if(!hasPermission(req.user, 'canViewLogs')) return res.status(403).json({error: "Forbidden"});
+    try {
+        const visitorId = req.params.id;
+        await supabase.from('visitor_logs').delete().eq('visitor_id', visitorId);
+        await supabase.from('visitor_activity').delete().eq('visitor_id', visitorId);
+        await supabase.from('visitor_chats').delete().eq('visitor_id', visitorId);
+        
+        await logAction(req.user.username, 'DEL_VISITOR', `Deleted visitor: ${visitorId}`, req);
+        res.json({ success: true });
+    } catch(e) { 
+        res.status(500).json({ error: "Delete failed" }); 
+    }
+});
+
+// User Management
 router.get('/admin/users', requireAuth, async (req, res) => {
     if (!hasPermission(req.user, 'canManageUsers')) return res.status(403).json({error: "Forbidden"});
     try {
@@ -477,6 +500,8 @@ router.post('/admin/users/add', requireAuth, async (req, res) => {
     if (!hasPermission(req.user, 'canManageUsers')) return res.status(403).json({error: "Forbidden"});
     try {
         const { username, password, permissions } = req.body;
+        if (!username || !password) return res.status(400).json({ error: "Invalid input" });
+        
         const safeUsername = xss(username);
         const salt = crypto.randomBytes(16).toString('hex');
         const hash = (await scryptAsync(password, salt, 64)).toString('hex');
@@ -503,6 +528,7 @@ router.post('/admin/change-password', requireAuth, async (req, res) => {
     try {
         const { currentPassword, newPassword } = req.body;
         const { username } = req.user;
+        
         const { data: user, error } = await supabase.from('admin_users').select('*').eq('username', username).single();
         if (error || !user) return res.status(404).json({ error: "User not found" });
 
@@ -572,29 +598,7 @@ router.post('/admin/drive-scan', requireAuth, async (req, res) => {
         res.json({ success: true, count: newItems.length, items: newItems });
     } catch(e) { res.status(500).json({ error: e.message }); }
 });
-// api/index.js
 
-// ... existing routes ...
-
-// --- DELETE VISITOR ROUTE ---
-router.delete('/admin/visitors/:id', requireAuth, async (req, res) => {
-    if(!hasPermission(req.user, 'canViewLogs')) return res.status(403).json({error: "Forbidden"});
-    try {
-        const visitorId = req.params.id;
-        // Delete from all tables
-        await supabase.from('visitor_logs').delete().eq('visitor_id', visitorId);
-        await supabase.from('visitor_activity').delete().eq('visitor_id', visitorId);
-        await supabase.from('visitor_chats').delete().eq('visitor_id', visitorId);
-        
-        await logAction(req.user.username, 'DEL_VISITOR', `Deleted visitor: ${visitorId}`, req);
-        res.json({ success: true });
-    } catch(e) { 
-        res.status(500).json({ error: "Delete failed" }); 
-    }
-});
-// -----------------------------
-
-// ... app.use('/api', router);
 app.use('/api', router);
 
 if (process.argv[1] && process.argv[1].endsWith('index.js')) {
