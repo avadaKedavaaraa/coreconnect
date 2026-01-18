@@ -325,12 +325,50 @@ router.post('/ai/parse', requireAuth, multer({ storage: multer.memoryStorage() }
       if (req.file) parts.push({ inlineData: { data: req.file.buffer.toString('base64'), mimeType: req.file.mimetype } });
       parts.push({ text: prompt ? xss(prompt) : "Analyze." });
 
+      // FIND THIS SECTION inside router.post('/ai/parse'...)
+// ...
+      const { prompt } = req.body;
+      let parts = [];
+      if (req.file) parts.push({ inlineData: { data: req.file.buffer.toString('base64'), mimeType: req.file.mimetype } });
+      parts.push({ text: prompt ? xss(prompt) : "Analyze." });
+
+// PASTE THIS NEW CODE BLOCK HERE:
+      const systemInstruction = `
+        You are the CoreConnect System Admin AI. Analyze the user's natural language command and output a JSON object to execute it.
+        
+        MODES:
+        1. CREATE SINGLE ITEM: { "type": "item", "data": { "title": "...", "content": "...", "sector": "...", "subject": "..." } }
+        2. SCHEDULE RULE: { "type": "schedule", "data": { "subject": "...", "type": "class"|"holiday", "days": ["Monday"...], "startTime": "...", "batch": "AICS"|"CSDA" } }
+           - If user implies a holiday/cancellation (e.g. "cancel class", "declare holiday"), set "type": "holiday".
+        3. BULK UPDATE: { 
+             "type": "bulk_update", 
+             "filter": { "sector": "optional_id", "subject": "optional_name", "title_contains": "optional_text" },
+             "action": { 
+                "set_color": "RANDOM_VISIBLE" | "HEX_CODE",
+                "append_content": "text to append",
+                "prepend_content": "text to prepend",
+                "set_pinned": boolean
+             },
+             "summary": "Short description of what will happen for the user to confirm."
+           }
+
+        RULES:
+        - For "Random but Visible" color, use string "RANDOM_VISIBLE".
+        - Use ISO dates.
+        - Infer sector IDs: 'announcements', 'lectures', 'books', 'notes', 'resources', 'tasks', 'system_info'.
+      `;
+
       const response = await aiClient.models.generateContent({
-          model: "gemini-3-flash-preview",
-          contents: [{ parts }],
-          config: { responseMimeType: "application/json" }
+          model: "gemini-3-flash", // Or your preferred model version
+          contents: [{ role: 'user', parts }],
+          config: { 
+              responseMimeType: "application/json",
+              systemInstruction: systemInstruction 
+          }
       });
+      
       res.json(JSON.parse(response.text));
+// ...
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 

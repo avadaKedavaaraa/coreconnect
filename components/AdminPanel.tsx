@@ -48,6 +48,16 @@ const loadFontPreview = (fontId: string) => {
         document.head.appendChild(link);
     }
 };
+// PASTE THIS HELPER OUTSIDE THE COMPONENT (Before const AdminPanel...)
+const getRandomBrightColor = () => {
+    const h = Math.floor(Math.random() * 360);
+    const s = 70 + Math.floor(Math.random() * 30); // 70-100% Saturation
+    const l = 60 + Math.floor(Math.random() * 20); // 60-80% Lightness
+    return `hsl(${h}, ${s}%, ${l}%)`;
+};
+
+// PASTE THIS INSIDE THE COMPONENT (With other states)
+  const [bulkProgress, setBulkProgress] = useState<{current: number, total: number, status: string} | null>(null);
 
 const AdminPanel: React.FC<AdminPanelProps> = ({ 
   lineage, isOpen, onClose, isAdmin, csrfToken, onLogin, onLogout, currentUser, permissions, initialTab = 'database',
@@ -651,38 +661,100 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   };
 
   // --- NEW: SMART AI COMMAND EXECUTOR ---
-  const applyAiAction = () => {
+  // --- SMART AI COMMAND EXECUTOR (ENHANCED) ---
+  const applyAiAction = async () => {
       if (!aiResult) return;
 
-      // Handle "Add to Scheduler"
-      if (aiResult.type === 'schedule' || (aiResult.target === 'scheduler')) {
+      // 1. BULK UPDATE HANDLER
+      if (aiResult.type === 'bulk_update' && aiResult.filter) {
+          const { filter, action, summary } = aiResult;
+          
+          // Filter Items locally
+          const targets = allItems.filter(item => {
+              let match = true;
+              if (filter.sector && item.sector !== filter.sector) match = false;
+              if (filter.subject && (item.subject || 'General').toLowerCase() !== filter.subject.toLowerCase()) match = false;
+              if (filter.title_contains && !item.title.toLowerCase().includes(filter.title_contains.toLowerCase())) match = false;
+              return match;
+          });
+
+          if (targets.length === 0) {
+              alert("AI: I couldn't find any items matching your criteria.");
+              return;
+          }
+
+          if (!confirm(`AI Plan: ${summary || 'Bulk Update'}\n\nThis will affect ${targets.length} items. Proceed?`)) return;
+
+          setBulkProgress({ current: 0, total: targets.length, status: 'Initializing...' });
+
+          // Execute Updates sequentially
+          for (let i = 0; i < targets.length; i++) {
+              const original = targets[i];
+              let updated = { ...original, style: { ...original.style } };
+
+              // Apply Actions
+              if (action.set_color) {
+                  const color = action.set_color === 'RANDOM_VISIBLE' ? getRandomBrightColor() : action.set_color;
+                  updated.style = { ...updated.style, titleColor: color };
+              }
+              if (action.append_content) {
+                  if (!updated.content.includes(action.append_content)) {
+                      updated.content = `${updated.content}\n\n<p style="opacity:0.7; font-size: 0.8em;">${action.append_content}</p>`;
+                  }
+              }
+              if (action.prepend_content) {
+                   updated.content = `${action.prepend_content}\n\n${updated.content}`;
+              }
+              if (action.set_pinned !== undefined) {
+                  updated.isPinned = action.set_pinned;
+              }
+
+              // Save
+              await onUpdateItem(updated); 
+              setBulkProgress({ current: i + 1, total: targets.length, status: `Updated: ${updated.title.substring(0, 20)}...` });
+              
+              // Small delay for visual update
+              await new Promise(r => setTimeout(r, 50));
+          }
+
+          setBulkProgress({ current: targets.length, total: targets.length, status: 'COMPLETE' });
+          setTimeout(() => {
+              setBulkProgress(null);
+              setAiResult(null); 
+              alert(`Successfully updated ${targets.length} items.`);
+          }, 1000);
+      }
+      
+      // 2. SCHEDULER HANDLER (Auto-Detect Holiday)
+      else if (aiResult.type === 'schedule' || (aiResult.target === 'scheduler')) {
+          const data = aiResult.data || aiResult;
           setRuleForm(prev => ({
               ...prev,
-              subject: aiResult.subject || aiResult.data?.subject || prev.subject,
-              days: aiResult.days || aiResult.data?.days || prev.days,
-              startTime: aiResult.startTime || aiResult.data?.startTime || prev.startTime,
-              type: aiResult.type === 'holiday' ? 'holiday' : 'class'
+              subject: data.subject || prev.subject,
+              days: data.days || prev.days,
+              startTime: data.startTime || prev.startTime,
+              type: data.type === 'holiday' ? 'holiday' : 'class', 
+              batch: data.batch || prev.batch
           }));
           setActiveTab('scheduler');
-          alert("AI: I've prepared the schedule form for you. Please review and save.");
+          alert("AI: I've prepared the schedule form. If this is a holiday, I've selected the 'Holiday' type for you. Please save to confirm.");
       }
-      // Handle "Create Item"
+      
+      // 3. CREATE ITEM HANDLER
       else if (aiResult.type === 'item' || aiResult.target === 'creator') {
+          const data = aiResult.data || aiResult;
           setItemForm(prev => ({
               ...prev,
-              title: aiResult.title || aiResult.data?.title || prev.title,
-              content: aiResult.content || aiResult.data?.content || prev.content,
-              sector: aiResult.sector || aiResult.data?.sector || prev.sector,
+              title: data.title || prev.title,
+              content: data.content || prev.content,
+              sector: data.sector || prev.sector,
+              subject: data.subject || prev.subject
           }));
           setActiveTab('creator');
           alert("AI: Artifact data loaded into Creator.");
       }
-      // Handle "Config Change" (Simple example)
-      else if (aiResult.target === 'config') {
-         alert("AI: Config instructions received. (Auto-apply implementation depends on safety preference)");
-      }
+      
       else {
-          // Fallback to creator
           transferAiToForm();
       }
   };
@@ -1861,6 +1933,23 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                             </div>
                                         </div>
                                     </div>
+
+                                    // PASTE THIS INSIDE THE 'ai-lab' TAB CONTAINER
+                                    {/* BULK PROGRESS BAR */}
+                                    {bulkProgress && (
+                                        <div className="p-4 bg-black/60 border border-green-500/50 rounded-xl animate-[fade-in_0.3s] mb-4">
+                                            <div className="flex justify-between text-xs font-bold mb-2 uppercase tracking-widest text-green-400">
+                                                <span>{bulkProgress.status}</span>
+                                                <span>{Math.round((bulkProgress.current / bulkProgress.total) * 100)}%</span>
+                                            </div>
+                                            <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden">
+                                                <div 
+                                                    className="h-full bg-green-500 transition-all duration-300 ease-out" 
+                                                    style={{width: `${(bulkProgress.current / bulkProgress.total) * 100}%`}}
+                                                ></div>
+                                            </div>
+                                        </div>
+                                    )}
 
                                     {aiResult && (
                                         <div className="flex-1 overflow-y-auto custom-scrollbar p-6 rounded-xl border bg-white/5 border-white/10 animate-[fade-in_0.3s]">
