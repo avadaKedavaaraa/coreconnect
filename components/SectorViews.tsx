@@ -230,12 +230,8 @@ export const SectorView: React.FC<SectorViewProps> = ({
       setSearch(''); setDateFilter(''); setSubjectFilter(''); setShowPinnedOnly(false);
       
       if (isLectures) {
-          // If on mobile/phone (< 768px), default to GRID view
-          // If on laptop/desktop, default to COLUMNS (Side-by-Side)
           const isMobile = window.innerWidth < 768;
           setViewMode(isMobile ? 'grid' : 'columns');
-          
-          // Default date to IST Today
           setDateFilter(getISTDateStr());
       } else {
           setViewMode('folders');
@@ -312,7 +308,6 @@ export const SectorView: React.FC<SectorViewProps> = ({
     const LectureCard3D = ({ cls, color }: { cls: LectureRule, color: 'blue' | 'fuchsia' }) => {
         return (
             <div className="perspective-1000 group">
-                {/* 3D Container with Transforms */}
                 <div
                     onClick={() => window.open(cls.link, '_blank')}
                     className={`
@@ -323,7 +318,6 @@ export const SectorView: React.FC<SectorViewProps> = ({
                     group-hover:z-10
                 `}
                 >
-                    {/* Banner */}
                     <div className="h-40 w-full relative overflow-hidden bg-black">
                         {cls.image ? (
                             <img src={cls.image} alt={cls.subject} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-all duration-700 transform group-hover:scale-110" />
@@ -333,23 +327,16 @@ export const SectorView: React.FC<SectorViewProps> = ({
                             </div>
                         )}
                         <div className="absolute inset-0 bg-gradient-to-t from-[#121212] via-transparent to-transparent"></div>
-
-                        {/* Time Badge */}
                         <div className="absolute top-3 right-3 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest bg-black/80 backdrop-blur-md border border-white/10 text-white shadow-xl flex items-center gap-2 z-10 translate-z-10">
                             <Clock size={12} className={color === 'blue' ? 'text-blue-400' : 'text-fuchsia-400'} />
                             {cls.startTime} {cls.endTime ? `- ${cls.endTime}` : ''}
                         </div>
                     </div>
-
-                    {/* Content */}
                     <div className="p-5 flex-1 flex flex-col relative -mt-10 z-20">
-                        {/* Floating Icon */}
                         <div className={`w-12 h-12 rounded-2xl rotate-3 flex items-center justify-center border-4 border-[#121212] shadow-2xl mb-3 transition-transform duration-500 group-hover:rotate-12 group-hover:scale-110 translate-z-20 ${color === 'blue' ? 'bg-gradient-to-br from-blue-600 to-blue-800' : 'bg-gradient-to-br from-fuchsia-600 to-purple-800'}`}>
                             <Video size={20} className="text-white drop-shadow-md" />
                         </div>
-
                         <h3 className="text-xl font-bold text-white leading-tight mb-2 group-hover:text-blue-300 transition-colors translate-z-10">{cls.subject}</h3>
-
                         <div className="mb-4 flex-1">
                             {cls.customMessage ? (
                                 <p className="text-sm text-zinc-400 leading-relaxed border-l-2 border-white/10 pl-3 italic line-clamp-3">{cls.customMessage}</p>
@@ -357,8 +344,6 @@ export const SectorView: React.FC<SectorViewProps> = ({
                                 <p className="text-sm text-zinc-600 italic">No class notes.</p>
                             )}
                         </div>
-
-                        {/* Interactive Join Button with Mouse Animation */}
                         {cls.link && (
                             <button className={`
                             relative overflow-hidden w-full py-3 rounded-lg font-bold text-xs uppercase tracking-[0.2em] 
@@ -367,12 +352,7 @@ export const SectorView: React.FC<SectorViewProps> = ({
                                     ? 'bg-blue-600/10 border border-blue-500/30 text-blue-200 group-hover:bg-blue-600 group-hover:text-white group-hover:border-blue-500'
                                     : 'bg-fuchsia-600/10 border border-fuchsia-500/30 text-fuchsia-200 group-hover:bg-fuchsia-600 group-hover:text-white group-hover:border-fuchsia-500'}
                         `}>
-                                <span className="relative z-10 flex items-center gap-2">
-                                    JOIN SESSION
-                                    <ExternalLink size={14} className="transition-transform group-hover/btn:translate-x-1" />
-                                </span>
-
-                                {/* The "3JS Structure" Mouse Animation */}
+                                <span className="relative z-10 flex items-center gap-2">JOIN SESSION <ExternalLink size={14} className="transition-transform group-hover/btn:translate-x-1" /></span>
                                 <div className="absolute right-4 opacity-0 group-hover:opacity-100 transition-all duration-500 delay-100 transform translate-y-4 group-hover:translate-y-0 text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.8)] z-20">
                                     <MousePointer2 size={24} className="fill-white text-black animate-bounce" />
                                 </div>
@@ -380,7 +360,6 @@ export const SectorView: React.FC<SectorViewProps> = ({
                         )}
                     </div>
                 </div>
-                {/* CSS for 3D Effect */}
                 <style jsx>{`
                 .perspective-1000 { perspective: 1000px; }
                 .transform-style-3d { transform-style: preserve-3d; }
@@ -398,7 +377,6 @@ export const SectorView: React.FC<SectorViewProps> = ({
     const renderSideBySideSchedule = () => {
         const aicsClasses = getClassesForDate(dateFilter, 'AICS');
         const csdaClasses = getClassesForDate(dateFilter, 'CSDA');
-
         const renderEmpty = (text: string, color: 'blue' | 'fuchsia') => (
             <div className={`py-12 px-6 text-center border-2 border-dashed rounded-2xl backdrop-blur-md transition-all flex flex-col items-center justify-center min-h-[150px]
             ${color === 'blue'
@@ -414,7 +392,6 @@ export const SectorView: React.FC<SectorViewProps> = ({
 
         return (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-[fade-in_0.3s]">
-                {/* AICS Column */}
                 <div className="space-y-4">
                     <div className="flex items-center justify-between bg-blue-950/20 p-3 rounded-lg border border-blue-500/20 backdrop-blur-sm">
                         <div className="flex items-center gap-3">
@@ -430,8 +407,6 @@ export const SectorView: React.FC<SectorViewProps> = ({
                         {aicsClasses.length > 0 ? aicsClasses.map(c => <LectureCard3D key={c.id} cls={c} color="blue" />) : renderEmpty("No AICS classes.", 'blue')}
                     </div>
                 </div>
-
-                {/* CSDA Column */}
                 <div className="space-y-4">
                     <div className="flex items-center justify-between bg-fuchsia-950/20 p-3 rounded-lg border border-fuchsia-500/20 backdrop-blur-sm">
                         <div className="flex items-center gap-3">
@@ -476,7 +451,7 @@ export const SectorView: React.FC<SectorViewProps> = ({
     // --- MAIN RENDER ---
     return (
         <div className={`w-full max-w-7xl mx-auto px-4 sm:px-6 pb-24 animate-[fade-in_0.3s_ease-out] ${isWizard ? 'scrollbar-wizard' : 'scrollbar-muggle'}`}>
-            {/* Context Menu & Modals (Preserved from Original) */}
+            {/* Context Menu & Modals */}
             {contextMenu && isAdmin && (
                 <div className={`fixed z-[100] min-w-[160px] rounded-lg border shadow-xl overflow-hidden py-1 animate-[fade-in_0.1s] ${isWizard ? 'bg-[#0a0f0a] border-emerald-500/50 shadow-emerald-900/50' : 'bg-[#0f0a15] border-fuchsia-500/50 shadow-fuchsia-900/50'}`} style={{ top: contextMenu.y, left: contextMenu.x }} onClick={(e) => e.stopPropagation()}>
                     <button onClick={(e) => { handleTogglePin(e, contextMenu.item); setContextMenu(null); }} className={`w-full px-4 py-2 text-left text-sm flex items-center gap-2 hover:bg-white/10 ${isWizard ? 'text-emerald-100' : 'text-fuchsia-100'}`}>{contextMenu.item.isPinned ? <PinOff size={14} /> : <Pin size={14} />} {contextMenu.item.isPinned ? "Unpin" : "Pin to Top"}</button>
@@ -527,7 +502,6 @@ export const SectorView: React.FC<SectorViewProps> = ({
                         </div>
                     )}
 
-                    {/* Date Picker for Lectures */}
                     {isLectures && (
                         <div className="flex items-center gap-3 mt-1">
                             <div className="text-sm font-bold opacity-80 bg-white/10 px-3 py-1.5 rounded-lg flex items-center gap-2 border border-white/10">
@@ -542,20 +516,15 @@ export const SectorView: React.FC<SectorViewProps> = ({
                     )}
                 </div>
 
-                {/* TOP RIGHT CONTROLS */}
                 <div className="flex flex-wrap gap-2 items-center justify-end w-full md:w-auto">
-
-                    {/* LECTURE CONTROLS: Batch Toggle & View Switcher */}
                     {isLectures && (
                         <div className="flex gap-2 items-center">
-                            {/* Batch Selector (Visible in Unified Grid/List View) */}
                             {viewMode !== 'columns' && (
                                 <div className="flex bg-black/40 rounded-lg p-1 border border-white/10">
                                     <button onClick={() => setActiveBatch('AICS')} className={`px-3 py-1.5 rounded text-xs font-bold transition-all ${activeBatch === 'AICS' ? 'bg-blue-600 text-white shadow-lg' : 'text-white/50 hover:text-white'}`}>AICS</button>
                                     <button onClick={() => setActiveBatch('CSDA')} className={`px-3 py-1.5 rounded text-xs font-bold transition-all ${activeBatch === 'CSDA' ? 'bg-fuchsia-600 text-white shadow-lg' : 'text-white/50 hover:text-white'}`}>CSDA</button>
                                 </div>
                             )}
-
                             <div className="flex bg-black/40 rounded-lg p-1 border border-white/10">
                                 <button onClick={() => setViewMode('columns')} className={`p-2 rounded ${viewMode === 'columns' ? 'bg-white/20 text-white' : 'text-white/40 hover:text-white'}`} title="Original View (Columns)"><Columns size={18} /></button>
                                 <button onClick={() => setViewMode('list')} className={`p-2 rounded ${viewMode === 'list' ? 'bg-white/20 text-white' : 'text-white/40 hover:text-white'}`} title="List"><List size={18} /></button>
@@ -563,8 +532,6 @@ export const SectorView: React.FC<SectorViewProps> = ({
                             </div>
                         </div>
                     )}
-
-                    {/* NON-LECTURE CONTROLS */}
                     {!isLectures && (
                         <div className="flex bg-black/40 rounded-lg p-1 border border-white/10">
                             <button onClick={() => setViewMode('list')} className={`p-2 rounded ${viewMode === 'list' ? 'bg-white/20' : 'hover:bg-white/10'}`}><List size={18} /></button>
@@ -572,7 +539,6 @@ export const SectorView: React.FC<SectorViewProps> = ({
                             <button onClick={() => setViewMode('folders')} className={`p-2 rounded ${viewMode === 'folders' ? 'bg-white/20' : 'hover:bg-white/10'}`}><FolderOpen size={18} /></button>
                         </div>
                     )}
-
                     {isAdmin && onAddItem && (
                         <button onClick={() => onAddItem(sectorId)} className="flex items-center gap-2 px-4 py-2 bg-blue-600 rounded font-bold hover:bg-blue-500 transition-colors text-sm h-full shadow-lg">
                             <Plus size={16} /> <span className="hidden sm:inline">NEW</span>
@@ -581,7 +547,6 @@ export const SectorView: React.FC<SectorViewProps> = ({
                 </div>
             </div>
 
-            {/* NON-LECTURE FILTER BAR (Original UI Preserved) */}
             {!isLectures && (
                 <div className={`mb-8 p-4 rounded-xl border backdrop-blur-md flex flex-col md:flex-row gap-4 items-center justify-between sticky top-2 sm:top-4 z-40 shadow-2xl transition-all mx-2 sm:mx-0 ${isWizard ? 'bg-emerald-950/80 border-emerald-500/50 shadow-black/50' : 'bg-fuchsia-950/80 border-fuchsia-500/50 shadow-black/50'}`}>
                     <div className="flex gap-2 w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
@@ -605,12 +570,10 @@ export const SectorView: React.FC<SectorViewProps> = ({
                 </div>
             )}
 
-            {/* LECTURE RENDER LOGIC */}
             {isLectures && (
                 viewMode === 'columns' ? renderSideBySideSchedule() : renderUnifiedSchedule()
             )}
 
-            {/* STANDARD ITEM RENDER LOGIC (ORIGINAL UI) */}
             {!isLectures && (viewMode === 'folders' && !search && !dateFilter && !showPinnedOnly ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 animate-[fade-in_0.3s]">
                     {subjects.map((subject, idx) => {
@@ -636,14 +599,12 @@ export const SectorView: React.FC<SectorViewProps> = ({
                     )}
                 </div>
             ) : (
-                // This block renders the filtered items for non-lecture sectors (Original UI)
                 <>
                     {filteredItems.length === 0 ? (
                         <div className="text-center py-20 opacity-40"><Search size={48} className="mx-auto mb-4" /><div className={`text-2xl font-bold mb-2 ${isWizard ? 'font-wizardTitle text-emerald-300' : 'font-muggle text-fuchsia-300'}`}>EMPTY SECTOR</div><p className="text-sm opacity-60">{isWizard ? "The scrolls are blank..." : "No data found."}</p></div>
                     ) : (
                         <div className={viewMode === 'list' ? 'flex flex-col gap-3' : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'}>
                             {filteredItems.map(item => (
-                                // Original Item Card Code
                                 <div key={item.id} draggable={isAdmin && isManualSort} onDragStart={(e) => handleDragStart(e, item)} onDragOver={(e) => handleDragOver(e, item)} onDrop={(e) => handleDrop(e, item)} onClick={() => onViewItem(item)} onContextMenu={(e) => handleContextMenu(e, item)} className={`relative rounded-xl border backdrop-blur-md group transition-all duration-300 cursor-pointer overflow-hidden select-none ${viewMode === 'list' ? 'p-4 flex items-center gap-4 hover:translate-x-1' : 'p-6 flex flex-col gap-4 hover:-translate-y-1 h-full'} ${isWizard ? 'bg-black/40 border-emerald-900/50 hover:bg-emerald-900/10' : 'bg-black/40 border-fuchsia-900/50 hover:bg-fuchsia-900/10'} ${item.isPinned ? (isWizard ? 'border-l-4 border-l-yellow-500' : 'border-l-4 border-l-yellow-500') : ''} ${draggedItem?.id === item.id ? 'opacity-20' : 'opacity-100'}`}>
                                     {item.isPinned && <div className={`absolute top-0 right-0 p-1.5 rounded-bl-lg shadow-sm ${isWizard ? 'bg-emerald-800 text-yellow-300' : 'bg-fuchsia-800 text-yellow-300'}`}><Pin size={12} fill="currentColor" /></div>}
                                     {item.image && viewMode === 'masonry' && <div className="w-full h-32 overflow-hidden rounded-lg relative"><img src={item.image} alt={item.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" /><div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors"></div></div>}
@@ -651,8 +612,22 @@ export const SectorView: React.FC<SectorViewProps> = ({
                                     {!item.image && <div className={`shrink-0 rounded-full flex items-center justify-center z-10 ${viewMode === 'list' ? 'w-12 h-12' : 'w-12 h-12 mb-2'} ${isWizard ? 'bg-emerald-900/30 text-emerald-400' : 'bg-fuchsia-900/30 text-fuchsia-400'}`}>{getTypeIcon(item.type)}</div>}
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2 mb-1">{item.subject && <span className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded border opacity-60 ${isWizard ? 'border-emerald-800 text-emerald-300' : 'border-fuchsia-800 text-fuchsia-300'}`}>{item.subject}</span>}<div className={`flex items-center gap-1 text-[10px] opacity-50 ${isWizard ? 'font-wizard' : 'font-muggle'}`}><Calendar size={10} /><span>{item.date}</span></div></div>
-                                        <h4 className={`font-bold leading-tight truncate ${viewMode === 'list' ? 'text-lg' : 'text-lg mb-2'}`} style={item.style?.isGradient ? { backgroundImage: `linear-gradient(to right, ${item.style.titleColor}, ${item.style.titleColorEnd || item.style.titleColor})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', color: 'transparent' } : { color: item.style?.titleColor }}>{item.title}</h4>
-                                        {!(item.fileUrl && (item.fileUrl.startsWith('http') || item.fileUrl.startsWith('https'))) && <div className={`text-xs opacity-70 line-clamp-3 mt-1 ${isWizard ? 'font-wizard' : 'font-muggle'}`} dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(item.content, { ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'u', 'span'], ALLOWED_ATTR: ['style', 'class'] }) }} />}
+                                        
+                                        {/* FIX: Applied text-white for Title & text-zinc-300 for Content in non-announcement sectors to prevent UI conflict */}
+                                        <h4 
+                                            className={`font-bold leading-tight truncate ${viewMode === 'list' ? 'text-lg' : 'text-lg mb-2'} ${sectorId !== 'announcements' ? 'text-white' : ''}`} 
+                                            style={item.style?.isGradient ? { backgroundImage: `linear-gradient(to right, ${item.style.titleColor}, ${item.style.titleColorEnd || item.style.titleColor})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', color: 'transparent' } : { color: item.style?.titleColor }}
+                                        >
+                                            {item.title}
+                                        </h4>
+                                        
+                                        {!(item.fileUrl && (item.fileUrl.startsWith('http') || item.fileUrl.startsWith('https'))) && 
+                                            <div 
+                                                className={`text-xs opacity-70 line-clamp-3 mt-1 ${isWizard ? 'font-wizard' : 'font-muggle'} ${sectorId !== 'announcements' ? 'text-zinc-300' : ''}`} 
+                                                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(item.content, { ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'u', 'span'], ALLOWED_ATTR: ['style', 'class'] }) }} 
+                                            />
+                                        }
+                                        
                                         {(item.fileUrl && (item.fileUrl.startsWith('http') || item.fileUrl.startsWith('https'))) && <div className="mt-2 pt-2 border-t border-white/5 flex"><a href={item.fileUrl} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className={`flex items-center justify-center gap-2 px-4 py-2 rounded font-bold text-xs uppercase tracking-widest transition-all hover:scale-[1.02] active:scale-95 shadow-lg ${isWizard ? 'bg-emerald-600 hover:bg-emerald-500 text-black' : 'bg-fuchsia-600 hover:bg-fuchsia-500 text-black'}`}><ExternalLink size={14} /> OPEN LINK</a></div>}
                                     </div>
                                 </div>
