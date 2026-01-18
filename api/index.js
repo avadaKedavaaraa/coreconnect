@@ -353,7 +353,7 @@ router.post('/ai/parse', requireAuth, multer({ storage: multer.memoryStorage() }
       `;
 
       const response = await aiClient.models.generateContent({
-          model: "gemini-2.0-flash", 
+          model: "gemini-3-flash-preview", 
           contents: [{ role: 'user', parts }],
           config: { 
               responseMimeType: "application/json",
