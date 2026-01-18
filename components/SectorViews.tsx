@@ -25,7 +25,7 @@ interface SectorViewProps {
   onUpdateItem?: (item: CarouselItem) => Promise<void>;
   onBack?: () => void;
   onAddItem?: (sectorId: string) => void;
-  onQuickCreate?: (item: CarouselItem) => Promise<void>;
+  onQuickCreate?: (item: CarouselItem) => Promise<void>; // Updated to Promise
   onUpdateSubject?: (oldName: string, newName: string, newImage?: string) => Promise<void>;
   onReorder?: (updates: { id: string, order_index: number }[]) => Promise<void>;
   
@@ -40,7 +40,6 @@ const ACADEMIC_SECTORS = ['books', 'notes', 'resources', 'tasks'];
 
 // --- TIMEZONE HELPERS (IST - Asia/Kolkata) ---
 const getISTDateStr = () => {
-    // Returns YYYY-MM-DD in Indian Time
     return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
 };
 
@@ -49,9 +48,9 @@ const getISTDayName = (dateStr?: string) => {
     return d.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'Asia/Kolkata' });
 };
 
-// --- SCHEDULER HELPERS ---
+// --- SCHEDULER HELPERS (V2.5) ---
 const isDateInRange = (checkDate: Date, start?: string, end?: string) => {
-    if (!start && !end) return true; 
+    if (!start && !end) return true; // No range = always active
     const target = new Date(checkDate).setHours(0,0,0,0);
     const s = start ? new Date(start).setHours(0,0,0,0) : -Infinity;
     const e = end ? new Date(end).setHours(0,0,0,0) : Infinity;
@@ -87,20 +86,17 @@ export const SectorView: React.FC<SectorViewProps> = ({
   
   // State
   const [search, setSearch] = useState('');
-  
-  // Initialize dateFilter to Today's date in IST
-  const [dateFilter, setDateFilter] = useState<string>(getISTDateStr());
-  
+  const [dateFilter, setDateFilter] = useState('');
   const [subjectFilter, setSubjectFilter] = useState('');
-  
-  // viewMode 'columns' = The "Earlier" Side-by-Side UI. 'grid'/'list' = The "New" UI.
+  // Expanded viewMode to support 'columns' for scheduler
   const [viewMode, setViewMode] = useState<'grid' | 'list' | 'folders' | 'masonry' | 'columns'>('folders');
-  
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [showPinnedOnly, setShowPinnedOnly] = useState(false);
 
   // Lecture Specific State
   const [activeBatch, setActiveBatch] = useState<'AICS' | 'CSDA'>('AICS');
+  // Default to IST Today for Scheduler
+  const [scheduleDate, setScheduleDate] = useState<string>(getISTDateStr());
 
   // Drag & Drop State
   const [draggedItem, setDraggedItem] = useState<CarouselItem | null>(null);
@@ -124,7 +120,7 @@ export const SectorView: React.FC<SectorViewProps> = ({
   const activeSortOrder = currentSector?.sortOrder || 'newest';
   const isManualSort = activeSortOrder === 'manual';
 
-  // --- ITEM SORTING & FILTERING ---
+  // --- ITEM SORTING & FILTERING (For Non-Scheduler Sectors) ---
   useEffect(() => {
       let combined = [...items];
       combined.sort((a, b) => {
@@ -151,50 +147,31 @@ export const SectorView: React.FC<SectorViewProps> = ({
   }, [items, sectorId, activeSortOrder]);
 
   const filteredItems = useMemo(() => {
-      const source = search ? (allItems || items) : localDisplayItems;
-      return source.filter(item => {
+      return localDisplayItems.filter(item => {
           const matchSearch = item.title.toLowerCase().includes(search.toLowerCase()) || 
                               item.content.toLowerCase().includes(search.toLowerCase());
           
           const normalizedItemDate = item.date.replace(/-/g, '.');
           const normalizedFilter = dateFilter.replace(/-/g, '.');
-          const matchDate = (!isLectures && !dateFilter) ? true : (isLectures ? true : normalizedItemDate === normalizedFilter);
-          
-          const matchSector = search ? true : item.sector === sectorId;
+          const matchDate = dateFilter ? normalizedItemDate === normalizedFilter : true;
           const matchSubject = subjectFilter ? (item.subject || 'General') === subjectFilter : true;
           const matchesPinned = showPinnedOnly ? item.isPinned : true;
-          return matchSearch && matchSector && matchDate && matchSubject && matchesPinned;
+          return matchSearch && matchDate && matchSubject && matchesPinned;
       });
-  }, [items, allItems, localDisplayItems, search, sectorId, dateFilter, subjectFilter, showPinnedOnly, isLectures]);
-
-  // --- SCHEDULER LOGIC (V2.5) ---
-  const getClassesForDate = (dateStr: string, batch?: string) => {
-      if (!schedules || !isLectures) return [];
-      const targetDate = new Date(dateStr);
-      
-      return schedules.filter(rule => {
-          if (!rule.isActive) return false;
-          if (batch && rule.batch && rule.batch !== batch) return false;
-          if (!isDateInRange(targetDate, rule.startDate, rule.endDate)) return false;
-          return isDayMatch(targetDate, rule.days, rule.dayOfWeek);
-      }).sort((a, b) => a.startTime.localeCompare(b.startTime));
-  };
+  }, [localDisplayItems, search, dateFilter, subjectFilter, showPinnedOnly]);
 
   // --- UI EFFECTS ---
   useEffect(() => {
-      if ((search) && viewMode === 'folders') { setViewMode('masonry'); }
-  }, [search, viewMode]);
+      if ((search || dateFilter) && viewMode === 'folders' && !isLectures) { setViewMode('masonry'); }
+  }, [search, dateFilter, viewMode, isLectures]);
 
   useEffect(() => {
-      setSearch(''); setSubjectFilter(''); setShowPinnedOnly(false);
-      // Default to 'columns' (Side-by-Side) for lectures, 'folders' for others
+      setSearch(''); setDateFilter(''); setSubjectFilter(''); setShowPinnedOnly(false);
+      // If Lectures, default to Columns (Side-by-Side). Else default to Folders.
       setViewMode(isLectures ? 'columns' : 'folders');
-      // Default date to IST Today for lectures
-      if (isLectures) setDateFilter(getISTDateStr());
-      else setDateFilter('');
   }, [sectorId, isLectures]);
 
-  // --- DRAG & DROP & ACTIONS (Standard) ---
+  // --- DRAG & DROP HANDLERS (Original) ---
   const handleDragStart = (e: React.DragEvent, item: CarouselItem) => {
       if (!isAdmin || !isManualSort) return;
       setDraggedItem(item);
@@ -227,6 +204,8 @@ export const SectorView: React.FC<SectorViewProps> = ({
           setIsOrderChanged(false);
       } catch (e) { alert("Failed to save order."); } finally { setIsSavingOrder(false); }
   };
+
+  // --- QUICK ACTIONS ---
   const handleQuickPost = async () => {
       if (!quickPostText.trim() || !onQuickCreate) return;
       setIsPosting(true);
@@ -241,6 +220,7 @@ export const SectorView: React.FC<SectorViewProps> = ({
           setQuickPostText('');
       } catch (e) { alert('Failed to post'); } finally { setIsPosting(false); }
   };
+
   const handleCreateSubject = async () => {
       if (!newSubjectName.trim() || !onQuickCreate) return;
       setIsProcessing(true);
@@ -248,6 +228,7 @@ export const SectorView: React.FC<SectorViewProps> = ({
       let targetSectors = [sectorId];
       if (ACADEMIC_SECTORS.includes(sectorId)) targetSectors = ACADEMIC_SECTORS;
       const today = new Date().toISOString().split('T')[0].replace(/-/g, '.');
+
       try {
           for (const targetSector of targetSectors) {
               const sourceList = allItems || items;
@@ -263,10 +244,12 @@ export const SectorView: React.FC<SectorViewProps> = ({
           setNewSubjectName(''); setNewSubjectImage(''); setIsCreatingSubject(false);
       } catch (e) { alert("Failed to create subject."); } finally { setIsProcessing(false); }
   };
+
   const handleTogglePin = async (e: React.MouseEvent, item: CarouselItem) => {
       e.stopPropagation();
       if (onUpdateItem) { await onUpdateItem({ ...item, isPinned: !item.isPinned }); } else if (onEdit) { onEdit({ ...item, isPinned: !item.isPinned }); }
   };
+
   const handleContextMenu = (e: React.MouseEvent, item: CarouselItem) => {
       if (!isAdmin) return;
       e.preventDefault(); e.stopPropagation();
@@ -275,6 +258,7 @@ export const SectorView: React.FC<SectorViewProps> = ({
       if (window.innerHeight - y < 150) y -= 150;
       setContextMenu({ x, y, item });
   };
+
   const getTypeIcon = (type: string) => {
       switch (type) { case 'video': return <Video size={20} />; case 'file': return <FileText size={20} />; case 'mixed': return <Layers size={20} />; case 'code': return <Code size={20} />; case 'link': return <LinkIcon size={20} />; default: return <FileText size={20} />; }
   };
@@ -290,15 +274,26 @@ export const SectorView: React.FC<SectorViewProps> = ({
   }
 
   // ==========================================
-  // RENDERER 1: SIDE-BY-SIDE (ORIGINAL/COLUMNS)
+  // LECTURE RENDERER 1: SIDE-BY-SIDE (Columns)
   // ==========================================
   const renderSideBySideSchedule = () => {
-    const aicsClasses = getClassesForDate(dateFilter, 'AICS');
-    const csdaClasses = getClassesForDate(dateFilter, 'CSDA');
+    // Helper to get classes for the selected scheduleDate
+    const getClasses = (batch: string) => {
+        const targetDate = new Date(scheduleDate);
+        return (schedules || []).filter(s => 
+            s.isActive && 
+            (s.batch === batch || (batch === 'AICS' && !s.batch)) && 
+            isDayMatch(targetDate, s.days, s.dayOfWeek) &&
+            isDateInRange(targetDate, s.startDate, s.endDate)
+        ).sort((a,b) => a.startTime.localeCompare(b.startTime));
+    };
+
+    const aicsClasses = getClasses('AICS');
+    const csdaClasses = getClasses('CSDA');
 
     const renderCard = (cls: LectureRule, color: 'blue' | 'fuchsia') => (
         <div key={cls.id} className={`group relative rounded-xl overflow-hidden border border-white/10 flex flex-col transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl bg-[#121212]`}>
-            {/* Standard Height Banner */}
+            {/* Standard Banner */}
             <div className="h-28 w-full relative overflow-hidden">
                 {cls.image ? (
                     <img src={cls.image} alt={cls.subject} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
@@ -328,7 +323,7 @@ export const SectorView: React.FC<SectorViewProps> = ({
     );
 
     return (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-[fade-in_0.3s]">
             <div className="space-y-4">
                 <div className="flex items-center justify-between bg-blue-950/20 p-3 rounded-lg border border-blue-500/20">
                     <div className="flex items-center gap-3"><div className="h-8 w-1 bg-blue-500 rounded-full"></div><div><h3 className="font-bold text-blue-100 leading-none">AICS</h3><div className="text-[10px] text-blue-300/60 uppercase tracking-wider">Artificial Intelligence</div></div></div>
@@ -348,14 +343,19 @@ export const SectorView: React.FC<SectorViewProps> = ({
   };
 
   // ==========================================
-  // RENDERER 2: UNIFIED GRID/LIST (NEW UI)
+  // LECTURE RENDERER 2: UNIFIED LIST/GRID (With Animations)
   // ==========================================
   const renderUnifiedSchedule = () => {
-    // Filter by the actively selected batch in this view
-    const activeClasses = getClassesForDate(dateFilter, activeBatch);
+    const targetDate = new Date(scheduleDate);
+    const activeClasses = (schedules || []).filter(s => 
+        s.isActive && 
+        s.batch === activeBatch &&
+        isDayMatch(targetDate, s.days, s.dayOfWeek) &&
+        isDateInRange(targetDate, s.startDate, s.endDate)
+    ).sort((a,b) => a.startTime.localeCompare(b.startTime));
 
     return (
-        <div className={`grid gap-6 ${viewMode === 'list' ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'}`}>
+        <div className={`grid gap-6 animate-[fade-in_0.3s] ${viewMode === 'list' ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'}`}>
             {activeClasses.length > 0 ? (
                 activeClasses.map(cls => (
                     <div 
@@ -363,7 +363,7 @@ export const SectorView: React.FC<SectorViewProps> = ({
                         className={`group relative rounded-xl overflow-hidden border border-white/10 flex flex-col transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_20px_40px_rgba(0,0,0,0.6)] bg-[#121212] cursor-pointer ring-1 ring-white/5 hover:ring-white/20`}
                         onClick={() => window.open(cls.link, '_blank')}
                     >
-                        {/* Large Banner Image (Requested Feature) */}
+                        {/* Large Banner Image */}
                         <div className="h-48 w-full relative overflow-hidden bg-black">
                             {cls.image ? (
                                 <img src={cls.image} alt={cls.subject} className="w-full h-full object-cover opacity-70 group-hover:opacity-100 transition-all duration-500 transform group-hover:scale-110" />
@@ -385,7 +385,6 @@ export const SectorView: React.FC<SectorViewProps> = ({
 
                         {/* Content */}
                         <div className="p-5 flex-1 flex flex-col relative -mt-10 z-20">
-                            {/* Floating Icon */}
                             <div className={`w-14 h-14 rounded-2xl rotate-3 flex items-center justify-center border-4 border-[#121212] shadow-2xl mb-3 transition-transform group-hover:rotate-6 group-hover:scale-110 ${activeBatch === 'AICS' ? 'bg-gradient-to-br from-blue-600 to-blue-800' : 'bg-gradient-to-br from-fuchsia-600 to-purple-800'}`}>
                                 <Video size={24} className="text-white drop-shadow-md" />
                             </div>
@@ -424,7 +423,7 @@ export const SectorView: React.FC<SectorViewProps> = ({
                     </div>
                     <h3 className="text-2xl font-bold text-white mb-2 tracking-wide">No Lectures Found</h3>
                     <p className="text-base text-zinc-400 max-w-md mx-auto">
-                        There are no classes scheduled for <span className="text-white font-bold">{new Date(dateFilter).toLocaleDateString()}</span> for {activeBatch}.
+                        There are no classes scheduled for <span className="text-white font-bold">{new Date(scheduleDate).toLocaleDateString()}</span> for {activeBatch}.
                     </p>
                 </div>
             )}
@@ -459,7 +458,7 @@ export const SectorView: React.FC<SectorViewProps> = ({
             </div>
         )}
 
-        {/* HEADER CONTROLS */}
+        {/* HEADER CONTROLS (Responsive) */}
         <div className="flex flex-col md:flex-row justify-between items-end gap-4 mb-8 border-b border-white/10 pb-4">
             <div className="flex-1 w-full md:w-auto">
                 <div className="flex items-center gap-4 mb-2">
@@ -473,6 +472,7 @@ export const SectorView: React.FC<SectorViewProps> = ({
                     </h2>
                 </div>
                 
+                {/* Search Bar (Only for Non-Lectures to match 'Original UI') */}
                 {!isLectures && (
                     <div className="relative w-full max-w-md">
                         <Search className="absolute left-3 top-2.5 text-white/30" size={14} />
@@ -487,37 +487,50 @@ export const SectorView: React.FC<SectorViewProps> = ({
                     </div>
                 )}
                 
-                {/* Date Picker (Visible for Lectures) */}
+                {/* Date Display for Lectures (Only shown here if in Lecture Mode) */}
                 {isLectures && (
                     <div className="flex items-center gap-3 mt-1">
                         <div className="text-sm font-bold opacity-80 bg-white/10 px-3 py-1.5 rounded-lg flex items-center gap-2 border border-white/10">
                              <CalendarDays size={14} className="text-white/60" />
-                             {getISTDayName(dateFilter)}, {new Date(dateFilter).toLocaleDateString()}
+                             {getISTDayName(scheduleDate)}, {new Date(scheduleDate).toLocaleDateString()}
                         </div>
+                        {/* Inline Date Picker */}
                         <div className="relative overflow-hidden w-9 h-9 rounded-lg bg-blue-600/20 hover:bg-blue-600/40 border border-blue-500/30 transition-colors cursor-pointer flex items-center justify-center group" title="Change Date">
                             <Calendar size={16} className="text-blue-300 group-hover:text-white" />
-                            <input type="date" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} className="absolute inset-0 opacity-0 cursor-pointer" />
+                            <input type="date" value={scheduleDate} onChange={(e) => setScheduleDate(e.target.value)} className="absolute inset-0 opacity-0 cursor-pointer" />
                         </div>
                     </div>
                 )}
             </div>
 
-            {/* CONTROLS (View Toggle, Batch Selector) */}
+            {/* TOP RIGHT CONTROLS */}
             <div className="flex flex-wrap gap-2 items-center justify-end w-full md:w-auto">
-                {isLectures && viewMode !== 'columns' && (
-                     <div className="flex bg-black/40 rounded-lg p-1 border border-white/10">
-                         <button onClick={() => setActiveBatch('AICS')} className={`px-4 py-1.5 rounded text-xs font-bold transition-all ${activeBatch === 'AICS' ? 'bg-blue-600 text-white shadow-lg' : 'text-white/50 hover:text-white'}`}>AICS</button>
-                         <button onClick={() => setActiveBatch('CSDA')} className={`px-4 py-1.5 rounded text-xs font-bold transition-all ${activeBatch === 'CSDA' ? 'bg-fuchsia-600 text-white shadow-lg' : 'text-white/50 hover:text-white'}`}>CSDA</button>
-                     </div>
-                )}
+                
+                {/* LECTURE CONTROLS: Batch Toggle & View Switcher */}
+                {isLectures ? (
+                     <div className="flex gap-2">
+                        {/* Batch Selector (Visible in Unified Grid/List View) */}
+                        {viewMode !== 'columns' && (
+                             <div className="flex bg-black/40 rounded-lg p-1 border border-white/10">
+                                 <button onClick={() => setActiveBatch('AICS')} className={`px-3 py-1.5 rounded text-xs font-bold transition-all ${activeBatch === 'AICS' ? 'bg-blue-600 text-white shadow-lg' : 'text-white/50 hover:text-white'}`}>AICS</button>
+                                 <button onClick={() => setActiveBatch('CSDA')} className={`px-3 py-1.5 rounded text-xs font-bold transition-all ${activeBatch === 'CSDA' ? 'bg-fuchsia-600 text-white shadow-lg' : 'text-white/50 hover:text-white'}`}>CSDA</button>
+                             </div>
+                        )}
 
-                <div className="flex bg-black/40 rounded-lg p-1 border border-white/10">
-                    {isLectures && (
-                        <button onClick={() => setViewMode('columns')} className={`p-2 rounded ${viewMode === 'columns' ? 'bg-white/20 text-white' : 'text-white/40 hover:text-white'}`} title="Side-by-Side View"><Columns size={18} /></button>
-                    )}
-                    <button onClick={() => setViewMode('list')} className={`p-2 rounded ${viewMode === 'list' ? 'bg-white/20 text-white' : 'text-white/40 hover:text-white'}`} title="List View"><List size={18} /></button>
-                    <button onClick={() => setViewMode('grid')} className={`p-2 rounded ${viewMode === 'grid' ? 'bg-white/20 text-white' : 'text-white/40 hover:text-white'}`} title="Grid View"><LayoutGrid size={18} /></button>
-                </div>
+                        <div className="flex bg-black/40 rounded-lg p-1 border border-white/10">
+                            <button onClick={() => setViewMode('columns')} className={`p-2 rounded ${viewMode === 'columns' ? 'bg-white/20 text-white' : 'text-white/40 hover:text-white'}`} title="Original View (Columns)"><Columns size={18} /></button>
+                            <button onClick={() => setViewMode('list')} className={`p-2 rounded ${viewMode === 'list' ? 'bg-white/20 text-white' : 'text-white/40 hover:text-white'}`} title="List View"><List size={18} /></button>
+                            <button onClick={() => setViewMode('grid')} className={`p-2 rounded ${viewMode === 'grid' ? 'bg-white/20 text-white' : 'text-white/40 hover:text-white'}`} title="Grid View"><LayoutGrid size={18} /></button>
+                        </div>
+                     </div>
+                ) : (
+                    /* NON-LECTURE CONTROLS (Original) */
+                    <div className="flex gap-2">
+                         <button onClick={() => setViewMode('list')} className={`p-2 rounded ${viewMode === 'list' ? 'bg-white/20' : 'hover:bg-white/10'}`}><List size={18} /></button>
+                         <button onClick={() => setViewMode('masonry')} className={`p-2 rounded ${viewMode === 'masonry' ? 'bg-white/20' : 'hover:bg-white/10'}`}><LayoutGrid size={18} /></button>
+                         <button onClick={() => setViewMode('folders')} className={`p-2 rounded ${viewMode === 'folders' ? 'bg-white/20' : 'hover:bg-white/10'}`}><FolderOpen size={18} /></button>
+                    </div>
+                )}
                 
                 {isAdmin && onAddItem && (
                     <button onClick={() => onAddItem(sectorId)} className="flex items-center gap-2 px-4 py-2 bg-blue-600 rounded font-bold hover:bg-blue-500 transition-colors text-sm h-full shadow-lg">
@@ -527,13 +540,61 @@ export const SectorView: React.FC<SectorViewProps> = ({
             </div>
         </div>
 
+        {/* ORIGINAL FILTER BAR (Only for Non-Lectures) */}
+        {!isLectures && (
+            <div className={`mb-8 p-4 rounded-xl border backdrop-blur-md flex flex-col md:flex-row gap-4 items-center justify-between sticky top-2 sm:top-4 z-40 shadow-2xl transition-all mx-2 sm:mx-0 ${isWizard ? 'bg-emerald-950/80 border-emerald-500/50 shadow-black/50' : 'bg-fuchsia-950/80 border-fuchsia-500/50 shadow-black/50'}`}>
+                <div className="flex gap-2 w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
+                    <div className="relative z-[40]">
+                        <CalendarWidget lineage={lineage} items={localDisplayItems} selectedDate={dateFilter} onSelectDate={setDateFilter} isOpen={calendarOpen} setIsOpen={setCalendarOpen} />
+                    </div>
+                    <button onClick={() => setShowPinnedOnly(!showPinnedOnly)} className={`flex items-center gap-2 px-4 py-2 rounded border transition-all hover:bg-white/5 whitespace-nowrap ${showPinnedOnly ? (isWizard ? 'bg-emerald-900/40 border-emerald-500 text-emerald-300' : 'bg-fuchsia-900/40 border-fuchsia-500 text-fuchsia-300') : (isWizard ? 'border-emerald-700 text-emerald-100' : 'border-fuchsia-700 text-fuchsia-100')}`} title="Show Pinned Messages Only">
+                        <Pin size={16} fill={showPinnedOnly ? "currentColor" : "none"} />
+                        <span className={isWizard ? 'font-wizard' : 'font-muggle text-xs'}>{showPinnedOnly ? "Pinned" : "All"}</span>
+                    </button>
+                    <div className="relative min-w-[140px]">
+                        <select value={subjectFilter} onChange={(e) => { setSubjectFilter(e.target.value); if (e.target.value && viewMode === 'folders') setViewMode('masonry'); }} className={`w-full px-4 py-2 rounded border bg-transparent outline-none appearance-none cursor-pointer text-base h-full ${isWizard ? 'border-emerald-700 text-emerald-100 bg-[#050a05] font-wizard' : 'border-fuchsia-700 text-fuchsia-100 bg-[#09050f] font-muggle'}`}>
+                            <option value="" className="bg-black">{isWizard ? "All Subjects" : "All Directories"}</option>
+                            {subjects.map(sub => <option key={sub} value={sub} className="bg-black text-white">{sub}</option>)}
+                        </select>
+                        <Filter className={`absolute right-3 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none opacity-50`} />
+                    </div>
+                    {(search || dateFilter || subjectFilter || showPinnedOnly) && <button onClick={() => { setSearch(''); setDateFilter(''); setSubjectFilter(''); setShowPinnedOnly(false); }} className={`p-2 rounded hover:bg-white/10 ${isWizard ? 'text-emerald-400' : 'text-fuchsia-400'} shrink-0 self-end md:self-auto`}><X size={20} /></button>}
+                </div>
+                {isAdmin && isManualSort && isOrderChanged && <button onClick={handleSaveOrder} disabled={isSavingOrder} className={`flex items-center gap-2 px-4 py-2 rounded font-bold shadow-lg transition-transform hover:scale-105 active:scale-95 ${isWizard ? 'bg-yellow-600 text-black' : 'bg-blue-600 text-white'}`}>{isSavingOrder ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} {isSavingOrder ? 'Saving...' : 'Save Order'}</button>}
+            </div>
+        )}
+
         {/* LECTURE RENDER LOGIC */}
-        {sectorId === 'lectures' && (
+        {isLectures && (
              viewMode === 'columns' ? renderSideBySideSchedule() : renderUnifiedSchedule()
         )}
 
         {/* STANDARD ITEM RENDER LOGIC */}
-        {!isLectures && filteredItems.length > 0 ? (
+        {!isLectures && (viewMode === 'folders' && !search && !dateFilter && !showPinnedOnly ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 animate-[fade-in_0.3s]">
+                {subjects.map((subject, idx) => {
+                    const subjectItems = localDisplayItems.filter(i => (i.subject || 'General') === subject);
+                    const count = subjectItems.length;
+                    const coverItem = subjectItems.find(i => i.image && i.image.length > 0);
+                    const coverImage = coverItem?.image;
+                    return (
+                        <div key={idx} className="relative group">
+                            <button onClick={() => { setSubjectFilter(subject); setViewMode('masonry'); }} className={`w-full h-40 relative overflow-hidden rounded-2xl border p-6 flex flex-col justify-end gap-2 text-left transition-all duration-500 hover:scale-[1.02] ${isWizard ? 'bg-black/60 border-emerald-900/50 hover:border-emerald-500/50 shadow-[0_0_20px_rgba(16,185,129,0.05)]' : 'bg-black/60 border-fuchsia-900/50 hover:border-fuchsia-500/50 shadow-[0_0_20px_rgba(217,70,239,0.05)]'}`}>
+                                {coverImage ? <><div className="absolute inset-0 bg-cover bg-center blur-md opacity-40 group-hover:opacity-60 transition-opacity duration-700 transform scale-110" style={{ backgroundImage: `url(${coverImage})` }}></div><div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-black/30"></div></> : <Book size={100} className={`absolute -right-4 -top-4 opacity-5 transition-transform duration-700 group-hover:rotate-12 group-hover:scale-110 ${isWizard ? 'text-emerald-500' : 'text-fuchsia-500'}`} />}
+                                <span className={`relative z-10 text-2xl font-bold leading-none drop-shadow-lg ${isWizard ? 'font-wizardTitle text-emerald-100' : 'font-muggle text-fuchsia-100'}`}>{subject}</span>
+                                <div className={`relative z-10 flex items-center gap-2 text-xs opacity-80 group-hover:opacity-100 transition-opacity drop-shadow-md ${isWizard ? 'font-wizard text-emerald-200' : 'font-muggle text-fuchsia-200'}`}><div className={`h-px w-8 ${isWizard ? 'bg-emerald-500' : 'bg-fuchsia-500'}`}></div>{count} {isWizard ? 'Scrolls' : 'Files'}</div>
+                            </button>
+                            {isAdmin && (<div className="absolute top-2 right-2 flex gap-1 z-20 opacity-0 group-hover:opacity-100 transition-opacity">{onUpdateSubject && <button onClick={(e) => { e.stopPropagation(); setEditingSubject({ originalName: subject, name: subject, image: coverImage || '' }); }} className="p-2 rounded-full bg-blue-600/80 text-white hover:bg-blue-500"><Edit2 size={16} /></button>}{onDelete && <button onClick={(e) => { e.stopPropagation(); if (!onDelete) return; const count = items.filter(i => (i.subject || 'General') === subject).length; if (!confirm(`Delete "${subject}" and ALL ${count} items?`)) return; items.filter(i => (i.subject || 'General') === subject).forEach(item => onDelete(item.id)); }} className="p-2 rounded-full bg-red-900/80 text-white hover:bg-red-700"><Trash2 size={16} /></button>}</div>)}
+                        </div>
+                    );
+                })}
+                {isAdmin && onQuickCreate && (
+                    <div className={`h-40 relative overflow-hidden rounded-2xl border-2 border-dashed flex flex-col items-center justify-center gap-2 transition-all duration-300 ${isWizard ? 'border-emerald-900/50 hover:border-emerald-500/50 hover:bg-emerald-900/10' : 'border-fuchsia-900/50 hover:border-fuchsia-500/50 hover:bg-fuchsia-900/10'}`}>
+                        {!isCreatingSubject ? <button onClick={() => setIsCreatingSubject(true)} className={`flex flex-col items-center justify-center w-full h-full text-white/50 hover:text-white transition-colors`}><FolderPlus size={40} className="mb-2" /><span className="font-bold uppercase tracking-widest text-xs">Create Subject</span></button> : <div className="w-full h-full flex flex-col items-center justify-center p-4 bg-black/80 animate-[fade-in_0.2s]"><input ref={inputRef} type="text" value={newSubjectName} onChange={(e) => setNewSubjectName(e.target.value)} placeholder="Subject Name..." onKeyDown={(e) => { if (e.key === 'Enter') handleCreateSubject(); if (e.key === 'Escape') { setIsCreatingSubject(false); setNewSubjectName(''); } }} className={`w-full bg-transparent border-b outline-none text-center font-bold text-sm mb-2 ${isWizard ? 'border-emerald-500 text-emerald-100 placeholder:text-emerald-800' : 'border-fuchsia-500 text-fuchsia-100 placeholder:text-fuchsia-800'}`} /><input type="text" value={newSubjectImage} onChange={(e) => setNewSubjectImage(e.target.value)} placeholder="Cover Image URL (Optional)..." className={`w-full bg-transparent border-b outline-none text-center text-[10px] mb-2 opacity-70 ${isWizard ? 'border-emerald-800 text-emerald-200' : 'border-fuchsia-800 text-fuchsia-200'}`} /><div className="flex gap-2"><button onClick={handleCreateSubject} disabled={isProcessing} className={`px-4 py-1.5 rounded text-[10px] font-bold ${isWizard ? 'bg-emerald-600 text-black' : 'bg-fuchsia-600 text-black'}`}>{isProcessing ? <Loader2 size={12} className="animate-spin" /> : 'CREATE'}</button><button onClick={() => { setIsCreatingSubject(false); setNewSubjectName(''); setNewSubjectImage(''); }} className="px-4 py-1.5 rounded text-[10px] font-bold border border-white/20 hover:bg-white/10">CANCEL</button></div></div>}
+                    </div>
+                )}
+            </div>
+        ) : filteredItems.length > 0 ? (
             <div className={`grid gap-6 ${viewMode === 'grid' || viewMode === 'masonry' ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'}`}>
                 {filteredItems.map(item => (
                     <div 
@@ -578,13 +639,13 @@ export const SectorView: React.FC<SectorViewProps> = ({
                     </div>
                 ))}
             </div>
-        ) : !isLectures && (
+        ) : (
             <div className="flex flex-col items-center justify-center py-20 opacity-30">
                 <div className={`text-2xl font-bold mb-2 ${isWizard ? 'font-wizardTitle text-emerald-300' : 'font-muggle text-fuchsia-300'}`}>EMPTY SECTOR</div>
                 <p className="text-sm opacity-60">{isWizard ? "The scrolls are blank..." : "No data found."}</p>
                 {search && <p className="text-sm">Try adjusting your search filters.</p>}
             </div>
-        )}
+        ))}
         
         <style dangerouslySetInnerHTML={{ __html: `@keyframes fade-in-up { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }` }} />
     </div>
