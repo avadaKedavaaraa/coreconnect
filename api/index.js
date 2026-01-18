@@ -317,6 +317,7 @@ router.post('/ai/chat', async (req, res) => {
     } catch (error) { res.status(500).json({ error: "Oracle Error" }); }
 });
 
+// --- UPDATED: AI PARSE WITH BULK ACTIONS ---
 router.post('/ai/parse', requireAuth, multer({ storage: multer.memoryStorage() }).single('file'), async (req, res) => {
     try {
       if (!aiClient) return res.status(503).json({ error: "Oracle Disconnected" });
@@ -325,14 +326,7 @@ router.post('/ai/parse', requireAuth, multer({ storage: multer.memoryStorage() }
       if (req.file) parts.push({ inlineData: { data: req.file.buffer.toString('base64'), mimeType: req.file.mimetype } });
       parts.push({ text: prompt ? xss(prompt) : "Analyze." });
 
-      // FIND THIS SECTION inside router.post('/ai/parse'...)
-// ...
-      const { prompt } = req.body;
-      let parts = [];
-      if (req.file) parts.push({ inlineData: { data: req.file.buffer.toString('base64'), mimeType: req.file.mimetype } });
-      parts.push({ text: prompt ? xss(prompt) : "Analyze." });
-
-// PASTE THIS NEW CODE BLOCK HERE:
+      // ENHANCED SYSTEM PROMPT
       const systemInstruction = `
         You are the CoreConnect System Admin AI. Analyze the user's natural language command and output a JSON object to execute it.
         
@@ -359,7 +353,7 @@ router.post('/ai/parse', requireAuth, multer({ storage: multer.memoryStorage() }
       `;
 
       const response = await aiClient.models.generateContent({
-          model: "gemini-3-flash", // Or your preferred model version
+          model: "gemini-2.0-flash", 
           contents: [{ role: 'user', parts }],
           config: { 
               responseMimeType: "application/json",
@@ -368,7 +362,6 @@ router.post('/ai/parse', requireAuth, multer({ storage: multer.memoryStorage() }
       });
       
       res.json(JSON.parse(response.text));
-// ...
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
