@@ -4,11 +4,14 @@ import { API_URL } from '../lib/config';
 import { 
   X, Unlock, Lock, Loader2, Database, PenTool, CalendarDays, HardDrive, 
   BrainCircuit, ScanFace, Users, Activity, Settings, LayoutTemplate, Search, 
-  Filter, Replace, Edit3, Trash2, Plus, Upload, ImageIcon, Save, Shield, 
-  ShieldAlert, FileUp, AlertTriangle, RefreshCw, Key, Type, Link as LinkIcon, Share2, FileText, Pin, ArrowDownUp, SortAsc, SortDesc, Sparkles, FolderInput, AlertCircle, Wand2, Check, GripVertical, File, Eye, MessageSquare, Smartphone, Monitor, BellRing, Layers, ImagePlus, Clock, Calendar,
-  Palmtree, Paperclip, Zap, Network
+  Filter, Replace, Edit3, Trash2, Plus, ImageIcon, Save,
+  FolderInput, AlertCircle, Wand2, RefreshCw, Pin, Share2, Link as LinkIcon, ImagePlus,
+  AlertTriangle, FileText, Sparkles, Network
 } from 'lucide-react';
 import DOMPurify from 'dompurify';
+
+// --- NEW IMPORT ---
+import { AdminPanelLinkTree } from './AdminPanelLinkTree'; 
 
 interface AdminPanelProps {
   lineage: Lineage | null;
@@ -49,11 +52,10 @@ const loadFontPreview = (fontId: string) => {
     }
 };
 
-// HELPER: Generate Random Bright Color (Visible on Dark)
 const getRandomBrightColor = () => {
     const h = Math.floor(Math.random() * 360);
-    const s = 70 + Math.floor(Math.random() * 30); // 70-100% Saturation
-    const l = 60 + Math.floor(Math.random() * 20); // 60-80% Lightness
+    const s = 70 + Math.floor(Math.random() * 30);
+    const l = 60 + Math.floor(Math.random() * 20);
     return `hsl(${h}, ${s}%, ${l}%)`;
 };
 
@@ -83,7 +85,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
       type: 'announcement', sector: defaultSector, subject: 'General', isUnread: true, isPinned: false, likes: 0,
       fileUrl: '',
       image: '',
-      images: [], // Init gallery array
+      images: [], 
       style: { titleColor: '#ffffff', titleColorEnd: '', contentColor: '#e4e4e7', fontFamily: 'sans', isGradient: false }
   });
   const [isEditingItem, setIsEditingItem] = useState(false);
@@ -105,7 +107,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   const [ruleForm, setRuleForm] = useState<LectureRule>({
       id: '', 
       subject: '', 
-      type: 'class', // Default to class
+      type: 'class',
       days: [], 
       startTime: '10:00', 
       endTime: '',
@@ -117,16 +119,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
       batch: 'AICS'
   });
   const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
-
-  // --- UPDATED Link Tree Tab State (NOW WITH BATCH) ---
-  const [linkTreeForm, setLinkTreeForm] = useState({
-      title: '',
-      url: '',
-      embedCode: '', 
-      subject: '',
-      batch: 'AICS' // Added Batch Default
-  });
-  const [linkTreeIsCustomSubject, setLinkTreeIsCustomSubject] = useState(false);
 
   // Config Tab State
   const [editedConfig, setEditedConfig] = useState<GlobalConfig>(globalConfig);
@@ -157,8 +149,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   const [aiResult, setAiResult] = useState<any>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
-  // --- BULK UPDATE PROGRESS STATE ---
   const [bulkProgress, setBulkProgress] = useState<{current: number, total: number, status: string} | null>(null);
 
   // AI Image Generator State
@@ -189,7 +179,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
       }
   }, [initialEditingItem, isOpen]);
 
-  // Sync config when panel opens
   useEffect(() => {
       if (isOpen) {
           setEditedConfig(globalConfig);
@@ -208,9 +197,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
       setItemForm({
           id: crypto.randomUUID(), title: '', content: '', date: new Date().toISOString().split('T')[0].replace(/-/g, '.'),
           type: 'announcement', sector: defaultSector, subject: 'General', isUnread: true, isPinned: false, likes: 0,
-          fileUrl: '',
-          image: '',
-          images: [],
+          fileUrl: '', image: '', images: [],
           style: { titleColor: '#ffffff', titleColorEnd: '', contentColor: '#e4e4e7', fontFamily: 'sans', isGradient: false }
       });
       setIsEditingItem(false);
@@ -256,7 +243,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
       } catch(e) {}
   };
 
-  // ... (Other handlers unchanged) ... 
   const handleCreateUser = async () => {
       if(!newUser || !newUserPass) return;
       try {
@@ -389,7 +375,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
       setItemForm({ ...itemForm, content: before + insert + after });
   };
 
-  // Single file upload
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, field: 'image' | 'fileUrl' | 'wizardLogoUrl' | 'muggleLogoUrl' | 'wizardImage' | 'muggleImage') => {
       const file = e.target.files?.[0];
       if (!file) return;
@@ -419,7 +404,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
       }
   };
 
-  // Multi-file upload for Gallery
   const handleGalleryUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
       const files = e.target.files;
       if (!files || files.length === 0) return;
@@ -594,35 +578,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
       }
   };
 
-  // --- LINK TREE HANDLERS (UPDATED) ---
-  const handleAddLinkTreeItem = () => {
-      if (!linkTreeForm.title || !linkTreeForm.url || !linkTreeForm.subject) {
-          alert("Please fill Title, URL, and Subject.");
-          return;
-      }
-      onAddItem({
-          id: crypto.randomUUID(),
-          title: linkTreeForm.title,
-          content: linkTreeForm.embedCode || 'Link Tree Item',
-          date: new Date().toISOString().split('T')[0].replace(/-/g, '.'),
-          type: 'link_tree', // Special type for SectorView
-          sector: 'resources', // Force to Resources sector
-          subject: linkTreeForm.subject,
-          
-          // --- BATCH ASSIGNMENT ---
-          batch: linkTreeForm.batch as 'AICS' | 'CSDA',
-          
-          fileUrl: linkTreeForm.url,
-          isUnread: false,
-          isPinned: false,
-          likes: 0,
-          style: { titleColor: '#ffffff' }
-      });
-      // Keep subject and batch for easy consecutive adding
-      setLinkTreeForm({ ...linkTreeForm, title: '', url: '', embedCode: '' });
-      alert("Link Added to Resources!");
-  };
-
   // --- AI LAB LOGIC ---
   const handleAiParse = async () => {
       setAiLoading(true);
@@ -658,15 +613,12 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
       setActiveTab('creator');
   };
 
-  // --- SMART AI COMMAND EXECUTOR (ENHANCED) ---
   const applyAiAction = async () => {
       if (!aiResult) return;
 
-      // 1. BULK UPDATE HANDLER
       if (aiResult.type === 'bulk_update' && aiResult.filter) {
           const { filter, action, summary } = aiResult;
           
-          // Filter Items locally
           const targets = allItems.filter(item => {
               let match = true;
               if (filter.sector && item.sector !== filter.sector) match = false;
@@ -684,12 +636,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
           setBulkProgress({ current: 0, total: targets.length, status: 'Initializing...' });
 
-          // Execute Updates sequentially
           for (let i = 0; i < targets.length; i++) {
               const original = targets[i];
               let updated = { ...original, style: { ...original.style } };
 
-              // Apply Actions
               if (action.set_color) {
                   const color = action.set_color === 'RANDOM_VISIBLE' ? getRandomBrightColor() : action.set_color;
                   updated.style = { ...updated.style, titleColor: color };
@@ -706,11 +656,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                   updated.isPinned = action.set_pinned;
               }
 
-              // Save
               await onUpdateItem(updated); 
               setBulkProgress({ current: i + 1, total: targets.length, status: `Updated: ${updated.title.substring(0, 20)}...` });
-              
-              // Small delay for visual update
               await new Promise(r => setTimeout(r, 50));
           }
 
@@ -721,8 +668,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
               alert(`Successfully updated ${targets.length} items.`);
           }, 1000);
       }
-      
-      // 2. SCHEDULER HANDLER (Auto-Detect Holiday)
       else if (aiResult.type === 'schedule' || (aiResult.target === 'scheduler')) {
           const data = aiResult.data || aiResult;
           setRuleForm(prev => ({
@@ -736,8 +681,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
           setActiveTab('scheduler');
           alert("AI: I've prepared the schedule form. If this is a holiday, I've selected the 'Holiday' type for you. Please save to confirm.");
       }
-      
-      // 3. CREATE ITEM HANDLER
       else if (aiResult.type === 'item' || aiResult.target === 'creator') {
           const data = aiResult.data || aiResult;
           setItemForm(prev => ({
@@ -750,40 +693,26 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
           setActiveTab('creator');
           alert("AI: Artifact data loaded into Creator.");
       }
-      
       else {
           transferAiToForm();
       }
   };
 
-  // --- NEW: AI IMAGE GENERATOR HELPER ---
-  // --- UPDATED: WEB IMAGE SEARCH (No Gen AI) ---
   const handleGenerateImages = async () => {
       if (!imageGenPrompt) return;
       setIsGeneratingImages(true);
-      setGeneratedImages([]); // Clear previous results
+      setGeneratedImages([]); 
       
-      // We use a mix of Bing Image Search (via public thumbnail endpoints) and LoremFlickr
-      // This fetches REAL images from the web, not generated ones.
       const q = encodeURIComponent(imageGenPrompt.trim());
       const randomSeed = Math.floor(Math.random() * 1000);
 
-      // These URLs attempt to find high-quality matches for the subject
       const suggestions = [
-          // Source 1: Bing Image Search Best Match
           `https://tse2.mm.bing.net/th?q=${q}&w=800&h=600&c=7&rs=1&pid=Api`,
-          
-          // Source 2: Bing Image Search (Aesthetic/Wallpaper variant)
           `https://tse3.mm.bing.net/th?q=${q}%20aesthetic%20wallpaper&w=800&h=600&c=7&rs=1&pid=Api`,
-          
-          // Source 3: Flickr Search (via LoremFlickr)
           `https://loremflickr.com/800/600/${imageGenPrompt.replace(/\s+/g, ',')}?lock=${randomSeed}`,
-          
-          // Source 4: Broad Search Variant
           `https://tse4.mm.bing.net/th?q=${q}%20background&w=800&h=600&c=7&rs=1&pid=Api`
       ];
 
-      // Simulate a short "Searching Web..." delay
       setTimeout(() => {
           setGeneratedImages(suggestions);
           setIsGeneratingImages(false);
@@ -1009,7 +938,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                     {[
                         { id: 'database', icon: Database, label: 'Database' },
                         { id: 'creator', icon: PenTool, label: 'Creator' },
-                        { id: 'link-tree', icon: Network, label: 'Link Tree' }, // NEW TAB ADDED HERE
+                        { id: 'link-tree', icon: Network, label: 'Link Tree' }, 
                         { id: 'scheduler', icon: CalendarDays, label: 'Scheduler' },
                         { id: 'backup', icon: HardDrive, label: 'System Backup' },
                         { id: 'ai-lab', icon: BrainCircuit, label: 'AI Magic' },
@@ -1458,167 +1387,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                 </div>
                             )}
 
-                            {/* --- NEW LINK TREE TAB (UPDATED WITH BATCH SUPPORT) --- */}
+                            {/* --- NEW LINK TREE TAB (REPLACED WITH COMPONENT) --- */}
                             {activeTab === 'link-tree' && (
-                                <div className="space-y-6 h-full flex flex-col">
-                                    <div className="flex items-center gap-3 mb-4">
-                                        <div className={`p-3 rounded-full ${isWizard ? 'bg-green-500/20 text-green-300' : 'bg-pink-500/20 text-pink-300'}`}>
-                                            <Network size={24} />
-                                        </div>
-                                        <div>
-                                            <h3 className="font-bold text-xl">Recorded Lectures (Link Tree)</h3>
-                                            <p className="text-sm opacity-60">Manage direct video links for the Resources section.</p>
-                                        </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-                                        {/* Left Column: Form */}
-                                        <div className="space-y-6">
-                                            <div className="p-6 rounded-xl border bg-white/5 border-white/10 space-y-4">
-                                                <h4 className="font-bold border-b border-white/10 pb-2">Add New Recording</h4>
-                                                
-                                                {/* --- NEW BATCH SELECTOR --- */}
-                                                <div>
-                                                    <label className="text-xs font-bold opacity-50 block mb-1 uppercase">Target Batch</label>
-                                                    <div className="flex gap-2 p-1 bg-black/40 rounded-lg border border-white/10 mb-4">
-                                                        <button 
-                                                            onClick={() => setLinkTreeForm({...linkTreeForm, batch: 'AICS'})}
-                                                            className={`flex-1 py-2 rounded text-xs font-bold transition-all ${linkTreeForm.batch === 'AICS' ? 'bg-blue-600 text-white shadow-lg' : 'text-zinc-400 hover:bg-white/5'}`}
-                                                        >
-                                                            AICS (AI)
-                                                        </button>
-                                                        <button 
-                                                            onClick={() => setLinkTreeForm({...linkTreeForm, batch: 'CSDA'})}
-                                                            className={`flex-1 py-2 rounded text-xs font-bold transition-all ${linkTreeForm.batch === 'CSDA' ? 'bg-fuchsia-600 text-white shadow-lg' : 'text-zinc-400 hover:bg-white/5'}`}
-                                                        >
-                                                            CSDA (Data)
-                                                        </button>
-                                                    </div>
-                                                </div>
-
-                                                {/* Subject Selection */}
-                                                <div>
-                                                    <label className="text-xs font-bold opacity-50 block mb-1 uppercase">Subject</label>
-                                                    <div className="relative">
-                                                        <select
-                                                            value={linkTreeIsCustomSubject ? '__NEW__' : linkTreeForm.subject}
-                                                            onChange={(e) => {
-                                                                if (e.target.value === '__NEW__') {
-                                                                    setLinkTreeIsCustomSubject(true);
-                                                                    setLinkTreeForm({...linkTreeForm, subject: ''});
-                                                                } else {
-                                                                    setLinkTreeIsCustomSubject(false);
-                                                                    setLinkTreeForm({...linkTreeForm, subject: e.target.value});
-                                                                }
-                                                            }}
-                                                            className="w-full p-3 bg-black/40 border border-white/10 rounded-lg text-sm text-white outline-none"
-                                                        >
-                                                            <option value="">-- Select Subject --</option>
-                                                            {uniqueSubjects.map(s => <option key={s} value={s} className="bg-black">{s}</option>)}
-                                                            <option value="__NEW__" className="bg-blue-900 font-bold">+ Create New Subject</option>
-                                                        </select>
-                                                    </div>
-                                                    {linkTreeIsCustomSubject && (
-                                                        <input 
-                                                            value={linkTreeForm.subject} 
-                                                            onChange={e => setLinkTreeForm({...linkTreeForm, subject: e.target.value})} 
-                                                            className="w-full mt-2 p-3 bg-blue-900/20 border border-blue-500/50 rounded-lg text-sm text-white outline-none" 
-                                                            placeholder="New Subject Name..." 
-                                                            autoFocus 
-                                                        />
-                                                    )}
-                                                </div>
-
-                                                {/* Title */}
-                                                <div>
-                                                    <label className="text-xs font-bold opacity-50 block mb-1 uppercase">Display Title</label>
-                                                    <input 
-                                                        value={linkTreeForm.title} 
-                                                        onChange={e => setLinkTreeForm({...linkTreeForm, title: e.target.value})} 
-                                                        className="w-full p-3 bg-black/40 border border-white/10 rounded-lg text-sm text-white outline-none" 
-                                                        placeholder="e.g. Lecture 1: Introduction" 
-                                                    />
-                                                </div>
-
-                                                {/* URL */}
-                                                <div>
-                                                    <label className="text-xs font-bold opacity-50 block mb-1 uppercase">Direct Link URL</label>
-                                                    <input 
-                                                        value={linkTreeForm.url} 
-                                                        onChange={e => setLinkTreeForm({...linkTreeForm, url: e.target.value})} 
-                                                        className="w-full p-3 bg-black/40 border border-white/10 rounded-lg text-sm text-white outline-none font-mono text-xs" 
-                                                        placeholder="https://..." 
-                                                    />
-                                                </div>
-
-                                                <button onClick={handleAddLinkTreeItem} className="w-full py-3 bg-green-600 rounded-lg font-bold hover:bg-green-500 transition-all shadow-lg text-black mt-4">
-                                                    ADD TO RESOURCES
-                                                </button>
-                                            </div>
-
-                                            {/* Existing Link Tree Items List */}
-                                            <div className="space-y-2">
-                                                <h4 className="font-bold text-sm opacity-60 uppercase">Existing Recordings</h4>
-                                                <div className="max-h-[400px] overflow-y-auto space-y-2 pr-2 custom-scrollbar">
-                                                    {allItems.filter(i => i.type === 'link_tree').map(item => (
-                                                        <div key={item.id} className="flex justify-between items-center p-3 bg-white/5 border border-white/10 rounded-lg hover:bg-white/10 transition-colors">
-                                                            <div>
-                                                                <div className="font-bold text-sm">{item.title}</div>
-                                                                <div className="flex gap-2 items-center text-xs opacity-50">
-                                                                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${item.batch === 'CSDA' ? 'bg-fuchsia-900 text-fuchsia-300' : 'bg-blue-900 text-blue-300'}`}>
-                                                                        {item.batch || 'AICS'}
-                                                                    </span>
-                                                                    <span>{item.subject} • {item.date}</span>
-                                                                </div>
-                                                            </div>
-                                                            <button onClick={() => { if(confirm('Delete?')) onDeleteItem(item.id); }} className="p-2 text-red-400 hover:bg-red-900/20 rounded"><Trash2 size={16}/></button>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {/* Right Column: Previewer */}
-                                        <div className="space-y-4">
-                                            <div className="p-6 rounded-xl border border-dashed border-white/20 bg-black/20">
-                                                <h4 className="font-bold mb-2 flex items-center gap-2">
-                                                    <Eye size={18} className="text-blue-400" /> Embed Code Tester
-                                                </h4>
-                                                <p className="text-xs opacity-60 mb-4">Paste the iframe code from Stream/SharePoint below to test if it works. This is for testing only; the user will click the direct link.</p>
-                                                
-                                                <textarea 
-                                                    value={linkTreeForm.embedCode} 
-                                                    onChange={e => setLinkTreeForm({...linkTreeForm, embedCode: e.target.value})} 
-                                                    className="w-full h-32 bg-black/40 border border-white/10 rounded-lg p-3 text-xs font-mono text-zinc-300 outline-none resize-none mb-4" 
-                                                    placeholder='<iframe src="..."></iframe>' 
-                                                />
-
-                                                {/* Live Preview Container */}
-                                                <div className="w-full aspect-video bg-black rounded-lg border border-white/10 overflow-hidden relative flex items-center justify-center">
-                                                    {linkTreeForm.embedCode ? (
-                                                        <div 
-                                                            className="w-full h-full"
-                                                            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(linkTreeForm.embedCode, { ADD_TAGS: ['iframe'], ADD_ATTR: ['allowfullscreen', 'frameborder', 'scrolling'] }) }}
-                                                        />
-                                                    ) : (
-                                                        <div className="text-center opacity-30">
-                                                            <Network size={48} className="mx-auto mb-2" />
-                                                            <p className="text-xs">Preview Area</p>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                
-                                                <div className="mt-4 p-3 bg-yellow-900/20 border border-yellow-500/30 rounded flex items-start gap-2 text-xs text-yellow-200">
-                                                    <AlertTriangle size={16} className="shrink-0 mt-0.5" />
-                                                    <p>
-                                                        <strong>Authentication Warning:</strong> If the preview shows an error or "Refused to connect", 
-                                                        ensure you have opened this website in the <u>same browser context</u> where you are logged into Moodle/Microsoft.
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
+                                <AdminPanelLinkTree 
+                                    items={allItems}
+                                    onAddItem={onAddItem}
+                                    onUpdateItem={onUpdateItem}
+                                    onDeleteItem={onDeleteItem}
+                                    isWizard={isWizard}
+                                />
                             )}
 
                             {/* SCHEDULER TAB - HOLIDAY & TYPES ENABLED */}

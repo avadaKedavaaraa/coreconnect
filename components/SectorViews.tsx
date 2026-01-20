@@ -65,6 +65,56 @@ const isDayMatch = (checkDate: Date, days?: string[], legacyDay?: string) => {
     return legacyDay === dayName;
 };
 
+// --- 3D LEAF NODE COMPONENT (NEW) ---
+const TreeLeafNode = ({ item, index, isLeft, colorClass }: { item: CarouselItem, index: number, isLeft: boolean, colorClass: string }) => (
+    <div
+        className={`relative flex items-center mb-12 w-full group ${isLeft ? 'flex-row-reverse' : 'flex-row'}`}
+        style={{ perspective: '1000px' }}
+    >
+        {/* 1. The Leaf Card (3D) */}
+        <div
+            onClick={() => window.open(item.fileUrl, '_blank')}
+            className={`
+                w-[90%] md:w-[45%] p-4 rounded-xl border relative cursor-pointer transition-all duration-500 transform-style-3d
+                hover:scale-105 hover:rotate-y-6 hover:shadow-[0_0_30px_rgba(255,255,255,0.1)]
+                bg-black/60 backdrop-blur-md group-hover:z-20
+                ${colorClass === 'blue' ? 'border-blue-500/30 shadow-blue-900/20' : 'border-fuchsia-500/30 shadow-fuchsia-900/20'}
+            `}
+        >
+            {/* Connector Dot on Card */}
+            <div className={`hidden md:block absolute top-1/2 w-3 h-3 rounded-full transform -translate-y-1/2 ${colorClass === 'blue' ? 'bg-blue-400 box-shadow-blue' : 'bg-fuchsia-400 box-shadow-fuchsia'} ${isLeft ? '-right-1.5' : '-left-1.5'}`}></div>
+
+            <div className="flex items-start justify-between">
+                <div>
+                    <h4 className={`text-lg font-bold leading-tight mb-1 ${colorClass === 'blue' ? 'text-blue-100' : 'text-fuchsia-100'}`}>{item.title}</h4>
+                    <div className="text-xs opacity-60 font-mono uppercase tracking-wider">{item.subject} • {item.date}</div>
+                </div>
+                <div className={`p-2 rounded-full ${colorClass === 'blue' ? 'bg-blue-500/20 text-blue-400' : 'bg-fuchsia-500/20 text-fuchsia-400'}`}>
+                    <PlayCircle size={20} />
+                </div>
+            </div>
+
+            <div className="mt-3 pt-3 border-t border-white/10 flex items-center justify-between text-xs opacity-50 group-hover:opacity-100 transition-opacity">
+                <span className="text-white">Watch Recording</span>
+                <ExternalLink size={12} />
+            </div>
+        </div>
+
+        {/* 2. The Branch Connection (SVG Line) - Hidden on mobile */}
+        <div className="hidden md:flex flex-1 h-[2px] relative">
+            <div className={`absolute top-1/2 w-full h-[1px] ${colorClass === 'blue' ? 'bg-blue-500/30' : 'bg-fuchsia-500/30'}`}></div>
+            {/* Pulsing Energy Dot traveling line */}
+            <div className={`absolute top-1/2 w-2 h-1 rounded-full animate-ping ${colorClass === 'blue' ? 'bg-blue-400' : 'bg-fuchsia-400'} opacity-50`} style={{ left: isLeft ? '10%' : '90%' }}></div>
+        </div>
+
+        {/* 3. The Trunk Connection Node - Hidden on mobile */}
+        <div className={`hidden md:block w-4 h-4 rounded-full border-2 z-10 bg-[#0a0a0a] ${colorClass === 'blue' ? 'border-blue-500 shadow-[0_0_10px_#3b82f6]' : 'border-fuchsia-500 shadow-[0_0_10px_#d946ef]'}`}></div>
+
+        {/* Spacer for the other side */}
+        <div className="hidden md:block flex-1"></div>
+    </div>
+);
+
 export const SectorView: React.FC<SectorViewProps> = ({
     items, allItems, lineage, sectorId, onViewItem, isAdmin, onDelete, onEdit,
     onUpdateItem, onBack, onAddItem, onQuickCreate, onUpdateSubject, onReorder,
@@ -95,7 +145,7 @@ export const SectorView: React.FC<SectorViewProps> = ({
     const [calendarOpen, setCalendarOpen] = useState(false);
     const [showPinnedOnly, setShowPinnedOnly] = useState(false);
 
-    // Lecture Specific State
+    // Lecture & Tree Specific State
     const [activeBatch, setActiveBatch] = useState<'AICS' | 'CSDA'>('AICS');
     // Default to IST Today for Scheduler
     const [scheduleDate, setScheduleDate] = useState<string>(getISTDateStr());
@@ -182,7 +232,7 @@ export const SectorView: React.FC<SectorViewProps> = ({
             if (!batch && rule.batch && rule.batch !== activeBatch && rule.batch !== 'AICS') return false;
 
             if (!isDateInRange(targetDate, rule.startDate, rule.endDate)) return false;
-            return isDayMatch(targetDate, rule.days, rule.dayOfWeek);
+            return isDayMatch(targetDate, rule.days);
         }).sort((a, b) => a.startTime.localeCompare(b.startTime));
     };
 
@@ -600,7 +650,6 @@ export const SectorView: React.FC<SectorViewProps> = ({
             ) : (
                 <>
                     {/* --- NEW LINK TREE VIEW IMPLEMENTATION --- */}
-                    // --- NEW TREE UI IMPLEMENTATION ---
                     {isResources && subjectFilter && filteredItems.some(i => i.type === 'link_tree') ? (
                         <div className="w-full max-w-5xl mx-auto flex flex-col gap-8 animate-[fade-in_0.5s]">
 
@@ -631,8 +680,8 @@ export const SectorView: React.FC<SectorViewProps> = ({
                                     {/* Sliding Background */}
                                     <div
                                         className={`absolute top-1 bottom-1 w-[50%] rounded-full transition-all duration-300 shadow-lg ${activeBatch === 'AICS'
-                                                ? 'left-1 bg-gradient-to-r from-blue-900 to-blue-600 border border-blue-400/50'
-                                                : 'left-[49%] bg-gradient-to-r from-fuchsia-900 to-fuchsia-600 border border-fuchsia-400/50'
+                                            ? 'left-1 bg-gradient-to-r from-blue-900 to-blue-600 border border-blue-400/50'
+                                            : 'left-[49%] bg-gradient-to-r from-fuchsia-900 to-fuchsia-600 border border-fuchsia-400/50'
                                             }`}
                                     ></div>
                                 </div>
@@ -641,12 +690,12 @@ export const SectorView: React.FC<SectorViewProps> = ({
                             {/* 2. THE TREE STRUCTURE */}
                             <div className="relative min-h-[400px] py-10">
                                 {/* The Central Trunk (Glowing Line) */}
-                                <div className={`absolute left-1/2 transform -translate-x-1/2 w-1 h-full rounded-full bg-gradient-to-b from-transparent via-white/20 to-transparent z-0`}>
+                                <div className={`absolute left-1/2 transform -translate-x-1/2 w-1 h-full rounded-full bg-gradient-to-b from-transparent via-white/20 to-transparent z-0 hidden md:block`}>
                                     <div className={`absolute inset-0 w-full h-full animate-pulse ${activeBatch === 'AICS' ? 'bg-blue-500/30 blur-sm' : 'bg-fuchsia-500/30 blur-sm'}`}></div>
                                 </div>
 
                                 {/* The Leaves */}
-                                <div className="relative z-10">
+                                <div className="relative z-10 flex flex-col items-center md:block">
                                     {(() => {
                                         // Filter by the selected Batch (or show all if item has no batch)
                                         const treeItems = filteredItems.filter(i =>
@@ -680,9 +729,12 @@ export const SectorView: React.FC<SectorViewProps> = ({
                                     <h4 className="text-center text-sm font-bold opacity-50 mb-8 uppercase tracking-widest">Additional Materials</h4>
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                         {filteredItems.filter(i => i.type !== 'link_tree').map(item => (
-                                            <div key={item.id} onClick={() => onViewItem(item)} className="p-4 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 cursor-pointer transition-colors">
-                                                <div className="font-bold text-white">{item.title}</div>
-                                                <div className="text-xs opacity-50">{item.type}</div>
+                                            <div key={item.id} onClick={() => onViewItem(item)} onContextMenu={(e) => handleContextMenu(e, item)} className={`relative rounded-xl border backdrop-blur-md group transition-all duration-300 cursor-pointer overflow-hidden select-none p-4 flex items-center gap-4 hover:translate-x-1 ${isWizard ? 'bg-black/40 border-emerald-900/50 hover:bg-emerald-900/10' : 'bg-black/40 border-fuchsia-900/50 hover:bg-fuchsia-900/10'}`}>
+                                                <div className={`shrink-0 rounded-full flex items-center justify-center w-10 h-10 ${isWizard ? 'bg-emerald-900/30 text-emerald-400' : 'bg-fuchsia-900/30 text-fuchsia-400'}`}>{getTypeIcon(item.type)}</div>
+                                                <div className="flex-1 min-w-0 text-left">
+                                                    <div className="font-bold truncate text-white">{item.title}</div>
+                                                    <div className="text-[10px] opacity-50">{item.date}</div>
+                                                </div>
                                             </div>
                                         ))}
                                     </div>
@@ -690,7 +742,6 @@ export const SectorView: React.FC<SectorViewProps> = ({
                             )}
                         </div>
                     ) : (
-                        // ... Rest of the original logic for other views
                         // --- STANDARD VIEW (No Change) ---
                         <>
                             {filteredItems.length === 0 ? (
