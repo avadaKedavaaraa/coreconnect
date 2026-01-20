@@ -59,6 +59,8 @@ export interface CarouselItem {
   // Added 'link_tree' to the type union below
   type: 'announcement' | 'file' | 'video' | 'task' | 'mixed' | 'link' | 'code' | 'link_tree';
   sector?: string;
+  // PASTE THIS NEW LINE HERE:
+  batch?: 'AICS' | 'CSDA' | 'General';
   style?: ItemStyle;
   subject?: string;
   isUnread?: boolean;

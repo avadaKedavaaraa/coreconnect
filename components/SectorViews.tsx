@@ -600,60 +600,97 @@ export const SectorView: React.FC<SectorViewProps> = ({
             ) : (
                 <>
                     {/* --- NEW LINK TREE VIEW IMPLEMENTATION --- */}
-                    {/* This logic injects the Link Tree view when in Resources > Subject */}
+                    // --- NEW TREE UI IMPLEMENTATION ---
                     {isResources && subjectFilter && filteredItems.some(i => i.type === 'link_tree') ? (
-                        <div className="w-full max-w-2xl mx-auto flex flex-col gap-4 animate-[fade-in_0.3s]">
-                             <div className="text-center mb-4">
-                                <h3 className={`text-xl font-bold uppercase tracking-widest ${isWizard ? 'text-emerald-300' : 'text-fuchsia-300'}`}>Recorded Lectures</h3>
-                                <p className="text-xs opacity-50">High-Contrast Link Tree Access</p>
-                             </div>
-                             
-                             {filteredItems.filter(i => i.type === 'link_tree').map(item => (
-                                 <button
-                                    key={item.id}
-                                    onClick={() => window.open(item.fileUrl, '_blank')}
-                                    onContextMenu={(e) => handleContextMenu(e, item)}
-                                    className={`
-                                        w-full p-4 rounded-xl border flex items-center justify-between group transition-all duration-300 transform hover:scale-[1.02] shadow-lg
-                                        ${isWizard 
-                                            ? 'bg-emerald-950/40 border-emerald-500/30 hover:bg-emerald-900/60 hover:border-emerald-400 text-emerald-100' 
-                                            : 'bg-fuchsia-950/40 border-fuchsia-500/30 hover:bg-fuchsia-900/60 hover:border-fuchsia-400 text-fuchsia-100'
-                                        }
-                                    `}
-                                 >
-                                    <div className="flex items-center gap-4">
-                                        <div className={`p-3 rounded-full ${isWizard ? 'bg-emerald-500/20 text-emerald-300' : 'bg-fuchsia-500/20 text-fuchsia-300'}`}>
-                                            <PlayCircle size={24} />
-                                        </div>
-                                        <div className="text-left">
-                                            <div className={`text-lg font-bold ${isWizard ? 'font-wizard' : 'font-muggle'}`}>{item.title}</div>
-                                            <div className="text-[10px] opacity-60 font-mono uppercase">{item.date}</div>
-                                        </div>
+                        <div className="w-full max-w-5xl mx-auto flex flex-col gap-8 animate-[fade-in_0.5s]">
+
+                            {/* 1. Header & Batch Toggle Switch */}
+                            <div className="flex flex-col items-center justify-center mb-8 relative z-10">
+                                <div className="text-center mb-6">
+                                    <h3 className={`text-3xl font-bold uppercase tracking-[0.2em] mb-2 drop-shadow-xl ${isWizard ? 'font-wizardTitle text-emerald-300' : 'font-muggle text-fuchsia-300'}`}>
+                                        Knowledge Tree
+                                    </h3>
+                                    <p className="text-sm opacity-60 font-mono">Select Frequency Channel</p>
+                                </div>
+
+                                {/* THE SWITCH */}
+                                <div className="flex p-1 rounded-full bg-black/60 border border-white/10 backdrop-blur-xl relative">
+                                    <button
+                                        onClick={() => setActiveBatch('AICS')}
+                                        className={`relative z-10 px-8 py-2 rounded-full font-bold text-sm transition-all duration-300 ${activeBatch === 'AICS' ? 'text-white' : 'text-zinc-500 hover:text-white'}`}
+                                    >
+                                        AICS (AI)
+                                    </button>
+                                    <button
+                                        onClick={() => setActiveBatch('CSDA')}
+                                        className={`relative z-10 px-8 py-2 rounded-full font-bold text-sm transition-all duration-300 ${activeBatch === 'CSDA' ? 'text-white' : 'text-zinc-500 hover:text-white'}`}
+                                    >
+                                        CSDA (Data)
+                                    </button>
+
+                                    {/* Sliding Background */}
+                                    <div
+                                        className={`absolute top-1 bottom-1 w-[50%] rounded-full transition-all duration-300 shadow-lg ${activeBatch === 'AICS'
+                                                ? 'left-1 bg-gradient-to-r from-blue-900 to-blue-600 border border-blue-400/50'
+                                                : 'left-[49%] bg-gradient-to-r from-fuchsia-900 to-fuchsia-600 border border-fuchsia-400/50'
+                                            }`}
+                                    ></div>
+                                </div>
+                            </div>
+
+                            {/* 2. THE TREE STRUCTURE */}
+                            <div className="relative min-h-[400px] py-10">
+                                {/* The Central Trunk (Glowing Line) */}
+                                <div className={`absolute left-1/2 transform -translate-x-1/2 w-1 h-full rounded-full bg-gradient-to-b from-transparent via-white/20 to-transparent z-0`}>
+                                    <div className={`absolute inset-0 w-full h-full animate-pulse ${activeBatch === 'AICS' ? 'bg-blue-500/30 blur-sm' : 'bg-fuchsia-500/30 blur-sm'}`}></div>
+                                </div>
+
+                                {/* The Leaves */}
+                                <div className="relative z-10">
+                                    {(() => {
+                                        // Filter by the selected Batch (or show all if item has no batch)
+                                        const treeItems = filteredItems.filter(i =>
+                                            i.type === 'link_tree' &&
+                                            (!i.batch || i.batch === activeBatch || i.batch === 'General')
+                                        );
+
+                                        if (treeItems.length === 0) return (
+                                            <div className="text-center py-20 opacity-50">
+                                                <div className="text-4xl mb-4">🍂</div>
+                                                <p>No leaves found on the {activeBatch} tree.</p>
+                                            </div>
+                                        );
+
+                                        return treeItems.map((item, index) => (
+                                            <TreeLeafNode
+                                                key={item.id}
+                                                item={item}
+                                                index={index}
+                                                isLeft={index % 2 === 0} // Alternates Left/Right
+                                                colorClass={activeBatch === 'AICS' ? 'blue' : 'fuchsia'}
+                                            />
+                                        ));
+                                    })()}
+                                </div>
+                            </div>
+
+                            {/* Other resources fallback (Tasks/Files) */}
+                            {filteredItems.some(i => i.type !== 'link_tree') && (
+                                <div className="mt-12 pt-12 border-t border-white/10">
+                                    <h4 className="text-center text-sm font-bold opacity-50 mb-8 uppercase tracking-widest">Additional Materials</h4>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                        {filteredItems.filter(i => i.type !== 'link_tree').map(item => (
+                                            <div key={item.id} onClick={() => onViewItem(item)} className="p-4 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 cursor-pointer transition-colors">
+                                                <div className="font-bold text-white">{item.title}</div>
+                                                <div className="text-xs opacity-50">{item.type}</div>
+                                            </div>
+                                        ))}
                                     </div>
-                                    <ExternalLink size={20} className="opacity-50 group-hover:opacity-100 transition-opacity" />
-                                 </button>
-                             ))}
-                             
-                             {/* Render other resource types below if they exist */}
-                             {filteredItems.some(i => i.type !== 'link_tree') && (
-                                 <div className="mt-8 pt-8 border-t border-white/10 text-center">
-                                     <h4 className="text-sm font-bold opacity-50 mb-4 uppercase">Other Resources</h4>
-                                     <div className={viewMode === 'list' ? 'flex flex-col gap-3' : 'grid grid-cols-1 md:grid-cols-2 gap-4'}>
-                                          {filteredItems.filter(i => i.type !== 'link_tree').map(item => (
-                                             <div key={item.id} onClick={() => onViewItem(item)} onContextMenu={(e) => handleContextMenu(e, item)} className={`relative rounded-xl border backdrop-blur-md group transition-all duration-300 cursor-pointer overflow-hidden select-none p-4 flex items-center gap-4 hover:translate-x-1 ${isWizard ? 'bg-black/40 border-emerald-900/50 hover:bg-emerald-900/10' : 'bg-black/40 border-fuchsia-900/50 hover:bg-fuchsia-900/10'}`}>
-                                                 {/* Reuse standard list item view for fallback */}
-                                                 <div className={`shrink-0 rounded-full flex items-center justify-center w-10 h-10 ${isWizard ? 'bg-emerald-900/30 text-emerald-400' : 'bg-fuchsia-900/30 text-fuchsia-400'}`}>{getTypeIcon(item.type)}</div>
-                                                 <div className="flex-1 min-w-0 text-left">
-                                                     <div className="font-bold truncate text-white">{item.title}</div>
-                                                     <div className="text-[10px] opacity-50">{item.date}</div>
-                                                 </div>
-                                             </div>
-                                          ))}
-                                     </div>
-                                 </div>
-                             )}
+                                </div>
+                            )}
                         </div>
                     ) : (
+                        // ... Rest of the original logic for other views
                         // --- STANDARD VIEW (No Change) ---
                         <>
                             {filteredItems.length === 0 ? (
@@ -668,22 +705,22 @@ export const SectorView: React.FC<SectorViewProps> = ({
                                             {!item.image && <div className={`shrink-0 rounded-full flex items-center justify-center z-10 ${viewMode === 'list' ? 'w-12 h-12' : 'w-12 h-12 mb-2'} ${isWizard ? 'bg-emerald-900/30 text-emerald-400' : 'bg-fuchsia-900/30 text-fuchsia-400'}`}>{getTypeIcon(item.type)}</div>}
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center gap-2 mb-1">{item.subject && <span className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded border opacity-60 ${isWizard ? 'border-emerald-800 text-emerald-300' : 'border-fuchsia-800 text-fuchsia-300'}`}>{item.subject}</span>}<div className={`flex items-center gap-1 text-[10px] opacity-50 ${isWizard ? 'font-wizard' : 'font-muggle'}`}><Calendar size={10} /><span>{item.date}</span></div></div>
-                                                
+
                                                 {/* FIX: Applied text-white for Title & text-zinc-300 for Content in non-announcement sectors to prevent UI conflict */}
-                                                <h4 
-                                                    className={`font-bold leading-tight truncate ${viewMode === 'list' ? 'text-lg' : 'text-lg mb-2'} ${sectorId !== 'announcements' ? 'text-white' : ''}`} 
+                                                <h4
+                                                    className={`font-bold leading-tight truncate ${viewMode === 'list' ? 'text-lg' : 'text-lg mb-2'} ${sectorId !== 'announcements' ? 'text-white' : ''}`}
                                                     style={item.style?.isGradient ? { backgroundImage: `linear-gradient(to right, ${item.style.titleColor}, ${item.style.titleColorEnd || item.style.titleColor})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', color: 'transparent' } : { color: item.style?.titleColor }}
                                                 >
                                                     {item.title}
                                                 </h4>
-                                                
-                                                {!(item.fileUrl && (item.fileUrl.startsWith('http') || item.fileUrl.startsWith('https'))) && 
-                                                    <div 
-                                                        className={`text-xs opacity-70 line-clamp-3 mt-1 ${isWizard ? 'font-wizard' : 'font-muggle'} ${sectorId !== 'announcements' ? 'text-zinc-300' : ''}`} 
-                                                        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(item.content, { ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'u', 'span'], ALLOWED_ATTR: ['style', 'class'] }) }} 
+
+                                                {!(item.fileUrl && (item.fileUrl.startsWith('http') || item.fileUrl.startsWith('https'))) &&
+                                                    <div
+                                                        className={`text-xs opacity-70 line-clamp-3 mt-1 ${isWizard ? 'font-wizard' : 'font-muggle'} ${sectorId !== 'announcements' ? 'text-zinc-300' : ''}`}
+                                                        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(item.content, { ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'u', 'span'], ALLOWED_ATTR: ['style', 'class'] }) }}
                                                     />
                                                 }
-                                                
+
                                                 {(item.fileUrl && (item.fileUrl.startsWith('http') || item.fileUrl.startsWith('https'))) && <div className="mt-2 pt-2 border-t border-white/5 flex"><a href={item.fileUrl} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className={`flex items-center justify-center gap-2 px-4 py-2 rounded font-bold text-xs uppercase tracking-widest transition-all hover:scale-[1.02] active:scale-95 shadow-lg ${isWizard ? 'bg-emerald-600 hover:bg-emerald-500 text-black' : 'bg-fuchsia-600 hover:bg-fuchsia-500 text-black'}`}><ExternalLink size={14} /> OPEN LINK</a></div>}
                                             </div>
                                         </div>
