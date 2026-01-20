@@ -3,14 +3,12 @@ import {
     Lineage, Sector, CarouselItem, LectureRule, GlobalConfig,
     SECTORS
 } from '../types';
-// Find this section at the top and REPLACE it with this:
-
 import {
     Book, FileText, Video, Calendar, Search, Filter, X, Trash2, LayoutGrid, List,
     FolderOpen, ArrowLeft, Edit2, Plus, FolderPlus, Loader2, Image as ImageIcon,
     Send, Link as LinkIcon, ExternalLink, Layers, Code, Pin, PinOff, Save, Check,
     Clock, CalendarDays, MousePointer2, Columns, PlayCircle,
-    ChevronRight, AlertTriangle // 👈 ADD THESE TWO!
+    ChevronRight, AlertTriangle // 👈 ADDED THESE MISSING IMPORTS
 } from 'lucide-react';
 import CalendarWidget from './CalendarWidget';
 import DOMPurify from 'dompurify';
@@ -68,7 +66,6 @@ const isDayMatch = (checkDate: Date, days?: string[], legacyDay?: string) => {
     return legacyDay === dayName;
 };
 
-// --- 3D LEAF NODE COMPONENT (NEW) ---
 // --- TREE LEAF NODE COMPONENT (Updated for Images & Mobile) ---
 const TreeLeafNode = ({
     item, index, isLeft, colorClass, onPlay
@@ -178,11 +175,22 @@ export const SectorView: React.FC<SectorViewProps> = ({
             }
         } catch (e) { }
     }, [sectorId, quickInputOnly]);
-    // ... inside SectorView component function ...
 
     // --- CINEMA STATE ---
     const [cinemaMode, setCinemaMode] = useState(false);
     const [cinemaItem, setCinemaItem] = useState<CarouselItem | null>(null);
+
+    // ✨ NEW: Handle Escape Key to Close Player
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape' && cinemaMode) {
+                setCinemaMode(false);
+                setCinemaItem(null);
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [cinemaMode]);
 
     // --- HANDLER ---
     const handlePlayItem = (item: CarouselItem) => {
@@ -229,13 +237,14 @@ export const SectorView: React.FC<SectorViewProps> = ({
     const inputRef = useRef<HTMLInputElement>(null);
 
     // --- DERIVED DATA ---
+    // ✨ FIX: Added (items || []) check to prevent crash if items is undefined
     const subjects = useMemo(() => Array.from(new Set((items || []).map(i => i.subject || 'General'))).sort(), [items]);
     const activeSortOrder = currentSector?.sortOrder || 'newest';
     const isManualSort = activeSortOrder === 'manual';
 
     // --- ITEM SORTING & FILTERING (Files/Announcements) ---
     useEffect(() => {
-        let combined = [...items];
+        let combined = [...(items || [])]; // Safety check
         combined.sort((a, b) => {
             if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
             if (activeSortOrder === 'manual') {
@@ -260,7 +269,7 @@ export const SectorView: React.FC<SectorViewProps> = ({
     }, [items, sectorId, activeSortOrder]);
 
     const filteredItems = useMemo(() => {
-        const source = search ? (allItems || items) : localDisplayItems;
+        const source = search ? (allItems || items || []) : localDisplayItems;
         return source.filter(item => {
             const matchSearch = item.title.toLowerCase().includes(search.toLowerCase()) ||
                 item.content.toLowerCase().includes(search.toLowerCase());
@@ -836,40 +845,51 @@ export const SectorView: React.FC<SectorViewProps> = ({
                     )}
                 </>
             ))}
-        {/* --- CINEMA MODE MODAL (USER FACING) --- */}
+            {/* --- CINEMA MODE MODAL (USER FACING) --- */}
             {cinemaMode && cinemaItem && (
-                <div className="fixed inset-0 z-[100000] bg-black/95 flex flex-col animate-[fade-in_0.2s]">
+                <div className="fixed inset-0 z-[100000] bg-black/95 flex flex-col animate-[fade-in_0.2s] backdrop-blur-sm">
+
                     {/* Header */}
-                    <div className="flex justify-between items-center p-4 border-b border-white/10 bg-[#0f0f0f]">
+                    <div className="flex justify-between items-center p-4 border-b border-white/10 bg-[#0f0f0f] shadow-2xl relative z-50">
                         <div className="flex items-center gap-4">
-                            <h3 className="font-bold text-white tracking-widest hidden sm:block">ARCHIVE PLAYER</h3>
-                            <div className="flex items-center gap-2 text-xs text-zinc-400 bg-white/5 px-3 py-1 rounded-full">
-                                <span className="uppercase">{cinemaItem.title}</span>
+                            <h3 className="font-bold text-white tracking-[0.2em] hidden sm:block">
+                                ARCHIVE PLAYER
+                            </h3>
+                            <div className="flex items-center gap-2 text-xs text-zinc-400 bg-white/5 px-3 py-1 rounded-full border border-white/5">
+                                <span className="uppercase max-w-[200px] truncate">{cinemaItem.title}</span>
                             </div>
                         </div>
-                        <button onClick={() => { setCinemaMode(false); setCinemaItem(null); }} className="p-2 hover:bg-white/10 rounded-full text-white"><X size={24}/></button>
+
+                        {/* ❌ THE CROSS ICON BUTTON */}
+                        <button
+                            onClick={() => { setCinemaMode(false); setCinemaItem(null); }}
+                            className="group p-2 rounded-full bg-white/5 hover:bg-red-500/20 border border-white/5 hover:border-red-500/50 transition-all duration-300"
+                            title="Close Player (Esc)"
+                        >
+                            <X size={24} className="text-zinc-400 group-hover:text-red-400 group-hover:rotate-90 transition-transform duration-300" />
+                        </button>
                     </div>
-                    
+
                     {/* Video Area */}
-                    <div className="flex-1 flex items-center justify-center p-2 sm:p-10 relative">
+                    <div className="flex-1 flex items-center justify-center p-2 sm:p-10 relative overflow-hidden">
                         <div className="w-full max-w-6xl aspect-video bg-black shadow-2xl rounded-xl border border-white/10 overflow-hidden relative group">
-                            <div 
+                            <div
                                 className="w-full h-full"
-                                dangerouslySetInnerHTML={{ 
-                                    __html: DOMPurify.sanitize(cinemaItem.content, { 
-                                        ADD_TAGS: ['iframe', 'div', 'style'], 
-                                        ADD_ATTR: ['allow', 'allowfullscreen', 'frameborder', 'scrolling', 'style', 'width', 'height', 'src'] 
-                                    }) 
-                                }} 
+                                dangerouslySetInnerHTML={{
+                                    __html: DOMPurify.sanitize(cinemaItem.content, {
+                                        ADD_TAGS: ['iframe', 'div', 'style'],
+                                        ADD_ATTR: ['allow', 'allowfullscreen', 'frameborder', 'scrolling', 'style', 'width', 'height', 'src']
+                                    })
+                                }}
                             />
                         </div>
                     </div>
 
                     {/* Warning Footer */}
-                    <div className="p-4 bg-yellow-900/20 border-t border-yellow-500/20 flex justify-center">
-                        <p className="text-[10px] text-yellow-200/60 flex items-center gap-2">
+                    <div className="p-3 bg-yellow-900/10 border-t border-yellow-500/10 flex justify-center backdrop-blur-md">
+                        <p className="text-[10px] text-yellow-200/60 flex items-center gap-2 font-mono">
                             <AlertTriangle size={12} />
-                            If the video shows a login screen, please ensure you are logged into your college Microsoft/Stream account in this browser.
+                            If the video shows a login screen, please ensure you are logged into your college account.
                         </p>
                     </div>
                 </div>
