@@ -66,51 +66,92 @@ const isDayMatch = (checkDate: Date, days?: string[], legacyDay?: string) => {
 };
 
 // --- 3D LEAF NODE COMPONENT (NEW) ---
-const TreeLeafNode = ({ item, index, isLeft, colorClass }: { item: CarouselItem, index: number, isLeft: boolean, colorClass: string }) => (
+// --- TREE LEAF NODE COMPONENT (Updated for Images & Mobile) ---
+const TreeLeafNode = ({
+    item, index, isLeft, colorClass, onPlay
+}: {
+    item: CarouselItem, index: number, isLeft: boolean, colorClass: string, onPlay: (item: CarouselItem) => void
+}) => (
     <div
-        className={`relative flex items-center mb-12 w-full group ${isLeft ? 'flex-row-reverse' : 'flex-row'}`}
+        className={`
+            relative flex items-center mb-8 md:mb-12 w-full group 
+            ${isLeft ? 'md:flex-row-reverse flex-row' : 'flex-row'}
+        `}
         style={{ perspective: '1000px' }}
     >
         {/* 1. The Leaf Card (3D) */}
         <div
-            onClick={() => window.open(item.fileUrl, '_blank')}
+            onClick={() => onPlay(item)}
             className={`
-                w-[90%] md:w-[45%] p-4 rounded-xl border relative cursor-pointer transition-all duration-500 transform-style-3d
-                hover:scale-105 hover:rotate-y-6 hover:shadow-[0_0_30px_rgba(255,255,255,0.1)]
-                bg-black/60 backdrop-blur-md group-hover:z-20
+                w-full ml-8 md:ml-0 md:w-[45%] relative cursor-pointer transition-all duration-500 transform-style-3d
+                hover:scale-[1.02] hover:-translate-y-1 hover:shadow-[0_0_30px_rgba(255,255,255,0.1)]
+                bg-black/80 backdrop-blur-md rounded-xl overflow-hidden border group-hover:z-20
+                flex flex-col md:flex-row
                 ${colorClass === 'blue' ? 'border-blue-500/30 shadow-blue-900/20' : 'border-fuchsia-500/30 shadow-fuchsia-900/20'}
             `}
         >
-            {/* Connector Dot on Card */}
-            <div className={`hidden md:block absolute top-1/2 w-3 h-3 rounded-full transform -translate-y-1/2 ${colorClass === 'blue' ? 'bg-blue-400 box-shadow-blue' : 'bg-fuchsia-400 box-shadow-fuchsia'} ${isLeft ? '-right-1.5' : '-left-1.5'}`}></div>
+            {/* Connector Dot */}
+            <div className={`
+                absolute top-1/2 w-4 h-4 rounded-full transform -translate-y-1/2 border-2 border-black
+                ${colorClass === 'blue' ? 'bg-blue-400 box-shadow-blue' : 'bg-fuchsia-400 box-shadow-fuchsia'}
+                -left-2 md:left-auto
+                ${isLeft ? 'md:-right-2' : 'md:-left-2'}
+                z-30
+            `}></div>
 
-            <div className="flex items-start justify-between">
-                <div>
-                    <h4 className={`text-lg font-bold leading-tight mb-1 ${colorClass === 'blue' ? 'text-blue-100' : 'text-fuchsia-100'}`}>{item.title}</h4>
-                    <div className="text-xs opacity-60 font-mono uppercase tracking-wider">{item.subject} • {item.date}</div>
-                </div>
-                <div className={`p-2 rounded-full ${colorClass === 'blue' ? 'bg-blue-500/20 text-blue-400' : 'bg-fuchsia-500/20 text-fuchsia-400'}`}>
-                    <PlayCircle size={20} />
+            {/* Image Section (Thumbnail) */}
+            <div className="w-full md:w-40 h-32 md:h-auto shrink-0 relative bg-black/50 border-b md:border-b-0 md:border-r border-white/5">
+                {item.image ? (
+                    <img src={item.image} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" loading="lazy" />
+                ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-white/5 to-transparent">
+                        <PlayCircle size={32} className={`opacity-20 ${colorClass === 'blue' ? 'text-blue-400' : 'text-fuchsia-400'}`} />
+                    </div>
+                )}
+                {/* Play Overlay */}
+                <div className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className={`p-2 rounded-full backdrop-blur-md shadow-lg ${colorClass === 'blue' ? 'bg-blue-600 text-white' : 'bg-fuchsia-600 text-white'}`}>
+                        <PlayCircle size={24} fill="currentColor" />
+                    </div>
                 </div>
             </div>
 
-            <div className="mt-3 pt-3 border-t border-white/10 flex items-center justify-between text-xs opacity-50 group-hover:opacity-100 transition-opacity">
-                <span className="text-white">Watch Recording</span>
-                <ExternalLink size={12} />
+            {/* Content Section */}
+            <div className="flex-1 p-4 flex flex-col justify-center min-w-0">
+                <div className="flex items-center gap-2 mb-1.5">
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border uppercase tracking-wider ${colorClass === 'blue' ? 'bg-blue-900/30 border-blue-500/30 text-blue-300' : 'bg-fuchsia-900/30 border-fuchsia-500/30 text-fuchsia-300'}`}>
+                        {item.batch || 'AICS'}
+                    </span>
+                    <span className="text-[10px] opacity-50 uppercase tracking-wider truncate border border-white/10 px-1.5 py-0.5 rounded">{item.subject}</span>
+                </div>
+
+                <h4 className={`text-base font-bold leading-tight mb-2 line-clamp-2 ${colorClass === 'blue' ? 'text-blue-50' : 'text-fuchsia-50'}`}>
+                    {item.title}
+                </h4>
+
+                <div className="mt-auto pt-2 border-t border-white/5 flex items-center justify-between text-xs opacity-60 group-hover:opacity-100 transition-opacity">
+                    <span className="flex items-center gap-1 font-mono">{item.date}</span>
+                    <span className={`flex items-center gap-1 font-bold ${colorClass === 'blue' ? 'text-blue-400' : 'text-fuchsia-400'}`}>
+                        WATCH <ChevronRight size={12} />
+                    </span>
+                </div>
             </div>
         </div>
 
-        {/* 2. The Branch Connection (SVG Line) - Hidden on mobile */}
+        {/* 2. The Branch Connection (Desktop Only) */}
         <div className="hidden md:flex flex-1 h-[2px] relative">
             <div className={`absolute top-1/2 w-full h-[1px] ${colorClass === 'blue' ? 'bg-blue-500/30' : 'bg-fuchsia-500/30'}`}></div>
-            {/* Pulsing Energy Dot traveling line */}
             <div className={`absolute top-1/2 w-2 h-1 rounded-full animate-ping ${colorClass === 'blue' ? 'bg-blue-400' : 'bg-fuchsia-400'} opacity-50`} style={{ left: isLeft ? '10%' : '90%' }}></div>
         </div>
 
-        {/* 3. The Trunk Connection Node - Hidden on mobile */}
-        <div className={`hidden md:block w-4 h-4 rounded-full border-2 z-10 bg-[#0a0a0a] ${colorClass === 'blue' ? 'border-blue-500 shadow-[0_0_10px_#3b82f6]' : 'border-fuchsia-500 shadow-[0_0_10px_#d946ef]'}`}></div>
+        {/* 3. The Trunk Node */}
+        <div className={`
+            absolute left-0 md:relative md:left-auto
+            w-4 h-4 rounded-full border-2 z-10 bg-[#0a0a0a] 
+            ${colorClass === 'blue' ? 'border-blue-500 shadow-[0_0_10px_#3b82f6]' : 'border-fuchsia-500 shadow-[0_0_10px_#d946ef]'}
+        `}></div>
 
-        {/* Spacer for the other side */}
+        {/* Spacer */}
         <div className="hidden md:block flex-1"></div>
     </div>
 );
@@ -134,6 +175,23 @@ export const SectorView: React.FC<SectorViewProps> = ({
             }
         } catch (e) { }
     }, [sectorId, quickInputOnly]);
+    // ... inside SectorView component function ...
+
+    // --- CINEMA STATE ---
+    const [cinemaMode, setCinemaMode] = useState(false);
+    const [cinemaItem, setCinemaItem] = useState<CarouselItem | null>(null);
+
+    // --- HANDLER ---
+    const handlePlayItem = (item: CarouselItem) => {
+        // If content has iframe/div (embed code), use Cinema Mode. 
+        // If it is just a URL, open in new tab.
+        if (item.content && (item.content.includes('<iframe') || item.content.includes('<div'))) {
+            setCinemaItem(item);
+            setCinemaMode(true);
+        } else if (item.fileUrl) {
+            window.open(item.fileUrl, '_blank');
+        }
+    };
 
     // State
     const [search, setSearch] = useState('');
@@ -688,38 +746,31 @@ export const SectorView: React.FC<SectorViewProps> = ({
                             </div>
 
                             {/* 2. THE TREE STRUCTURE */}
-                            <div className="relative min-h-[400px] py-10">
-                                {/* The Central Trunk (Glowing Line) */}
-                                <div className={`absolute left-1/2 transform -translate-x-1/2 w-1 h-full rounded-full bg-gradient-to-b from-transparent via-white/20 to-transparent z-0 hidden md:block`}>
+                            <div className="relative min-h-[400px] py-10 px-4 md:px-0">
+
+                                {/* Central Trunk (Desktop Only) */}
+                                <div className={`hidden md:block absolute left-1/2 transform -translate-x-1/2 w-1 h-full rounded-full bg-gradient-to-b from-transparent via-white/20 to-transparent z-0`}>
                                     <div className={`absolute inset-0 w-full h-full animate-pulse ${activeBatch === 'AICS' ? 'bg-blue-500/30 blur-sm' : 'bg-fuchsia-500/30 blur-sm'}`}></div>
                                 </div>
 
-                                {/* The Leaves */}
-                                <div className="relative z-10 flex flex-col items-center md:block">
-                                    {(() => {
-                                        // Filter by the selected Batch (or show all if item has no batch)
-                                        const treeItems = filteredItems.filter(i =>
-                                            i.type === 'link_tree' &&
-                                            (!i.batch || i.batch === activeBatch || i.batch === 'General')
-                                        );
+                                {/* Mobile Trunk (Left Aligned) - THIS IS NEW FOR PHONES */}
+                                <div className={`md:hidden absolute left-4 w-1 h-full rounded-full bg-gradient-to-b from-transparent via-white/20 to-transparent z-0`}>
+                                    <div className={`absolute inset-0 w-full h-full animate-pulse ${activeBatch === 'AICS' ? 'bg-blue-500/30 blur-sm' : 'bg-fuchsia-500/30 blur-sm'}`}></div>
+                                </div>
 
-                                        if (treeItems.length === 0) return (
-                                            <div className="text-center py-20 opacity-50">
-                                                <div className="text-4xl mb-4">🍂</div>
-                                                <p>No leaves found on the {activeBatch} tree.</p>
-                                            </div>
-                                        );
-
-                                        return treeItems.map((item, index) => (
+                                {/* Leaves */}
+                                <div className="relative z-10 flex flex-col md:block">
+                                    {filteredItems.filter(i => i.type === 'link_tree' && (!i.batch || i.batch === activeBatch || i.batch === 'General'))
+                                        .map((item, index) => (
                                             <TreeLeafNode
                                                 key={item.id}
                                                 item={item}
                                                 index={index}
-                                                isLeft={index % 2 === 0} // Alternates Left/Right
+                                                isLeft={index % 2 === 0}
                                                 colorClass={activeBatch === 'AICS' ? 'blue' : 'fuchsia'}
+                                                onPlay={handlePlayItem} // <--- THIS IS CRITICAL: It connects the click to the video player
                                             />
-                                        ));
-                                    })()}
+                                        ))}
                                 </div>
                             </div>
 
@@ -782,6 +833,44 @@ export const SectorView: React.FC<SectorViewProps> = ({
                     )}
                 </>
             ))}
+        {/* --- CINEMA MODE MODAL (USER FACING) --- */}
+            {cinemaMode && cinemaItem && (
+                <div className="fixed inset-0 z-[100000] bg-black/95 flex flex-col animate-[fade-in_0.2s]">
+                    {/* Header */}
+                    <div className="flex justify-between items-center p-4 border-b border-white/10 bg-[#0f0f0f]">
+                        <div className="flex items-center gap-4">
+                            <h3 className="font-bold text-white tracking-widest hidden sm:block">ARCHIVE PLAYER</h3>
+                            <div className="flex items-center gap-2 text-xs text-zinc-400 bg-white/5 px-3 py-1 rounded-full">
+                                <span className="uppercase">{cinemaItem.title}</span>
+                            </div>
+                        </div>
+                        <button onClick={() => { setCinemaMode(false); setCinemaItem(null); }} className="p-2 hover:bg-white/10 rounded-full text-white"><X size={24}/></button>
+                    </div>
+                    
+                    {/* Video Area */}
+                    <div className="flex-1 flex items-center justify-center p-2 sm:p-10 relative">
+                        <div className="w-full max-w-6xl aspect-video bg-black shadow-2xl rounded-xl border border-white/10 overflow-hidden relative group">
+                            <div 
+                                className="w-full h-full"
+                                dangerouslySetInnerHTML={{ 
+                                    __html: DOMPurify.sanitize(cinemaItem.content, { 
+                                        ADD_TAGS: ['iframe', 'div', 'style'], 
+                                        ADD_ATTR: ['allow', 'allowfullscreen', 'frameborder', 'scrolling', 'style', 'width', 'height', 'src'] 
+                                    }) 
+                                }} 
+                            />
+                        </div>
+                    </div>
+
+                    {/* Warning Footer */}
+                    <div className="p-4 bg-yellow-900/20 border-t border-yellow-500/20 flex justify-center">
+                        <p className="text-[10px] text-yellow-200/60 flex items-center gap-2">
+                            <AlertTriangle size={12} />
+                            If the video shows a login screen, please ensure you are logged into your college Microsoft/Stream account in this browser.
+                        </p>
+                    </div>
+                </div>
+            )}
 
             <style dangerouslySetInnerHTML={{ __html: `@keyframes fade-in-up { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }` }} />
         </div>
