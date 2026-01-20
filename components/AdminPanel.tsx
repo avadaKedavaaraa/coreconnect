@@ -6,7 +6,7 @@ import {
   BrainCircuit, ScanFace, Users, Activity, Settings, LayoutTemplate, Search, 
   Filter, Replace, Edit3, Trash2, Plus, Upload, ImageIcon, Save, Shield, 
   ShieldAlert, FileUp, AlertTriangle, RefreshCw, Key, Type, Link as LinkIcon, Share2, FileText, Pin, ArrowDownUp, SortAsc, SortDesc, Sparkles, FolderInput, AlertCircle, Wand2, Check, GripVertical, File, Eye, MessageSquare, Smartphone, Monitor, BellRing, Layers, ImagePlus, Clock, Calendar,
-  Palmtree, Paperclip, Zap 
+  Palmtree, Paperclip, Zap, Network
 } from 'lucide-react';
 import DOMPurify from 'dompurify';
 
@@ -20,7 +20,7 @@ interface AdminPanelProps {
   onLogout: () => void;
   currentUser: string;
   permissions: AdminPermissions | null;
-  initialTab?: 'database' | 'creator' | 'scheduler' | 'config' | 'users' | 'visitors' | 'backup' | 'ai-lab' | 'structure';
+  initialTab?: 'database' | 'creator' | 'scheduler' | 'config' | 'users' | 'visitors' | 'backup' | 'ai-lab' | 'structure' | 'link-tree';
   
   allItems: CarouselItem[];
   sectors: Sector[];
@@ -62,7 +62,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   onAddItem, onUpdateItem, onDeleteItem, onUpdateSectors, onUpdateConfig, allItems = [], sectors = [], globalConfig, onClearData, initialEditingItem, defaultSector
 }) => {
   const isWizard = lineage === Lineage.WIZARD;
-  const [activeTab, setActiveTab] = useState<'creator' | 'ai-lab' | 'database' | 'visitors' | 'structure' | 'users' | 'logs' | 'config' | 'backup' | 'scheduler'>(initialTab || 'database');
+  const [activeTab, setActiveTab] = useState<'creator' | 'ai-lab' | 'database' | 'visitors' | 'structure' | 'users' | 'logs' | 'config' | 'backup' | 'scheduler' | 'link-tree'>(initialTab || 'database');
   
   // Login State
   const [loginUser, setLoginUser] = useState('');
@@ -117,6 +117,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
       batch: 'AICS'
   });
   const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
+
+  // Link Tree Tab State (NEW)
+  const [linkTreeForm, setLinkTreeForm] = useState({
+      title: '',
+      url: '',
+      embedCode: '', // For preview only
+      subject: ''
+  });
+  const [linkTreeIsCustomSubject, setLinkTreeIsCustomSubject] = useState(false);
 
   // Config Tab State
   const [editedConfig, setEditedConfig] = useState<GlobalConfig>(globalConfig);
@@ -246,6 +255,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
       } catch(e) {}
   };
 
+  // ... (Other handlers unchanged) ... 
   const handleCreateUser = async () => {
       if(!newUser || !newUserPass) return;
       try {
@@ -581,6 +591,30 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
       } else {
           setRuleForm({ ...ruleForm, days: [...currentDays, day] });
       }
+  };
+
+  // --- LINK TREE HANDLERS ---
+  const handleAddLinkTreeItem = () => {
+      if (!linkTreeForm.title || !linkTreeForm.url || !linkTreeForm.subject) {
+          alert("Please fill Title, URL, and Subject.");
+          return;
+      }
+      onAddItem({
+          id: crypto.randomUUID(),
+          title: linkTreeForm.title,
+          content: linkTreeForm.embedCode || 'Link Tree Item',
+          date: new Date().toISOString().split('T')[0].replace(/-/g, '.'),
+          type: 'link_tree', // Special type for SectorView
+          sector: 'resources', // Force to Resources sector
+          subject: linkTreeForm.subject,
+          fileUrl: linkTreeForm.url,
+          isUnread: false,
+          isPinned: false,
+          likes: 0,
+          style: { titleColor: '#ffffff' }
+      });
+      setLinkTreeForm({ title: '', url: '', embedCode: '', subject: linkTreeForm.subject });
+      alert("Link Added to Resources!");
   };
 
   // --- AI LAB LOGIC ---
@@ -969,6 +1003,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                     {[
                         { id: 'database', icon: Database, label: 'Database' },
                         { id: 'creator', icon: PenTool, label: 'Creator' },
+                        { id: 'link-tree', icon: Network, label: 'Link Tree' }, // NEW TAB ADDED HERE
                         { id: 'scheduler', icon: CalendarDays, label: 'Scheduler' },
                         { id: 'backup', icon: HardDrive, label: 'System Backup' },
                         { id: 'ai-lab', icon: BrainCircuit, label: 'AI Magic' },
@@ -1009,8 +1044,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                                 <option value="mixed" className="bg-black">Mixed</option>
                                                 <option value="link" className="bg-black">Links</option>
                                                 <option value="code" className="bg-black">Code</option>
+                                                <option value="link_tree" className="bg-black">Link Tree</option> {/* Added Link Tree Option */}
                                             </select>
                                         </div>
+                                        {/* ... Rest of Database Search UI ... */}
                                         <div className="relative">
                                             <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none"><Replace size={14} /></div>
                                             <input value={findText} onChange={e => setFindText(e.target.value)} placeholder="Find..." className="h-full pl-9 p-3 bg-white/5 border border-white/10 rounded outline-none w-32 focus:w-48 transition-all" />
@@ -1072,6 +1109,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
                             {/* CREATOR TAB */}
                             {activeTab === 'creator' && (
+                                // ... Existing Creator Code ...
                                 <div className="flex flex-col xl:flex-row gap-8 xl:h-full">
                                     {/* Editor Column */}
                                     <div className="flex-1 space-y-6 max-w-2xl xl:overflow-y-auto">
@@ -1157,7 +1195,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
                                         <div className="w-full h-px bg-white/10 my-4"></div>
 
-                                        {/* ... same editor inputs ... */}
+                                        {/* ... editor inputs ... */}
                                         <div className="grid grid-cols-2 gap-4">
                                             <input value={itemForm.title} onChange={e => setItemForm({ ...itemForm, title: e.target.value })} placeholder="Title (Leave empty to auto-extract from HTML)" className="col-span-2 p-3 bg-white/5 border border-white/10 rounded text-white outline-none" />
                                             <select value={itemForm.type} onChange={e => setItemForm({ ...itemForm, type: e.target.value as any })} className="p-3 bg-white/5 border border-white/10 rounded text-white outline-none">
@@ -1379,9 +1417,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                         </div>
 
                                         <div className={`rounded-xl border overflow-hidden relative shadow-2xl transition-all duration-300 mx-auto
-                                ${isWizard ? 'bg-[#0f1510] border-emerald-500/30' : 'bg-[#150f1a] border-fuchsia-500/30'}
-                                ${previewMode === 'mobile' ? 'h-[600px] w-full max-w-[350px]' : 'w-full h-auto min-h-[400px]'}
-                            `}>
+                                            ${isWizard ? 'bg-[#0f1510] border-emerald-500/30' : 'bg-[#150f1a] border-fuchsia-500/30'}
+                                            ${previewMode === 'mobile' ? 'h-[600px] w-full max-w-[350px]' : 'w-full h-auto min-h-[400px]'}
+                                        `}>
                                             <div className="p-4 border-b border-white/10 flex justify-between items-center bg-black/20">
                                                 <span className="text-[10px] uppercase font-bold opacity-70 tracking-widest">{itemForm.sector}</span>
                                                 <span className="text-[10px] opacity-50">{itemForm.date}</span>
@@ -1408,6 +1446,145 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                                         ))}
                                                     </div>
                                                 )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* --- NEW LINK TREE TAB --- */}
+                            {activeTab === 'link-tree' && (
+                                <div className="space-y-6 h-full flex flex-col">
+                                    <div className="flex items-center gap-3 mb-4">
+                                        <div className={`p-3 rounded-full ${isWizard ? 'bg-green-500/20 text-green-300' : 'bg-pink-500/20 text-pink-300'}`}>
+                                            <Network size={24} />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-bold text-xl">Recorded Lectures (Link Tree)</h3>
+                                            <p className="text-sm opacity-60">Manage direct video links for the Resources section.</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+                                        {/* Left Column: Form */}
+                                        <div className="space-y-6">
+                                            <div className="p-6 rounded-xl border bg-white/5 border-white/10 space-y-4">
+                                                <h4 className="font-bold border-b border-white/10 pb-2">Add New Recording</h4>
+                                                
+                                                {/* Subject Selection */}
+                                                <div>
+                                                    <label className="text-xs font-bold opacity-50 block mb-1 uppercase">Subject</label>
+                                                    <div className="relative">
+                                                        <select
+                                                            value={linkTreeIsCustomSubject ? '__NEW__' : linkTreeForm.subject}
+                                                            onChange={(e) => {
+                                                                if (e.target.value === '__NEW__') {
+                                                                    setLinkTreeIsCustomSubject(true);
+                                                                    setLinkTreeForm({...linkTreeForm, subject: ''});
+                                                                } else {
+                                                                    setLinkTreeIsCustomSubject(false);
+                                                                    setLinkTreeForm({...linkTreeForm, subject: e.target.value});
+                                                                }
+                                                            }}
+                                                            className="w-full p-3 bg-black/40 border border-white/10 rounded-lg text-sm text-white outline-none"
+                                                        >
+                                                            <option value="">-- Select Subject --</option>
+                                                            {uniqueSubjects.map(s => <option key={s} value={s} className="bg-black">{s}</option>)}
+                                                            <option value="__NEW__" className="bg-blue-900 font-bold">+ Create New Subject</option>
+                                                        </select>
+                                                    </div>
+                                                    {linkTreeIsCustomSubject && (
+                                                        <input 
+                                                            value={linkTreeForm.subject} 
+                                                            onChange={e => setLinkTreeForm({...linkTreeForm, subject: e.target.value})} 
+                                                            className="w-full mt-2 p-3 bg-blue-900/20 border border-blue-500/50 rounded-lg text-sm text-white outline-none" 
+                                                            placeholder="New Subject Name..." 
+                                                            autoFocus 
+                                                        />
+                                                    )}
+                                                </div>
+
+                                                {/* Title */}
+                                                <div>
+                                                    <label className="text-xs font-bold opacity-50 block mb-1 uppercase">Display Title</label>
+                                                    <input 
+                                                        value={linkTreeForm.title} 
+                                                        onChange={e => setLinkTreeForm({...linkTreeForm, title: e.target.value})} 
+                                                        className="w-full p-3 bg-black/40 border border-white/10 rounded-lg text-sm text-white outline-none" 
+                                                        placeholder="e.g. Lecture 1: Introduction" 
+                                                    />
+                                                </div>
+
+                                                {/* URL */}
+                                                <div>
+                                                    <label className="text-xs font-bold opacity-50 block mb-1 uppercase">Direct Link URL</label>
+                                                    <input 
+                                                        value={linkTreeForm.url} 
+                                                        onChange={e => setLinkTreeForm({...linkTreeForm, url: e.target.value})} 
+                                                        className="w-full p-3 bg-black/40 border border-white/10 rounded-lg text-sm text-white outline-none font-mono text-xs" 
+                                                        placeholder="https://..." 
+                                                    />
+                                                </div>
+
+                                                <button onClick={handleAddLinkTreeItem} className="w-full py-3 bg-green-600 rounded-lg font-bold hover:bg-green-500 transition-all shadow-lg text-black mt-4">
+                                                    ADD TO RESOURCES
+                                                </button>
+                                            </div>
+
+                                            {/* Existing Link Tree Items List */}
+                                            <div className="space-y-2">
+                                                <h4 className="font-bold text-sm opacity-60 uppercase">Existing Recordings</h4>
+                                                <div className="max-h-[400px] overflow-y-auto space-y-2 pr-2 custom-scrollbar">
+                                                    {allItems.filter(i => i.type === 'link_tree').map(item => (
+                                                        <div key={item.id} className="flex justify-between items-center p-3 bg-white/5 border border-white/10 rounded-lg hover:bg-white/10 transition-colors">
+                                                            <div>
+                                                                <div className="font-bold text-sm">{item.title}</div>
+                                                                <div className="text-xs opacity-50">{item.subject} • {item.date}</div>
+                                                            </div>
+                                                            <button onClick={() => { if(confirm('Delete?')) onDeleteItem(item.id); }} className="p-2 text-red-400 hover:bg-red-900/20 rounded"><Trash2 size={16}/></button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Right Column: Previewer */}
+                                        <div className="space-y-4">
+                                            <div className="p-6 rounded-xl border border-dashed border-white/20 bg-black/20">
+                                                <h4 className="font-bold mb-2 flex items-center gap-2">
+                                                    <Eye size={18} className="text-blue-400" /> Embed Code Tester
+                                                </h4>
+                                                <p className="text-xs opacity-60 mb-4">Paste the iframe code from Stream/SharePoint below to test if it works. This is for testing only; the user will click the direct link.</p>
+                                                
+                                                <textarea 
+                                                    value={linkTreeForm.embedCode} 
+                                                    onChange={e => setLinkTreeForm({...linkTreeForm, embedCode: e.target.value})} 
+                                                    className="w-full h-32 bg-black/40 border border-white/10 rounded-lg p-3 text-xs font-mono text-zinc-300 outline-none resize-none mb-4" 
+                                                    placeholder='<iframe src="..."></iframe>' 
+                                                />
+
+                                                {/* Live Preview Container */}
+                                                <div className="w-full aspect-video bg-black rounded-lg border border-white/10 overflow-hidden relative flex items-center justify-center">
+                                                    {linkTreeForm.embedCode ? (
+                                                        <div 
+                                                            className="w-full h-full"
+                                                            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(linkTreeForm.embedCode, { ADD_TAGS: ['iframe'], ADD_ATTR: ['allowfullscreen', 'frameborder', 'scrolling'] }) }}
+                                                        />
+                                                    ) : (
+                                                        <div className="text-center opacity-30">
+                                                            <Network size={48} className="mx-auto mb-2" />
+                                                            <p className="text-xs">Preview Area</p>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                
+                                                <div className="mt-4 p-3 bg-yellow-900/20 border border-yellow-500/30 rounded flex items-start gap-2 text-xs text-yellow-200">
+                                                    <AlertTriangle size={16} className="shrink-0 mt-0.5" />
+                                                    <p>
+                                                        <strong>Authentication Warning:</strong> If the preview shows an error or "Refused to connect", 
+                                                        ensure you have opened this website in the <u>same browser context</u> where you are logged into Moodle/Microsoft.
+                                                    </p>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -1626,7 +1803,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                                                     )}
                                                                 </div>
                                                                 <div className={`text-xs opacity-70 mb-2 font-mono ${isHoliday ? 'text-red-300' : 'text-yellow-500/80'}`}>
-                                                                    {(rule.days && rule.days.length > 0) ? rule.days.join(', ') : 'All Week'}
+                                                                        {(rule.days && rule.days.length > 0) ? rule.days.join(', ') : 'All Week'}
                                                                 </div>
                                                                 <div className={`font-bold text-lg ${isHoliday ? 'text-red-100' : ''}`}>{rule.subject}</div>
                                                                 {rule.customMessage && <div className="text-xs opacity-60 mt-1 italic">"{rule.customMessage}"</div>}
@@ -1665,6 +1842,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
                             {/* VISITOR SURVEILLANCE TAB */}
                             {activeTab === 'visitors' && (
+                                // ... Existing Visitors Code ...
                                 <div className="space-y-6 h-full flex flex-col">
                                     {!selectedVisitor ? (
                                         <div className="bg-white/5 border border-white/10 rounded-xl flex flex-col flex-1 overflow-hidden shadow-2xl animate-[fade-in_0.3s]">
@@ -1816,7 +1994,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                                         {loadingDetails ? <div className="text-center p-4"><Loader2 className="animate-spin mx-auto" /></div> :
                                                             visitorDetails?.activity ? (
                                                                 (() => {
-                                                                    // --- FILTER LOGIC APPLIED HERE ---
                                                                     const visibleActivity = visitorDetails.activity.filter(a => a.activity_type !== 'HEARTBEAT');
                                                                     
                                                                     if (visibleActivity.length > 0) {
@@ -1867,6 +2044,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
                             {/* LOGS TAB */}
                             {activeTab === 'logs' && (
+                                // ... Existing Logs Code ...
                                 <div className="space-y-6">
                                     <div className="flex justify-between items-center mb-4">
                                         <h3 className="font-bold text-xl">System Audit Logs</h3>
@@ -1900,8 +2078,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                 </div>
                             )}
 
-                            {/* AI LAB TAB - ADVANCED */}
+                            {/* AI LAB TAB */}
                             {activeTab === 'ai-lab' && (
+                                // ... Existing AI Lab Code ...
                                 <div className="flex flex-col h-full max-w-4xl mx-auto space-y-6 pb-24">
                                     <div className={`p-6 rounded-xl border space-y-4 shadow-xl transition-all ${isWizard ? 'bg-purple-900/10 border-purple-500/30' : 'bg-blue-900/10 border-blue-500/30'}`}>
                                         <div className="flex items-center gap-3 mb-2">
@@ -1998,6 +2177,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
                             {/* USERS TAB */}
                             {activeTab === 'users' && (
+                                // ... Existing Users Code ...
                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                                     <div>
                                         <h3 className="font-bold mb-4">Manage Admins</h3>
@@ -2049,6 +2229,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
                             {/* BACKUP TAB */}
                             {activeTab === 'backup' && (
+                                // ... Existing Backup Code ...
                                 <div className="space-y-8 max-w-xl mx-auto text-center py-10">
                                     <div className="p-8 border border-white/10 rounded-xl bg-white/5 space-y-4">
                                         <HardDrive size={48} className="mx-auto text-blue-400 mb-4" />
@@ -2083,6 +2264,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
                             {/* CONFIG TAB - UPDATED WITH UPDATE POPUP */}
                             {activeTab === 'config' && (
+                                // ... Existing Config Code ...
                                 <div className="space-y-6 max-w-3xl">
                                     <div className="p-6 rounded border bg-white/5 border-white/10 space-y-6">
                                         
@@ -2228,8 +2410,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                 </div>
                             )}
 
-                            {/* STRUCTURE TAB (Unchanged) */}
+                            {/* STRUCTURE TAB */}
                             {activeTab === 'structure' && (
+                                // ... Existing Structure Code ...
                                 <div className="space-y-6 pb-20">
                                     <div className="sticky top-0 z-20 bg-black/80 backdrop-blur-md p-4 -mx-4 -mt-4 border-b border-white/10 flex justify-between items-center mb-4">
                                         <div>
@@ -2278,9 +2461,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                                     </div>
                                                     <div>
                                                         <label className="text-[10px] uppercase opacity-50 block mb-1">Sorting Rule</label>
-                                                        <select
-                                                            value={sector.sortOrder || 'newest'}
-                                                            onChange={e => handleUpdateSector(idx, 'sortOrder', e.target.value)}
+                                                        <select 
+                                                            value={sector.sortOrder || 'newest'} 
+                                                            onChange={e => handleUpdateSector(idx, 'sortOrder', e.target.value)} 
                                                             className="w-full p-2 bg-black border border-white/10 rounded text-white text-sm"
                                                         >
                                                             <option value="newest">Newest First</option>
@@ -2301,7 +2484,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                 )}
             </div>
 
-            {/* --- AI IMAGE GENERATION MODAL --- */}
             {/* --- WEB IMAGE SEARCH MODAL --- */}
             {showImageGen && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-md p-4 animate-[fade-in_0.2s]">

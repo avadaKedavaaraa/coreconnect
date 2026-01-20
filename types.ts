@@ -56,7 +56,8 @@ export interface CarouselItem {
   title: string;
   date: string;
   content: string;
-  type: 'announcement' | 'file' | 'video' | 'task' | 'mixed' | 'link' | 'code';
+  // Added 'link_tree' to the type union below
+  type: 'announcement' | 'file' | 'video' | 'task' | 'mixed' | 'link' | 'code' | 'link_tree';
   sector?: string;
   style?: ItemStyle;
   subject?: string;

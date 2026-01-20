@@ -7,7 +7,7 @@ import {
     Book, FileText, Video, Calendar, Search, Filter, X, Trash2, LayoutGrid, List,
     FolderOpen, ArrowLeft, Edit2, Plus, FolderPlus, Loader2, Image as ImageIcon,
     Send, Link as LinkIcon, ExternalLink, Layers, Code, Pin, PinOff, Save, Check,
-    Clock, CalendarDays, MousePointer2, Columns
+    Clock, CalendarDays, MousePointer2, Columns, PlayCircle
 } from 'lucide-react';
 import CalendarWidget from './CalendarWidget';
 import DOMPurify from 'dompurify';
@@ -73,6 +73,7 @@ export const SectorView: React.FC<SectorViewProps> = ({
     const isWizard = lineage === Lineage.WIZARD;
     const currentSector = sectors.find(s => s.id === sectorId) || SECTORS[0];
     const isLectures = sectorId === 'lectures';
+    const isResources = sectorId === 'resources'; // Helper for Link Tree
 
     // --- TRACKING ---
     useEffect(() => {
@@ -174,8 +175,6 @@ export const SectorView: React.FC<SectorViewProps> = ({
             if (!rule.isActive) return false;
 
             // Batch Filtering logic:
-            // If viewing AICS column: show AICS items AND items with no batch (shared)
-            // If viewing CSDA column: show only CSDA items
             if (batch === 'AICS' && rule.batch && rule.batch !== 'AICS') return false;
             if (batch === 'CSDA' && rule.batch !== 'CSDA') return false;
 
@@ -227,17 +226,17 @@ export const SectorView: React.FC<SectorViewProps> = ({
     }, [search, viewMode, isLectures]);
 
     useEffect(() => {
-      setSearch(''); setDateFilter(''); setSubjectFilter(''); setShowPinnedOnly(false);
-      
-      if (isLectures) {
-          const isMobile = window.innerWidth < 768;
-          setViewMode(isMobile ? 'grid' : 'columns');
-          setDateFilter(getISTDateStr());
-      } else {
-          setViewMode('folders');
-          setDateFilter('');
-      }
-  }, [sectorId, isLectures]);
+        setSearch(''); setDateFilter(''); setSubjectFilter(''); setShowPinnedOnly(false);
+
+        if (isLectures) {
+            const isMobile = window.innerWidth < 768;
+            setViewMode(isMobile ? 'grid' : 'columns');
+            setDateFilter(getISTDateStr());
+        } else {
+            setViewMode('folders');
+            setDateFilter('');
+        }
+    }, [sectorId, isLectures]);
 
     // --- ACTIONS ---
     const handleQuickPost = async () => {
@@ -289,7 +288,7 @@ export const SectorView: React.FC<SectorViewProps> = ({
         setContextMenu({ x, y, item });
     };
     const getTypeIcon = (type: string) => {
-        switch (type) { case 'video': return <Video size={20} />; case 'file': return <FileText size={20} />; case 'mixed': return <Layers size={20} />; case 'code': return <Code size={20} />; case 'link': return <LinkIcon size={20} />; default: return <FileText size={20} />; }
+        switch (type) { case 'video': return <Video size={20} />; case 'file': return <FileText size={20} />; case 'mixed': return <Layers size={20} />; case 'code': return <Code size={20} />; case 'link': return <LinkIcon size={20} />; case 'link_tree': return <PlayCircle size={20} />; default: return <FileText size={20} />; }
     };
 
     // --- ADMIN HUD QUICK CREATE ---
@@ -600,39 +599,98 @@ export const SectorView: React.FC<SectorViewProps> = ({
                 </div>
             ) : (
                 <>
-                    {filteredItems.length === 0 ? (
-                        <div className="text-center py-20 opacity-40"><Search size={48} className="mx-auto mb-4" /><div className={`text-2xl font-bold mb-2 ${isWizard ? 'font-wizardTitle text-emerald-300' : 'font-muggle text-fuchsia-300'}`}>EMPTY SECTOR</div><p className="text-sm opacity-60">{isWizard ? "The scrolls are blank..." : "No data found."}</p></div>
-                    ) : (
-                        <div className={viewMode === 'list' ? 'flex flex-col gap-3' : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'}>
-                            {filteredItems.map(item => (
-                                <div key={item.id} draggable={isAdmin && isManualSort} onDragStart={(e) => handleDragStart(e, item)} onDragOver={(e) => handleDragOver(e, item)} onDrop={(e) => handleDrop(e, item)} onClick={() => onViewItem(item)} onContextMenu={(e) => handleContextMenu(e, item)} className={`relative rounded-xl border backdrop-blur-md group transition-all duration-300 cursor-pointer overflow-hidden select-none ${viewMode === 'list' ? 'p-4 flex items-center gap-4 hover:translate-x-1' : 'p-6 flex flex-col gap-4 hover:-translate-y-1 h-full'} ${isWizard ? 'bg-black/40 border-emerald-900/50 hover:bg-emerald-900/10' : 'bg-black/40 border-fuchsia-900/50 hover:bg-fuchsia-900/10'} ${item.isPinned ? (isWizard ? 'border-l-4 border-l-yellow-500' : 'border-l-4 border-l-yellow-500') : ''} ${draggedItem?.id === item.id ? 'opacity-20' : 'opacity-100'}`}>
-                                    {item.isPinned && <div className={`absolute top-0 right-0 p-1.5 rounded-bl-lg shadow-sm ${isWizard ? 'bg-emerald-800 text-yellow-300' : 'bg-fuchsia-800 text-yellow-300'}`}><Pin size={12} fill="currentColor" /></div>}
-                                    {item.image && viewMode === 'masonry' && <div className="w-full h-32 overflow-hidden rounded-lg relative"><img src={item.image} alt={item.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" /><div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors"></div></div>}
-                                    {viewMode === 'list' && item.image && <div className="w-16 h-16 shrink-0 overflow-hidden rounded-lg"><img src={item.image} alt={item.title} className="w-full h-full object-cover" /></div>}
-                                    {!item.image && <div className={`shrink-0 rounded-full flex items-center justify-center z-10 ${viewMode === 'list' ? 'w-12 h-12' : 'w-12 h-12 mb-2'} ${isWizard ? 'bg-emerald-900/30 text-emerald-400' : 'bg-fuchsia-900/30 text-fuchsia-400'}`}>{getTypeIcon(item.type)}</div>}
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2 mb-1">{item.subject && <span className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded border opacity-60 ${isWizard ? 'border-emerald-800 text-emerald-300' : 'border-fuchsia-800 text-fuchsia-300'}`}>{item.subject}</span>}<div className={`flex items-center gap-1 text-[10px] opacity-50 ${isWizard ? 'font-wizard' : 'font-muggle'}`}><Calendar size={10} /><span>{item.date}</span></div></div>
-                                        
-                                        {/* FIX: Applied text-white for Title & text-zinc-300 for Content in non-announcement sectors to prevent UI conflict */}
-                                        <h4 
-                                            className={`font-bold leading-tight truncate ${viewMode === 'list' ? 'text-lg' : 'text-lg mb-2'} ${sectorId !== 'announcements' ? 'text-white' : ''}`} 
-                                            style={item.style?.isGradient ? { backgroundImage: `linear-gradient(to right, ${item.style.titleColor}, ${item.style.titleColorEnd || item.style.titleColor})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', color: 'transparent' } : { color: item.style?.titleColor }}
-                                        >
-                                            {item.title}
-                                        </h4>
-                                        
-                                        {!(item.fileUrl && (item.fileUrl.startsWith('http') || item.fileUrl.startsWith('https'))) && 
-                                            <div 
-                                                className={`text-xs opacity-70 line-clamp-3 mt-1 ${isWizard ? 'font-wizard' : 'font-muggle'} ${sectorId !== 'announcements' ? 'text-zinc-300' : ''}`} 
-                                                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(item.content, { ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'u', 'span'], ALLOWED_ATTR: ['style', 'class'] }) }} 
-                                            />
+                    {/* --- NEW LINK TREE VIEW IMPLEMENTATION --- */}
+                    {/* This logic injects the Link Tree view when in Resources > Subject */}
+                    {isResources && subjectFilter && filteredItems.some(i => i.type === 'link_tree') ? (
+                        <div className="w-full max-w-2xl mx-auto flex flex-col gap-4 animate-[fade-in_0.3s]">
+                             <div className="text-center mb-4">
+                                <h3 className={`text-xl font-bold uppercase tracking-widest ${isWizard ? 'text-emerald-300' : 'text-fuchsia-300'}`}>Recorded Lectures</h3>
+                                <p className="text-xs opacity-50">High-Contrast Link Tree Access</p>
+                             </div>
+                             
+                             {filteredItems.filter(i => i.type === 'link_tree').map(item => (
+                                 <button
+                                    key={item.id}
+                                    onClick={() => window.open(item.fileUrl, '_blank')}
+                                    onContextMenu={(e) => handleContextMenu(e, item)}
+                                    className={`
+                                        w-full p-4 rounded-xl border flex items-center justify-between group transition-all duration-300 transform hover:scale-[1.02] shadow-lg
+                                        ${isWizard 
+                                            ? 'bg-emerald-950/40 border-emerald-500/30 hover:bg-emerald-900/60 hover:border-emerald-400 text-emerald-100' 
+                                            : 'bg-fuchsia-950/40 border-fuchsia-500/30 hover:bg-fuchsia-900/60 hover:border-fuchsia-400 text-fuchsia-100'
                                         }
-                                        
-                                        {(item.fileUrl && (item.fileUrl.startsWith('http') || item.fileUrl.startsWith('https'))) && <div className="mt-2 pt-2 border-t border-white/5 flex"><a href={item.fileUrl} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className={`flex items-center justify-center gap-2 px-4 py-2 rounded font-bold text-xs uppercase tracking-widest transition-all hover:scale-[1.02] active:scale-95 shadow-lg ${isWizard ? 'bg-emerald-600 hover:bg-emerald-500 text-black' : 'bg-fuchsia-600 hover:bg-fuchsia-500 text-black'}`}><ExternalLink size={14} /> OPEN LINK</a></div>}
+                                    `}
+                                 >
+                                    <div className="flex items-center gap-4">
+                                        <div className={`p-3 rounded-full ${isWizard ? 'bg-emerald-500/20 text-emerald-300' : 'bg-fuchsia-500/20 text-fuchsia-300'}`}>
+                                            <PlayCircle size={24} />
+                                        </div>
+                                        <div className="text-left">
+                                            <div className={`text-lg font-bold ${isWizard ? 'font-wizard' : 'font-muggle'}`}>{item.title}</div>
+                                            <div className="text-[10px] opacity-60 font-mono uppercase">{item.date}</div>
+                                        </div>
                                     </div>
-                                </div>
-                            ))}
+                                    <ExternalLink size={20} className="opacity-50 group-hover:opacity-100 transition-opacity" />
+                                 </button>
+                             ))}
+                             
+                             {/* Render other resource types below if they exist */}
+                             {filteredItems.some(i => i.type !== 'link_tree') && (
+                                 <div className="mt-8 pt-8 border-t border-white/10 text-center">
+                                     <h4 className="text-sm font-bold opacity-50 mb-4 uppercase">Other Resources</h4>
+                                     <div className={viewMode === 'list' ? 'flex flex-col gap-3' : 'grid grid-cols-1 md:grid-cols-2 gap-4'}>
+                                          {filteredItems.filter(i => i.type !== 'link_tree').map(item => (
+                                             <div key={item.id} onClick={() => onViewItem(item)} onContextMenu={(e) => handleContextMenu(e, item)} className={`relative rounded-xl border backdrop-blur-md group transition-all duration-300 cursor-pointer overflow-hidden select-none p-4 flex items-center gap-4 hover:translate-x-1 ${isWizard ? 'bg-black/40 border-emerald-900/50 hover:bg-emerald-900/10' : 'bg-black/40 border-fuchsia-900/50 hover:bg-fuchsia-900/10'}`}>
+                                                 {/* Reuse standard list item view for fallback */}
+                                                 <div className={`shrink-0 rounded-full flex items-center justify-center w-10 h-10 ${isWizard ? 'bg-emerald-900/30 text-emerald-400' : 'bg-fuchsia-900/30 text-fuchsia-400'}`}>{getTypeIcon(item.type)}</div>
+                                                 <div className="flex-1 min-w-0 text-left">
+                                                     <div className="font-bold truncate text-white">{item.title}</div>
+                                                     <div className="text-[10px] opacity-50">{item.date}</div>
+                                                 </div>
+                                             </div>
+                                          ))}
+                                     </div>
+                                 </div>
+                             )}
                         </div>
+                    ) : (
+                        // --- STANDARD VIEW (No Change) ---
+                        <>
+                            {filteredItems.length === 0 ? (
+                                <div className="text-center py-20 opacity-40"><Search size={48} className="mx-auto mb-4" /><div className={`text-2xl font-bold mb-2 ${isWizard ? 'font-wizardTitle text-emerald-300' : 'font-muggle text-fuchsia-300'}`}>EMPTY SECTOR</div><p className="text-sm opacity-60">{isWizard ? "The scrolls are blank..." : "No data found."}</p></div>
+                            ) : (
+                                <div className={viewMode === 'list' ? 'flex flex-col gap-3' : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'}>
+                                    {filteredItems.map(item => (
+                                        <div key={item.id} draggable={isAdmin && isManualSort} onDragStart={(e) => handleDragStart(e, item)} onDragOver={(e) => handleDragOver(e, item)} onDrop={(e) => handleDrop(e, item)} onClick={() => onViewItem(item)} onContextMenu={(e) => handleContextMenu(e, item)} className={`relative rounded-xl border backdrop-blur-md group transition-all duration-300 cursor-pointer overflow-hidden select-none ${viewMode === 'list' ? 'p-4 flex items-center gap-4 hover:translate-x-1' : 'p-6 flex flex-col gap-4 hover:-translate-y-1 h-full'} ${isWizard ? 'bg-black/40 border-emerald-900/50 hover:bg-emerald-900/10' : 'bg-black/40 border-fuchsia-900/50 hover:bg-fuchsia-900/10'} ${item.isPinned ? (isWizard ? 'border-l-4 border-l-yellow-500' : 'border-l-4 border-l-yellow-500') : ''} ${draggedItem?.id === item.id ? 'opacity-20' : 'opacity-100'}`}>
+                                            {item.isPinned && <div className={`absolute top-0 right-0 p-1.5 rounded-bl-lg shadow-sm ${isWizard ? 'bg-emerald-800 text-yellow-300' : 'bg-fuchsia-800 text-yellow-300'}`}><Pin size={12} fill="currentColor" /></div>}
+                                            {item.image && viewMode === 'masonry' && <div className="w-full h-32 overflow-hidden rounded-lg relative"><img src={item.image} alt={item.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" /><div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors"></div></div>}
+                                            {viewMode === 'list' && item.image && <div className="w-16 h-16 shrink-0 overflow-hidden rounded-lg"><img src={item.image} alt={item.title} className="w-full h-full object-cover" /></div>}
+                                            {!item.image && <div className={`shrink-0 rounded-full flex items-center justify-center z-10 ${viewMode === 'list' ? 'w-12 h-12' : 'w-12 h-12 mb-2'} ${isWizard ? 'bg-emerald-900/30 text-emerald-400' : 'bg-fuchsia-900/30 text-fuchsia-400'}`}>{getTypeIcon(item.type)}</div>}
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2 mb-1">{item.subject && <span className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded border opacity-60 ${isWizard ? 'border-emerald-800 text-emerald-300' : 'border-fuchsia-800 text-fuchsia-300'}`}>{item.subject}</span>}<div className={`flex items-center gap-1 text-[10px] opacity-50 ${isWizard ? 'font-wizard' : 'font-muggle'}`}><Calendar size={10} /><span>{item.date}</span></div></div>
+                                                
+                                                {/* FIX: Applied text-white for Title & text-zinc-300 for Content in non-announcement sectors to prevent UI conflict */}
+                                                <h4 
+                                                    className={`font-bold leading-tight truncate ${viewMode === 'list' ? 'text-lg' : 'text-lg mb-2'} ${sectorId !== 'announcements' ? 'text-white' : ''}`} 
+                                                    style={item.style?.isGradient ? { backgroundImage: `linear-gradient(to right, ${item.style.titleColor}, ${item.style.titleColorEnd || item.style.titleColor})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', color: 'transparent' } : { color: item.style?.titleColor }}
+                                                >
+                                                    {item.title}
+                                                </h4>
+                                                
+                                                {!(item.fileUrl && (item.fileUrl.startsWith('http') || item.fileUrl.startsWith('https'))) && 
+                                                    <div 
+                                                        className={`text-xs opacity-70 line-clamp-3 mt-1 ${isWizard ? 'font-wizard' : 'font-muggle'} ${sectorId !== 'announcements' ? 'text-zinc-300' : ''}`} 
+                                                        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(item.content, { ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'u', 'span'], ALLOWED_ATTR: ['style', 'class'] }) }} 
+                                                    />
+                                                }
+                                                
+                                                {(item.fileUrl && (item.fileUrl.startsWith('http') || item.fileUrl.startsWith('https'))) && <div className="mt-2 pt-2 border-t border-white/5 flex"><a href={item.fileUrl} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className={`flex items-center justify-center gap-2 px-4 py-2 rounded font-bold text-xs uppercase tracking-widest transition-all hover:scale-[1.02] active:scale-95 shadow-lg ${isWizard ? 'bg-emerald-600 hover:bg-emerald-500 text-black' : 'bg-fuchsia-600 hover:bg-fuchsia-500 text-black'}`}><ExternalLink size={14} /> OPEN LINK</a></div>}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </>
                     )}
                 </>
             ))}
