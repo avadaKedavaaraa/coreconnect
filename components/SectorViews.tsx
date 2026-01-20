@@ -3,11 +3,14 @@ import {
     Lineage, Sector, CarouselItem, LectureRule, GlobalConfig,
     SECTORS
 } from '../types';
+// Find this section at the top and REPLACE it with this:
+
 import {
     Book, FileText, Video, Calendar, Search, Filter, X, Trash2, LayoutGrid, List,
     FolderOpen, ArrowLeft, Edit2, Plus, FolderPlus, Loader2, Image as ImageIcon,
     Send, Link as LinkIcon, ExternalLink, Layers, Code, Pin, PinOff, Save, Check,
-    Clock, CalendarDays, MousePointer2, Columns, PlayCircle
+    Clock, CalendarDays, MousePointer2, Columns, PlayCircle,
+    ChevronRight, AlertTriangle // 👈 ADD THESE TWO!
 } from 'lucide-react';
 import CalendarWidget from './CalendarWidget';
 import DOMPurify from 'dompurify';
@@ -226,7 +229,7 @@ export const SectorView: React.FC<SectorViewProps> = ({
     const inputRef = useRef<HTMLInputElement>(null);
 
     // --- DERIVED DATA ---
-    const subjects = useMemo(() => Array.from(new Set(items.map(i => i.subject || 'General'))).sort(), [items]);
+    const subjects = useMemo(() => Array.from(new Set((items || []).map(i => i.subject || 'General'))).sort(), [items]);
     const activeSortOrder = currentSector?.sortOrder || 'newest';
     const isManualSort = activeSortOrder === 'manual';
 
