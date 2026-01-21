@@ -8,7 +8,7 @@ import {
     FolderOpen, ArrowLeft, Edit2, Plus, FolderPlus, Loader2, Image as ImageIcon,
     Send, Link as LinkIcon, ExternalLink, Layers, Code, Pin, PinOff, Save, Check,
     Clock, CalendarDays, MousePointer2, Columns, PlayCircle,
-    ChevronRight, AlertTriangle
+    ChevronRight, AlertTriangle // 👈 Ensures icons are imported
 } from 'lucide-react';
 import CalendarWidget from './CalendarWidget';
 import DOMPurify from 'dompurify';
@@ -138,15 +138,24 @@ const TreeLeafNode = ({
             </div>
         </div>
 
-        {/* 2. The Branch Connection (Desktop Only) */}
-        <div className="hidden md:flex flex-1 h-[2px] relative">
-            <div className={`absolute top-1/2 w-full h-[1px] ${colorClass === 'blue' ? 'bg-blue-500/30' : 'bg-fuchsia-500/30'}`}></div>
-            <div className={`absolute top-1/2 w-2 h-1 rounded-full animate-ping ${colorClass === 'blue' ? 'bg-blue-400' : 'bg-fuchsia-400'} opacity-50`} style={{ left: isLeft ? '10%' : '90%' }}></div>
+        {/* 2. The Branch Connection (Desktop Only) - FIXED: Solid 2px Line */}
+        <div className="hidden md:flex flex-1 items-center relative -mx-1">
+            {/* 1. "items-center" on parent centers the child vertically.
+               2. We use a static div (not absolute) with h-[2px].
+               3. -mx-1 adds a tiny overlap to ensure no gaps between card and trunk.
+            */}
+            <div className={`w-full h-[2px] ${colorClass === 'blue' ? 'bg-blue-500/30' : 'bg-fuchsia-500/30'}`}></div>
+            
+            {/* Keep the pulse animation absolute so it sits ON TOP of the line */}
+            <div 
+                className={`absolute w-2 h-1 rounded-full animate-ping ${colorClass === 'blue' ? 'bg-blue-400' : 'bg-fuchsia-400'} opacity-50`} 
+                style={{ left: isLeft ? '10%' : '90%' }}
+            ></div>
         </div>
 
         {/* 3. The Trunk Node */}
         <div className={`
-            absolute left-0 md:relative md:left-auto
+            absolute left-[10px] md:relative md:left-auto
             w-4 h-4 rounded-full border-2 z-10 bg-[#0a0a0a] 
             ${colorClass === 'blue' ? 'border-blue-500 shadow-[0_0_10px_#3b82f6]' : 'border-fuchsia-500 shadow-[0_0_10px_#d946ef]'}
         `}></div>
@@ -759,16 +768,9 @@ export const SectorView: React.FC<SectorViewProps> = ({
                             {/* 2. THE TREE STRUCTURE */}
                             <div className="relative min-h-[400px] py-10 px-4 md:px-0">
 
-                                {/* Central Trunk (Desktop Only) - UPDATED WITH GLOW & NODES */}
-                                <div className={`hidden md:block absolute left-1/2 transform -translate-x-1/2 w-1.5 h-full rounded-full bg-zinc-800/50 z-0 overflow-visible`}>
-                                    {/* Glow Effect */}
-                                    <div className={`absolute top-0 left-1/2 -translate-x-1/2 w-6 h-full blur-xl opacity-40 ${activeBatch === 'AICS' ? 'bg-blue-500' : 'bg-fuchsia-500'}`}></div>
-                                    {/* Pulse Core */}
-                                    <div className={`absolute inset-0 w-full h-full animate-pulse ${activeBatch === 'AICS' ? 'bg-blue-500/50' : 'bg-fuchsia-500/50'}`}></div>
-                                    {/* Top Node */}
-                                    <div className={`absolute -top-2 left-1/2 -translate-x-1/2 w-4 h-4 rounded-full border-2 border-black z-10 shadow-[0_0_15px_currentColor] ${activeBatch === 'AICS' ? 'bg-blue-400 text-blue-500' : 'bg-fuchsia-400 text-fuchsia-500'}`}></div>
-                                    {/* Bottom Node */}
-                                    <div className={`absolute -bottom-2 left-1/2 -translate-x-1/2 w-4 h-4 rounded-full border-2 border-black z-10 shadow-[0_0_15px_currentColor] ${activeBatch === 'AICS' ? 'bg-blue-400 text-blue-500' : 'bg-fuchsia-400 text-fuchsia-500'}`}></div>
+                                {/* Central Trunk (Desktop Only) */}
+                                <div className={`hidden md:block absolute left-1/2 transform -translate-x-1/2 w-1 h-full rounded-full bg-gradient-to-b from-transparent via-white/20 to-transparent z-0`}>
+                                    <div className={`absolute inset-0 w-full h-full animate-pulse ${activeBatch === 'AICS' ? 'bg-blue-500/30 blur-sm' : 'bg-fuchsia-500/30 blur-sm'}`}></div>
                                 </div>
 
                                 {/* Mobile Trunk (Left Aligned) - THIS IS NEW FOR PHONES */}
@@ -786,7 +788,7 @@ export const SectorView: React.FC<SectorViewProps> = ({
                                                 index={index}
                                                 isLeft={index % 2 === 0}
                                                 colorClass={activeBatch === 'AICS' ? 'blue' : 'fuchsia'}
-                                                onPlay={handlePlayItem}
+                                                onPlay={handlePlayItem} // <--- THIS IS CRITICAL: It connects the click to the video player
                                             />
                                         ))}
                                 </div>
@@ -853,12 +855,11 @@ export const SectorView: React.FC<SectorViewProps> = ({
             ))}
             {/* --- CINEMA MODE MODAL (USER FACING) --- */}
             {cinemaMode && cinemaItem && (
-                // Added pt-20 to push the modal content down below any top navigation bar
-                <div className="fixed inset-0 z-[100000] bg-black/95 flex flex-col animate-[fade-in_0.2s] backdrop-blur-sm pt-20 md:pt-24 px-4 md:px-20 pb-10">
+                <div className="fixed inset-0 z-[100000] bg-black/95 flex flex-col animate-[fade-in_0.2s] backdrop-blur-sm">
 
                     {/* Header - MOBILE OPTIMIZED 📱 */}
                     {/* Header - Optimized for both Phone & Laptop */}
-                    <div className="flex justify-between items-center p-4 gap-4 border border-white/10 bg-[#0f0f0f] shadow-2xl relative z-50 rounded-t-2xl">
+                    <div className="flex justify-between items-center p-4 gap-4 border-b border-white/10 bg-[#0f0f0f] shadow-2xl relative z-50">
 
                         {/* 1. TITLE SECTION */}
                         {/* min-w-0 and overflow-hidden prevent text from pushing button off-screen */}
@@ -888,7 +889,7 @@ export const SectorView: React.FC<SectorViewProps> = ({
                     </div>
 
                     {/* Video Area */}
-                    <div className="flex-1 flex items-center justify-center p-2 sm:p-10 relative overflow-hidden bg-black/40 border-x border-white/10">
+                    <div className="flex-1 flex items-center justify-center p-2 sm:p-10 relative overflow-hidden">
                         <div className="w-full max-w-6xl aspect-video bg-black shadow-2xl rounded-xl border border-white/10 overflow-hidden relative group">
                             <div
                                 className="w-full h-full"
@@ -903,7 +904,7 @@ export const SectorView: React.FC<SectorViewProps> = ({
                     </div>
 
                     {/* Warning Footer */}
-                    <div className="p-3 bg-yellow-900/10 border-t border-b border-x border-white/10 rounded-b-2xl flex justify-center backdrop-blur-md">
+                    <div className="p-3 bg-yellow-900/10 border-t border-yellow-500/10 flex justify-center backdrop-blur-md">
                         <p className="text-[10px] text-yellow-200/60 flex items-center gap-2 font-mono">
                             <AlertTriangle size={12} />
                             If the video shows a login screen, please ensure you are logged into your college account.
