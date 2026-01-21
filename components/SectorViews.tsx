@@ -849,18 +849,27 @@ export const SectorView: React.FC<SectorViewProps> = ({
                 <div className="fixed inset-0 z-[100000] bg-black/95 flex flex-col animate-[fade-in_0.2s] backdrop-blur-sm">
 
                     {/* Header - MOBILE OPTIMIZED 📱 */}
+                    {/* Header - Optimized for both Phone & Laptop */}
                     <div className="flex justify-between items-center p-4 gap-4 border-b border-white/10 bg-[#0f0f0f] shadow-2xl relative z-50">
-                        {/* Title Section (Flexible) */}
+
+                        {/* 1. TITLE SECTION */}
+                        {/* min-w-0 and overflow-hidden prevent text from pushing button off-screen */}
                         <div className="flex items-center gap-3 min-w-0 flex-1 overflow-hidden">
+
+                            {/* LAPTOP ONLY: Show "ARCHIVE PLAYER" text */}
                             <h3 className="font-bold text-white tracking-[0.2em] hidden sm:block shrink-0">
                                 ARCHIVE PLAYER
                             </h3>
+
+                            {/* PHONE & LAPTOP: The Item Title */}
+                            {/* truncated to ensure it doesn't overlap the cross button */}
                             <div className="flex items-center gap-2 text-xs text-zinc-400 bg-white/5 px-3 py-1 rounded-full border border-white/5 min-w-0 max-w-full">
                                 <span className="uppercase truncate block">{cinemaItem.title}</span>
                             </div>
                         </div>
 
-                        {/* ❌ THE CROSS ICON BUTTON (Fixed Width) */}
+                        {/* 2. CLOSE BUTTON SECTION */}
+                        {/* shrink-0 ensures this button NEVER disappears or gets squished */}
                         <button
                             onClick={() => { setCinemaMode(false); setCinemaItem(null); }}
                             className="shrink-0 p-3 rounded-full bg-white/10 hover:bg-red-500/20 border border-white/10 hover:border-red-500/50 transition-all duration-300 z-50"
