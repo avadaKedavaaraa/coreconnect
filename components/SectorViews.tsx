@@ -66,95 +66,97 @@ const isDayMatch = (checkDate: Date, days?: string[], legacyDay?: string) => {
     return legacyDay === dayName;
 };
 
-// --- TREE LEAF NODE COMPONENT (Updated for Images & Mobile) ---
+// --- ✨ NEW ANIMATED TREE NODE (No Flickering, Glass Effect) ---
 const TreeLeafNode = ({
     item, index, isLeft, colorClass, onPlay
 }: {
     item: CarouselItem, index: number, isLeft: boolean, colorClass: string, onPlay: (item: CarouselItem) => void
-}) => (
-    <div
-        className={`
-            relative flex items-center mb-8 md:mb-12 w-full group 
-            ${isLeft ? 'md:flex-row-reverse flex-row' : 'flex-row'}
-        `}
-        style={{ perspective: '1000px' }}
-    >
-        {/* 1. The Leaf Card (3D) */}
-        <div
-            onClick={() => onPlay(item)}
-            className={`
-                w-full ml-8 md:ml-0 md:w-[45%] relative cursor-pointer transition-all duration-500 transform-style-3d
-                hover:scale-[1.02] hover:-translate-y-1 hover:shadow-[0_0_30px_rgba(255,255,255,0.1)]
-                bg-black/80 backdrop-blur-md rounded-xl overflow-hidden border group-hover:z-20
-                flex flex-col md:flex-row
-                ${colorClass === 'blue' ? 'border-blue-500/30 shadow-blue-900/20' : 'border-fuchsia-500/30 shadow-fuchsia-900/20'}
-            `}
-        >
-            {/* Connector Dot */}
+}) => {
+    const isBlue = colorClass === 'blue';
+    // Style constants
+    const borderColor = isBlue ? 'border-blue-500/30' : 'border-fuchsia-500/30';
+    const shadowColor = isBlue ? 'shadow-blue-500/20' : 'shadow-fuchsia-500/20';
+    const glowText = isBlue ? 'text-blue-400' : 'text-fuchsia-400';
+    const lineColor = isBlue ? 'bg-blue-500' : 'bg-fuchsia-500';
+
+    return (
+        <div className={`relative flex items-center mb-12 w-full group ${isLeft ? 'md:flex-row-reverse' : 'md:flex-row'}`}>
+            
+            {/* 1. Desktop Connector Line (Solid Div, No flickering Border) */}
+            <div className="hidden md:block absolute top-1/2 w-[55%] h-[2px] bg-white/5 z-0">
+                <div className={`absolute inset-0 w-full h-full ${lineColor} opacity-20 group-hover:opacity-60 transition-opacity duration-500`}></div>
+                <div className={`absolute top-0 bottom-0 w-full h-full ${isBlue ? 'bg-blue-400' : 'bg-fuchsia-400'} opacity-0 group-hover:opacity-100 transition-all duration-1000 origin-left scale-x-0 group-hover:scale-x-100`}></div>
+            </div>
+
+            {/* 2. The Card (Glassmorphism) */}
+            <div 
+                onClick={() => onPlay(item)}
+                className={`
+                    relative z-10 w-full md:w-[45%] ml-12 md:ml-0 
+                    bg-[#0a0a0a]/90 backdrop-blur-xl border ${borderColor} rounded-2xl overflow-hidden
+                    transition-all duration-300 transform hover:scale-[1.02] hover:-translate-y-1 
+                    shadow-lg hover:shadow-2xl ${shadowColor} cursor-pointer group/card
+                `}
+            >
+                <div className="flex flex-col sm:flex-row">
+                    {/* Thumbnail */}
+                    <div className="w-full sm:w-40 h-32 sm:h-auto shrink-0 relative overflow-hidden bg-black/50 border-b sm:border-b-0 sm:border-r border-white/5">
+                        {item.image ? (
+                            <img src={item.image} className="w-full h-full object-cover opacity-60 group-hover/card:opacity-100 transition-all duration-500 transform group-hover/card:scale-110" loading="lazy" />
+                        ) : (
+                            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-white/5 to-transparent">
+                                <PlayCircle size={32} className={`opacity-20 ${glowText}`} />
+                            </div>
+                        )}
+                        {/* Play Icon Overlay */}
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 group-hover/card:opacity-100 transition-opacity duration-300">
+                            <div className={`p-3 rounded-full backdrop-blur-md shadow-xl ${isBlue ? 'bg-blue-600 text-white' : 'bg-fuchsia-600 text-white'}`}>
+                                <PlayCircle size={24} fill="currentColor" />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Content */}
+                    <div className="flex-1 p-4 flex flex-col justify-between min-w-0">
+                        <div>
+                            <div className="flex items-center gap-2 mb-2">
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase tracking-wider ${isBlue ? 'bg-blue-950/50 border-blue-500/30 text-blue-300' : 'bg-fuchsia-950/50 border-fuchsia-500/30 text-fuchsia-300'}`}>
+                                    {item.batch || 'AICS'}
+                                </span>
+                                <span className="text-[10px] opacity-40 uppercase tracking-wider truncate border border-white/10 px-2 py-0.5 rounded">{item.subject}</span>
+                            </div>
+                            <h4 className={`text-base font-bold leading-snug line-clamp-2 ${isBlue ? 'text-blue-50 group-hover/card:text-blue-200' : 'text-fuchsia-50 group-hover/card:text-fuchsia-200'} transition-colors`}>
+                                {item.title}
+                            </h4>
+                        </div>
+
+                        <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between text-xs">
+                            <span className="flex items-center gap-1 opacity-50 font-mono">{item.date}</span>
+                            <span className={`flex items-center gap-1 font-bold uppercase tracking-wider text-[10px] ${glowText} opacity-80 group-hover/card:opacity-100 transition-opacity`}>
+                                Watch Now <ChevronRight size={12} />
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* 3. Mobile Connector (Left Vertical Line) */}
+            <div className="md:hidden absolute left-0 top-[-24px] bottom-[-24px] w-[2px] bg-white/10 -ml-[19px] z-0">
+                 <div className={`absolute inset-0 w-full h-full ${lineColor} opacity-30`}></div>
+            </div>
+            
+            {/* 4. Connection Dot */}
             <div className={`
-                absolute top-1/2 w-4 h-4 rounded-full transform -translate-y-1/2 border-2 border-black
-                ${colorClass === 'blue' ? 'bg-blue-400 box-shadow-blue' : 'bg-fuchsia-400 box-shadow-fuchsia'}
-                -left-2 md:left-auto
-                ${isLeft ? 'md:-right-2' : 'md:-left-2'}
-                z-30
+                absolute top-1/2 w-4 h-4 rounded-full border-[3px] border-[#0a0a0a] z-20 
+                shadow-[0_0_15px_currentColor] transition-all duration-300 scale-100 group-hover:scale-125
+                ${isBlue ? 'bg-blue-400 text-blue-500' : 'bg-fuchsia-400 text-fuchsia-500'}
+                left-[-26px] md:left-auto md:translate-x-0
+                ${isLeft ? 'md:right-[-8px]' : 'md:left-[-8px]'}
+                -translate-y-1/2
             `}></div>
-
-            {/* Image Section (Thumbnail) */}
-            <div className="w-full md:w-40 h-32 md:h-auto shrink-0 relative bg-black/50 border-b md:border-b-0 md:border-r border-white/5">
-                {item.image ? (
-                    <img src={item.image} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" loading="lazy" />
-                ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-white/5 to-transparent">
-                        <PlayCircle size={32} className={`opacity-20 ${colorClass === 'blue' ? 'text-blue-400' : 'text-fuchsia-400'}`} />
-                    </div>
-                )}
-                {/* Play Overlay */}
-                <div className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <div className={`p-2 rounded-full backdrop-blur-md shadow-lg ${colorClass === 'blue' ? 'bg-blue-600 text-white' : 'bg-fuchsia-600 text-white'}`}>
-                        <PlayCircle size={24} fill="currentColor" />
-                    </div>
-                </div>
-            </div>
-
-            {/* Content Section */}
-            <div className="flex-1 p-4 flex flex-col justify-center min-w-0">
-                <div className="flex items-center gap-2 mb-1.5">
-                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border uppercase tracking-wider ${colorClass === 'blue' ? 'bg-blue-900/30 border-blue-500/30 text-blue-300' : 'bg-fuchsia-900/30 border-fuchsia-500/30 text-fuchsia-300'}`}>
-                        {item.batch || 'AICS'}
-                    </span>
-                    <span className="text-[10px] opacity-50 uppercase tracking-wider truncate border border-white/10 px-1.5 py-0.5 rounded">{item.subject}</span>
-                </div>
-
-                <h4 className={`text-base font-bold leading-tight mb-2 line-clamp-2 ${colorClass === 'blue' ? 'text-blue-50' : 'text-fuchsia-50'}`}>
-                    {item.title}
-                </h4>
-
-                <div className="mt-auto pt-2 border-t border-white/5 flex items-center justify-between text-xs opacity-60 group-hover:opacity-100 transition-opacity">
-                    <span className="flex items-center gap-1 font-mono">{item.date}</span>
-                    <span className={`flex items-center gap-1 font-bold ${colorClass === 'blue' ? 'text-blue-400' : 'text-fuchsia-400'}`}>
-                        WATCH <ChevronRight size={12} />
-                    </span>
-                </div>
-            </div>
         </div>
-
-        {/* 2. The Branch Connection (Desktop Only) */}
-        <div className="hidden md:flex flex-1 h-[2px] relative">
-            <div className={`absolute top-1/2 w-full h-[1px] ${colorClass === 'blue' ? 'bg-blue-500/30' : 'bg-fuchsia-500/30'}`}></div>
-            <div className={`absolute top-1/2 w-2 h-1 rounded-full animate-ping ${colorClass === 'blue' ? 'bg-blue-400' : 'bg-fuchsia-400'} opacity-50`} style={{ left: isLeft ? '10%' : '90%' }}></div>
-        </div>
-
-        {/* 3. The Trunk Node */}
-        <div className={`
-            absolute left-0 md:relative md:left-auto
-            w-4 h-4 rounded-full border-2 z-10 bg-[#0a0a0a] 
-            ${colorClass === 'blue' ? 'border-blue-500 shadow-[0_0_10px_#3b82f6]' : 'border-fuchsia-500 shadow-[0_0_10px_#d946ef]'}
-        `}></div>
-
-        {/* Spacer */}
-        <div className="hidden md:block flex-1"></div>
-    </div>
-);
+    );
+};
 
 export const SectorView: React.FC<SectorViewProps> = ({
     items, allItems, lineage, sectorId, onViewItem, isAdmin, onDelete, onEdit,
@@ -718,93 +720,41 @@ export const SectorView: React.FC<SectorViewProps> = ({
                 </div>
             ) : (
                 <>
-                    {/* --- NEW LINK TREE VIEW IMPLEMENTATION --- */}
+                    {/* --- LINK TREE VIEW --- */}
                     {isResources && subjectFilter && filteredItems.some(i => i.type === 'link_tree') ? (
                         <div className="w-full max-w-5xl mx-auto flex flex-col gap-8 animate-[fade-in_0.5s]">
-
-                            {/* 1. Header & Batch Toggle Switch */}
+                            {/* Toggle */}
                             <div className="flex flex-col items-center justify-center mb-8 relative z-10">
                                 <div className="text-center mb-6">
-                                    <h3 className={`text-3xl font-bold uppercase tracking-[0.2em] mb-2 drop-shadow-xl ${isWizard ? 'font-wizardTitle text-emerald-300' : 'font-muggle text-fuchsia-300'}`}>
-                                        Knowledge Tree
-                                    </h3>
+                                    <h3 className={`text-3xl font-bold uppercase tracking-[0.2em] mb-2 drop-shadow-xl ${isWizard ? 'font-wizardTitle text-emerald-300' : 'font-muggle text-fuchsia-300'}`}>Knowledge Tree</h3>
                                     <p className="text-sm opacity-60 font-mono">Select Frequency Channel</p>
                                 </div>
-
-                                {/* THE SWITCH */}
                                 <div className="flex p-1 rounded-full bg-black/60 border border-white/10 backdrop-blur-xl relative">
-                                    <button
-                                        onClick={() => setActiveBatch('AICS')}
-                                        className={`relative z-10 px-8 py-2 rounded-full font-bold text-sm transition-all duration-300 ${activeBatch === 'AICS' ? 'text-white' : 'text-zinc-500 hover:text-white'}`}
-                                    >
-                                        AICS (AI)
-                                    </button>
-                                    <button
-                                        onClick={() => setActiveBatch('CSDA')}
-                                        className={`relative z-10 px-8 py-2 rounded-full font-bold text-sm transition-all duration-300 ${activeBatch === 'CSDA' ? 'text-white' : 'text-zinc-500 hover:text-white'}`}
-                                    >
-                                        CSDA (Data)
-                                    </button>
-
-                                    {/* Sliding Background */}
-                                    <div
-                                        className={`absolute top-1 bottom-1 w-[50%] rounded-full transition-all duration-300 shadow-lg ${activeBatch === 'AICS'
-                                            ? 'left-1 bg-gradient-to-r from-blue-900 to-blue-600 border border-blue-400/50'
-                                            : 'left-[49%] bg-gradient-to-r from-fuchsia-900 to-fuchsia-600 border border-fuchsia-400/50'
-                                            }`}
-                                    ></div>
+                                    <button onClick={() => setActiveBatch('AICS')} className={`relative z-10 px-8 py-2 rounded-full font-bold text-sm transition-all duration-300 ${activeBatch === 'AICS' ? 'text-white' : 'text-zinc-500 hover:text-white'}`}>AICS (AI)</button>
+                                    <button onClick={() => setActiveBatch('CSDA')} className={`relative z-10 px-8 py-2 rounded-full font-bold text-sm transition-all duration-300 ${activeBatch === 'CSDA' ? 'text-white' : 'text-zinc-500 hover:text-white'}`}>CSDA (Data)</button>
+                                    <div className={`absolute top-1 bottom-1 w-[50%] rounded-full transition-all duration-300 shadow-lg ${activeBatch === 'AICS' ? 'left-1 bg-gradient-to-r from-blue-900 to-blue-600 border border-blue-400/50' : 'left-[49%] bg-gradient-to-r from-fuchsia-900 to-fuchsia-600 border border-fuchsia-400/50'}`}></div>
                                 </div>
                             </div>
 
-                            {/* 2. THE TREE STRUCTURE */}
+                            {/* TREE */}
                             <div className="relative min-h-[400px] py-10 px-4 md:px-0">
-
-                                {/* Central Trunk (Desktop Only) */}
-                                <div className={`hidden md:block absolute left-1/2 transform -translate-x-1/2 w-1 h-full rounded-full bg-gradient-to-b from-transparent via-white/20 to-transparent z-0`}>
-                                    <div className={`absolute inset-0 w-full h-full animate-pulse ${activeBatch === 'AICS' ? 'bg-blue-500/30 blur-sm' : 'bg-fuchsia-500/30 blur-sm'}`}></div>
+                                {/* Main Trunk (Animated) */}
+                                <div className={`hidden md:block absolute left-1/2 transform -translate-x-1/2 w-[2px] h-full bg-white/5 rounded-full z-0`}>
+                                    <div className={`absolute inset-0 w-full h-full animate-pulse ${activeBatch === 'AICS' ? 'bg-blue-500/20' : 'bg-fuchsia-500/20'}`}></div>
                                 </div>
-
-                                {/* Mobile Trunk (Left Aligned) - THIS IS NEW FOR PHONES */}
-                                <div className={`md:hidden absolute left-4 w-1 h-full rounded-full bg-gradient-to-b from-transparent via-white/20 to-transparent z-0`}>
-                                    <div className={`absolute inset-0 w-full h-full animate-pulse ${activeBatch === 'AICS' ? 'bg-blue-500/30 blur-sm' : 'bg-fuchsia-500/30 blur-sm'}`}></div>
-                                </div>
+                                {/* Mobile Trunk */}
+                                <div className={`md:hidden absolute left-[26px] w-[2px] h-full bg-white/10 z-0`}></div>
 
                                 {/* Leaves */}
                                 <div className="relative z-10 flex flex-col md:block">
-                                    {filteredItems.filter(i => i.type === 'link_tree' && (!i.batch || i.batch === activeBatch || i.batch === 'General'))
-                                        .map((item, index) => (
-                                            <TreeLeafNode
-                                                key={item.id}
-                                                item={item}
-                                                index={index}
-                                                isLeft={index % 2 === 0}
-                                                colorClass={activeBatch === 'AICS' ? 'blue' : 'fuchsia'}
-                                                onPlay={handlePlayItem} // <--- THIS IS CRITICAL: It connects the click to the video player
-                                            />
-                                        ))}
+                                    {filteredItems.filter(i => i.type === 'link_tree' && (!i.batch || i.batch === activeBatch || i.batch === 'General')).map((item, index) => (
+                                        <TreeLeafNode key={item.id} item={item} index={index} isLeft={index % 2 === 0} colorClass={activeBatch === 'AICS' ? 'blue' : 'fuchsia'} onPlay={handlePlayItem} />
+                                    ))}
                                 </div>
                             </div>
-
-                            {/* Other resources fallback (Tasks/Files) */}
-                            {filteredItems.some(i => i.type !== 'link_tree') && (
-                                <div className="mt-12 pt-12 border-t border-white/10">
-                                    <h4 className="text-center text-sm font-bold opacity-50 mb-8 uppercase tracking-widest">Additional Materials</h4>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                        {filteredItems.filter(i => i.type !== 'link_tree').map(item => (
-                                            <div key={item.id} onClick={() => onViewItem(item)} onContextMenu={(e) => handleContextMenu(e, item)} className={`relative rounded-xl border backdrop-blur-md group transition-all duration-300 cursor-pointer overflow-hidden select-none p-4 flex items-center gap-4 hover:translate-x-1 ${isWizard ? 'bg-black/40 border-emerald-900/50 hover:bg-emerald-900/10' : 'bg-black/40 border-fuchsia-900/50 hover:bg-fuchsia-900/10'}`}>
-                                                <div className={`shrink-0 rounded-full flex items-center justify-center w-10 h-10 ${isWizard ? 'bg-emerald-900/30 text-emerald-400' : 'bg-fuchsia-900/30 text-fuchsia-400'}`}>{getTypeIcon(item.type)}</div>
-                                                <div className="flex-1 min-w-0 text-left">
-                                                    <div className="font-bold truncate text-white">{item.title}</div>
-                                                    <div className="text-[10px] opacity-50">{item.date}</div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
                         </div>
                     ) : (
-                        // --- STANDARD VIEW (No Change) ---
+                        // Standard View Fallback
                         <>
                             {filteredItems.length === 0 ? (
                                 <div className="text-center py-20 opacity-40"><Search size={48} className="mx-auto mb-4" /><div className={`text-2xl font-bold mb-2 ${isWizard ? 'font-wizardTitle text-emerald-300' : 'font-muggle text-fuchsia-300'}`}>EMPTY SECTOR</div><p className="text-sm opacity-60">{isWizard ? "The scrolls are blank..." : "No data found."}</p></div>
@@ -818,22 +768,8 @@ export const SectorView: React.FC<SectorViewProps> = ({
                                             {!item.image && <div className={`shrink-0 rounded-full flex items-center justify-center z-10 ${viewMode === 'list' ? 'w-12 h-12' : 'w-12 h-12 mb-2'} ${isWizard ? 'bg-emerald-900/30 text-emerald-400' : 'bg-fuchsia-900/30 text-fuchsia-400'}`}>{getTypeIcon(item.type)}</div>}
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center gap-2 mb-1">{item.subject && <span className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded border opacity-60 ${isWizard ? 'border-emerald-800 text-emerald-300' : 'border-fuchsia-800 text-fuchsia-300'}`}>{item.subject}</span>}<div className={`flex items-center gap-1 text-[10px] opacity-50 ${isWizard ? 'font-wizard' : 'font-muggle'}`}><Calendar size={10} /><span>{item.date}</span></div></div>
-
-                                                {/* FIX: Applied text-white for Title & text-zinc-300 for Content in non-announcement sectors to prevent UI conflict */}
-                                                <h4
-                                                    className={`font-bold leading-tight truncate ${viewMode === 'list' ? 'text-lg' : 'text-lg mb-2'} ${sectorId !== 'announcements' ? 'text-white' : ''}`}
-                                                    style={item.style?.isGradient ? { backgroundImage: `linear-gradient(to right, ${item.style.titleColor}, ${item.style.titleColorEnd || item.style.titleColor})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', color: 'transparent' } : { color: item.style?.titleColor }}
-                                                >
-                                                    {item.title}
-                                                </h4>
-
-                                                {!(item.fileUrl && (item.fileUrl.startsWith('http') || item.fileUrl.startsWith('https'))) &&
-                                                    <div
-                                                        className={`text-xs opacity-70 line-clamp-3 mt-1 ${isWizard ? 'font-wizard' : 'font-muggle'} ${sectorId !== 'announcements' ? 'text-zinc-300' : ''}`}
-                                                        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(item.content, { ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'u', 'span'], ALLOWED_ATTR: ['style', 'class'] }) }}
-                                                    />
-                                                }
-
+                                                <h4 className={`font-bold leading-tight truncate ${viewMode === 'list' ? 'text-lg' : 'text-lg mb-2'} ${sectorId !== 'announcements' ? 'text-white' : ''}`} style={item.style?.isGradient ? { backgroundImage: `linear-gradient(to right, ${item.style.titleColor}, ${item.style.titleColorEnd || item.style.titleColor})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', color: 'transparent' } : { color: item.style?.titleColor }}>{item.title}</h4>
+                                                {!(item.fileUrl && (item.fileUrl.startsWith('http') || item.fileUrl.startsWith('https'))) && <div className={`text-xs opacity-70 line-clamp-3 mt-1 ${isWizard ? 'font-wizard' : 'font-muggle'} ${sectorId !== 'announcements' ? 'text-zinc-300' : ''}`} dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(item.content, { ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'u', 'span'], ALLOWED_ATTR: ['style', 'class'] }) }} />}
                                                 {(item.fileUrl && (item.fileUrl.startsWith('http') || item.fileUrl.startsWith('https'))) && <div className="mt-2 pt-2 border-t border-white/5 flex"><a href={item.fileUrl} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className={`flex items-center justify-center gap-2 px-4 py-2 rounded font-bold text-xs uppercase tracking-widest transition-all hover:scale-[1.02] active:scale-95 shadow-lg ${isWizard ? 'bg-emerald-600 hover:bg-emerald-500 text-black' : 'bg-fuchsia-600 hover:bg-fuchsia-500 text-black'}`}><ExternalLink size={14} /> OPEN LINK</a></div>}
                                             </div>
                                         </div>
@@ -844,66 +780,37 @@ export const SectorView: React.FC<SectorViewProps> = ({
                     )}
                 </>
             ))}
-            {/* --- CINEMA MODE MODAL (USER FACING) --- */}
+
+            {/* --- CINEMA MODE MODAL (FIXED SCROLL & MOBILE UI) --- */}
             {cinemaMode && cinemaItem && (
-                <div className="fixed inset-0 z-[100000] bg-black/95 flex flex-col animate-[fade-in_0.2s] backdrop-blur-sm">
-
-                    {/* Header - MOBILE OPTIMIZED 📱 */}
-                    {/* Header - Optimized for both Phone & Laptop */}
-                    <div className="flex justify-between items-center p-4 gap-4 border-b border-white/10 bg-[#0f0f0f] shadow-2xl relative z-50">
-
-                        {/* 1. TITLE SECTION */}
-                        {/* min-w-0 and overflow-hidden prevent text from pushing button off-screen */}
+                <div className="fixed inset-0 z-[100000] bg-black/95 flex flex-col h-[100dvh] backdrop-blur-sm animate-[fade-in_0.2s]">
+                    {/* Header: Shrink-0 ensures it never collapses */}
+                    <div className="flex justify-between items-center p-4 gap-4 border-b border-white/10 bg-[#0f0f0f] shadow-2xl shrink-0 z-50">
+                        {/* Title Section (Flexible) */}
                         <div className="flex items-center gap-3 min-w-0 flex-1 overflow-hidden">
-
-                            {/* LAPTOP ONLY: Show "ARCHIVE PLAYER" text */}
-                            <h3 className="font-bold text-white tracking-[0.2em] hidden sm:block shrink-0">
-                                ARCHIVE PLAYER
-                            </h3>
-
-                            {/* PHONE & LAPTOP: The Item Title */}
-                            {/* truncated to ensure it doesn't overlap the cross button */}
+                            <h3 className="font-bold text-white tracking-[0.2em] hidden sm:block shrink-0">ARCHIVE PLAYER</h3>
                             <div className="flex items-center gap-2 text-xs text-zinc-400 bg-white/5 px-3 py-1 rounded-full border border-white/5 min-w-0 max-w-full">
                                 <span className="uppercase truncate block">{cinemaItem.title}</span>
                             </div>
                         </div>
-
-                        {/* 2. CLOSE BUTTON SECTION */}
-                        {/* shrink-0 ensures this button NEVER disappears or gets squished */}
-                        <button
-                            onClick={() => { setCinemaMode(false); setCinemaItem(null); }}
-                            className="shrink-0 p-3 rounded-full bg-white/10 hover:bg-red-500/20 border border-white/10 hover:border-red-500/50 transition-all duration-300 z-50"
-                            title="Close Player (Esc)"
-                        >
-                            <X size={24} className="text-white group-hover:text-red-400 group-hover:rotate-90 transition-transform duration-300" />
-                        </button>
+                        {/* Close Button (Fixed Width) */}
+                        <button onClick={() => { setCinemaMode(false); setCinemaItem(null); }} className="shrink-0 p-3 rounded-full bg-white/10 hover:bg-red-500/20 border border-white/10 hover:border-red-500/50 transition-all duration-300 z-50" title="Close Player (Esc)"><X size={24} className="text-white group-hover:text-red-400 group-hover:rotate-90 transition-transform duration-300" /></button>
                     </div>
 
-                    {/* Video Area */}
-                    <div className="flex-1 flex items-center justify-center p-2 sm:p-10 relative overflow-hidden">
-                        <div className="w-full max-w-6xl aspect-video bg-black shadow-2xl rounded-xl border border-white/10 overflow-hidden relative group">
-                            <div
-                                className="w-full h-full"
-                                dangerouslySetInnerHTML={{
-                                    __html: DOMPurify.sanitize(cinemaItem.content, {
-                                        ADD_TAGS: ['iframe', 'div', 'style'],
-                                        ADD_ATTR: ['allow', 'allowfullscreen', 'frameborder', 'scrolling', 'style', 'width', 'height', 'src']
-                                    })
-                                }}
-                            />
+                    {/* Scrollable Content Area: Flex-1 takes remaining space */}
+                    <div className="flex-1 overflow-y-auto overscroll-contain flex flex-col items-center justify-center p-2 sm:p-10">
+                        <div className="w-full max-w-6xl aspect-video bg-black shadow-2xl rounded-xl border border-white/10 overflow-hidden relative group shrink-0">
+                            <div className="w-full h-full" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(cinemaItem.content, { ADD_TAGS: ['iframe', 'div', 'style'], ADD_ATTR: ['allow', 'allowfullscreen', 'frameborder', 'scrolling', 'style', 'width', 'height', 'src'] }) }} />
                         </div>
                     </div>
 
-                    {/* Warning Footer */}
-                    <div className="p-3 bg-yellow-900/10 border-t border-yellow-500/10 flex justify-center backdrop-blur-md">
-                        <p className="text-[10px] text-yellow-200/60 flex items-center gap-2 font-mono">
-                            <AlertTriangle size={12} />
-                            If the video shows a login screen, please ensure you are logged into your college account.
-                        </p>
+                    {/* Footer: Shrink-0 ensures visibility */}
+                    <div className="p-3 bg-yellow-900/10 border-t border-yellow-500/10 flex justify-center backdrop-blur-md shrink-0">
+                        <p className="text-[10px] text-yellow-200/60 flex items-center gap-2 font-mono"><AlertTriangle size={12} /> If the video shows a login screen, please ensure you are logged into your college account.</p>
                     </div>
                 </div>
             )}
-
+            
             <style dangerouslySetInnerHTML={{ __html: `@keyframes fade-in-up { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }` }} />
         </div>
     );
