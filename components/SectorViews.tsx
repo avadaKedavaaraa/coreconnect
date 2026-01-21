@@ -8,7 +8,7 @@ import {
     FolderOpen, ArrowLeft, Edit2, Plus, FolderPlus, Loader2, Image as ImageIcon,
     Send, Link as LinkIcon, ExternalLink, Layers, Code, Pin, PinOff, Save, Check,
     Clock, CalendarDays, MousePointer2, Columns, PlayCircle,
-    ChevronRight, AlertTriangle // 👈 ADDED THESE MISSING IMPORTS
+    ChevronRight, AlertTriangle // 👈 Ensures icons are imported
 } from 'lucide-react';
 import CalendarWidget from './CalendarWidget';
 import DOMPurify from 'dompurify';
@@ -237,7 +237,6 @@ export const SectorView: React.FC<SectorViewProps> = ({
     const inputRef = useRef<HTMLInputElement>(null);
 
     // --- DERIVED DATA ---
-    // ✨ FIX: Added (items || []) check to prevent crash if items is undefined
     const subjects = useMemo(() => Array.from(new Set((items || []).map(i => i.subject || 'General'))).sort(), [items]);
     const activeSortOrder = currentSector?.sortOrder || 'newest';
     const isManualSort = activeSortOrder === 'manual';
@@ -849,24 +848,25 @@ export const SectorView: React.FC<SectorViewProps> = ({
             {cinemaMode && cinemaItem && (
                 <div className="fixed inset-0 z-[100000] bg-black/95 flex flex-col animate-[fade-in_0.2s] backdrop-blur-sm">
 
-                    {/* Header */}
-                    <div className="flex justify-between items-center p-4 border-b border-white/10 bg-[#0f0f0f] shadow-2xl relative z-50">
-                        <div className="flex items-center gap-4">
-                            <h3 className="font-bold text-white tracking-[0.2em] hidden sm:block">
+                    {/* Header - MOBILE OPTIMIZED 📱 */}
+                    <div className="flex justify-between items-center p-4 gap-4 border-b border-white/10 bg-[#0f0f0f] shadow-2xl relative z-50">
+                        {/* Title Section (Flexible) */}
+                        <div className="flex items-center gap-3 min-w-0 flex-1 overflow-hidden">
+                            <h3 className="font-bold text-white tracking-[0.2em] hidden sm:block shrink-0">
                                 ARCHIVE PLAYER
                             </h3>
-                            <div className="flex items-center gap-2 text-xs text-zinc-400 bg-white/5 px-3 py-1 rounded-full border border-white/5">
-                                <span className="uppercase max-w-[200px] truncate">{cinemaItem.title}</span>
+                            <div className="flex items-center gap-2 text-xs text-zinc-400 bg-white/5 px-3 py-1 rounded-full border border-white/5 min-w-0 max-w-full">
+                                <span className="uppercase truncate block">{cinemaItem.title}</span>
                             </div>
                         </div>
 
-                        {/* ❌ THE CROSS ICON BUTTON */}
+                        {/* ❌ THE CROSS ICON BUTTON (Fixed Width) */}
                         <button
                             onClick={() => { setCinemaMode(false); setCinemaItem(null); }}
-                            className="group p-2 rounded-full bg-white/5 hover:bg-red-500/20 border border-white/5 hover:border-red-500/50 transition-all duration-300"
+                            className="shrink-0 p-3 rounded-full bg-white/10 hover:bg-red-500/20 border border-white/10 hover:border-red-500/50 transition-all duration-300 z-50"
                             title="Close Player (Esc)"
                         >
-                            <X size={24} className="text-zinc-400 group-hover:text-red-400 group-hover:rotate-90 transition-transform duration-300" />
+                            <X size={24} className="text-white group-hover:text-red-400 group-hover:rotate-90 transition-transform duration-300" />
                         </button>
                     </div>
 
