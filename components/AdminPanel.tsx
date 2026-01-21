@@ -502,14 +502,16 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     // const matchSearch = item.title.toLowerCase().includes(itemSearch.toLowerCase()) || 
     //                     item.content.toLowerCase().includes(itemSearch.toLowerCase());
 
-    // NEW SAFE CODE:
+    // --- DATABASE LOGIC ---
     const filteredItems = allItems.filter(item => {
-        // safely handle missing title/content
+        // FIX APPLIED: safely handle missing title/content with ( || '')
         const safeTitle = (item.title || '').toLowerCase();
         const safeContent = (item.content || '').toLowerCase();
         const searchLower = itemSearch.toLowerCase();
 
-        const matchSearch = safeTitle.includes(searchLower) || safeContent.includes(searchLower);
+        const matchSearch = safeTitle.includes(searchLower) ||
+            safeContent.includes(searchLower);
+
         const matchType = typeFilter === 'all' || item.type === typeFilter;
         return matchSearch && matchType;
     });
@@ -1379,6 +1381,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                                     className="text-sm opacity-80 whitespace-pre-wrap font-sans html-content"
                                                     style={{ color: itemForm.style?.contentColor }}
                                                     dangerouslySetInnerHTML={{
+                                                        // FIX APPLIED: Ensure content is not null
                                                         __html: DOMPurify.sanitize(itemForm.content || '', { ADD_TAGS: ['style'] })
                                                     }}
                                                 ></div>
@@ -2245,7 +2248,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                             <div key={sector.id} className="p-6 rounded-xl border bg-white/5 border-white/10 shadow-lg relative group">
                                                 // NEW SAFE CODE:
                                                 <div className="absolute top-4 right-4 text-xs font-mono opacity-30">
-                                                    {sector.id ? sector.id.toUpperCase() : 'UNKNOWN_ID'}
+                                                    {/* FIX APPLIED: Check if sector.id exists before uppercase */}
+                                                    {sector.id ? sector.id.toUpperCase() : 'NO_ID'}
                                                 </div>
 
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
