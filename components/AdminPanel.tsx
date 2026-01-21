@@ -6,7 +6,7 @@ import {
     BrainCircuit, ScanFace, Users, Activity, Settings, LayoutTemplate, Search,
     Filter, Replace, Edit3, Trash2, Plus, ImageIcon, Save,
     FolderInput, AlertCircle, Wand2, RefreshCw, Pin, Share2, Link as LinkIcon, ImagePlus,
-    AlertTriangle, FileText, Sparkles, Network
+    AlertTriangle, FileText, Sparkles, Network, MessageSquare, ArrowDownUp, BellRing, Paperclip, Zap, Palmtree, Smartphone, Monitor, FileUp, Clock, Calendar
 } from 'lucide-react';
 import DOMPurify from 'dompurify';
 
@@ -497,29 +497,27 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
         }
     };
 
-    // --- DATABASE LOGIC ---
-    // OLD CRASHY CODE:
-    // const matchSearch = item.title.toLowerCase().includes(itemSearch.toLowerCase()) || 
-    //                     item.content.toLowerCase().includes(itemSearch.toLowerCase());
-
-    // --- DATABASE LOGIC ---
+    // --- DATABASE LOGIC (SAFE VERSION) ---
+    // This logic prevents "Black Screen" by checking for undefined values before using string methods.
     const filteredItems = allItems.filter(item => {
-        // FIX APPLIED: safely handle missing title/content with ( || '')
+        // 1️⃣ Safety Check: If title or content is undefined, treat as empty string.
         const safeTitle = (item.title || '').toLowerCase();
         const safeContent = (item.content || '').toLowerCase();
         const searchLower = itemSearch.toLowerCase();
 
-        const matchSearch = safeTitle.includes(searchLower) ||
-            safeContent.includes(searchLower);
+        // 2️⃣ Match Search Term
+        const matchSearch = safeTitle.includes(searchLower) || safeContent.includes(searchLower);
 
+        // 3️⃣ Match Type Filter
         const matchType = typeFilter === 'all' || item.type === typeFilter;
+
         return matchSearch && matchType;
     });
 
     const scanForMatches = () => {
         if (!findText) return;
-        const matches = allItems.filter(i => i.content.includes(findText) || i.title.includes(findText))
-            .map(i => ({ id: i.id, title: i.title, context: 'Content/Title' }));
+        const matches = allItems.filter(i => (i.content || '').includes(findText) || (i.title || '').includes(findText))
+            .map(i => ({ id: i.id, title: i.title || 'Untitled', context: 'Content/Title' }));
         setFoundMatches(matches);
     };
 
@@ -532,8 +530,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
             if (item) {
                 const updated = {
                     ...item,
-                    title: item.title.replace(new RegExp(findText, 'g'), replaceText),
-                    content: item.content.replace(new RegExp(findText, 'g'), replaceText)
+                    title: (item.title || '').replace(new RegExp(findText, 'g'), replaceText),
+                    content: (item.content || '').replace(new RegExp(findText, 'g'), replaceText)
                 };
                 onUpdateItem(updated);
             }
@@ -990,10 +988,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                                 <option value="mixed" className="bg-black">Mixed</option>
                                                 <option value="link" className="bg-black">Links</option>
                                                 <option value="code" className="bg-black">Code</option>
-                                                <option value="link_tree" className="bg-black">Link Tree</option> {/* Added Link Tree Option */}
+                                                <option value="link_tree" className="bg-black">Link Tree</option>
                                             </select>
                                         </div>
-                                        {/* ... Rest of Database Search UI ... */}
                                         <div className="relative">
                                             <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none"><Replace size={14} /></div>
                                             <input value={findText} onChange={e => setFindText(e.target.value)} placeholder="Find..." className="h-full pl-9 p-3 bg-white/5 border border-white/10 rounded outline-none w-32 focus:w-48 transition-all" />
@@ -1363,9 +1360,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                         </div>
 
                                         <div className={`rounded-xl border overflow-hidden relative shadow-2xl transition-all duration-300 mx-auto
-                                            ${isWizard ? 'bg-[#0f1510] border-emerald-500/30' : 'bg-[#150f1a] border-fuchsia-500/30'}
-                                            ${previewMode === 'mobile' ? 'h-[600px] w-full max-w-[350px]' : 'w-full h-auto min-h-[400px]'}
-                                        `}>
+                                    ${isWizard ? 'bg-[#0f1510] border-emerald-500/30' : 'bg-[#150f1a] border-fuchsia-500/30'}
+                                    ${previewMode === 'mobile' ? 'h-[600px] w-full max-w-[350px]' : 'w-full h-auto min-h-[400px]'}
+                                `}>
                                             <div className="p-4 border-b border-white/10 flex justify-between items-center bg-black/20">
                                                 <span className="text-[10px] uppercase font-bold opacity-70 tracking-widest">{itemForm.sector}</span>
                                                 <span className="text-[10px] opacity-50">{itemForm.date}</span>
@@ -1376,12 +1373,11 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                                     <h2 className="text-2xl font-bold" style={previewTitleStyle}>{itemForm.title || 'Untitled'}</h2>
                                                     {itemForm.isPinned && <Pin size={16} className="text-yellow-400 fill-yellow-400 shrink-0" />}
                                                 </div>
-                                                // NEW SAFE CODE:
+                                                
                                                 <div
                                                     className="text-sm opacity-80 whitespace-pre-wrap font-sans html-content"
                                                     style={{ color: itemForm.style?.contentColor }}
                                                     dangerouslySetInnerHTML={{
-                                                        // FIX APPLIED: Ensure content is not null
                                                         __html: DOMPurify.sanitize(itemForm.content || '', { ADD_TAGS: ['style'] })
                                                     }}
                                                 ></div>
@@ -1605,9 +1601,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                                 const isHoliday = rule.type === 'holiday';
                                                 return (
                                                     <div key={rule.id} className={`relative p-4 rounded-xl border transition-all group overflow-hidden 
-                                                        ${editingRuleId === rule.id ? 'ring-1 ring-blue-500' : ''}
-                                                        ${isHoliday ? 'bg-red-950/20 border-red-500/30' : 'bg-white/5 border-white/10 hover:border-white/20'}
-                                                    `}>
+                                                    ${editingRuleId === rule.id ? 'ring-1 ring-blue-500' : ''}
+                                                    ${isHoliday ? 'bg-red-950/20 border-red-500/30' : 'bg-white/5 border-white/10 hover:border-white/20'}
+                                                `}>
                                                         {rule.image && (
                                                             <div className="absolute inset-0 opacity-10 bg-cover bg-center" style={{ backgroundImage: `url(${rule.image})` }}></div>
                                                         )}
@@ -1726,7 +1722,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                                                                 {v.display_name}
                                                                                 {v.visit_count > 10 && <span className="text-[10px] bg-yellow-500/20 text-yellow-500 px-1.5 rounded border border-yellow-500/30">REGULAR</span>}
                                                                             </div>
-                                                                            <div className="font-mono text-[10px] opacity-40">{v.visitor_id.substring(0, 12)}...</div>
+                                                                            <div className="font-mono text-[10px] opacity-40">{(v.visitor_id || '').substring(0, 12)}...</div>
                                                                         </div>
                                                                     </div>
                                                                 </td>
@@ -1931,8 +1927,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                                     onClick={handleAiParse}
                                                     disabled={aiLoading || (bulkProgress !== null)}
                                                     className={`px-6 py-2 rounded-lg font-bold text-xs tracking-widest transition-all shadow-lg hover:scale-105 active:scale-95 flex items-center gap-2
-                                                        ${isWizard ? 'bg-purple-600 hover:bg-purple-500 text-white' : 'bg-blue-600 hover:bg-blue-500 text-white'}
-                                                    `}
+                                                ${isWizard ? 'bg-purple-600 hover:bg-purple-500 text-white' : 'bg-blue-600 hover:bg-blue-500 text-white'}
+                                            `}
                                                 >
                                                     {aiLoading ? <Loader2 className="animate-spin" /> : <><Sparkles size={16} /> CAST SPELL</>}
                                                 </button>
@@ -2246,10 +2242,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                     <div className="grid gap-6">
                                         {editedSectors.map((sector, idx) => (
                                             <div key={sector.id} className="p-6 rounded-xl border bg-white/5 border-white/10 shadow-lg relative group">
-                                                // NEW SAFE CODE:
                                                 <div className="absolute top-4 right-4 text-xs font-mono opacity-30">
-                                                    {/* FIX APPLIED: Check if sector.id exists before uppercase */}
-                                                    {sector.id ? sector.id.toUpperCase() : 'NO_ID'}
+                                                    {sector.id ? sector.id.toUpperCase() : 'UNKNOWN_ID'}
                                                 </div>
 
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
