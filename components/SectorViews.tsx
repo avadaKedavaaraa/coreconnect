@@ -138,24 +138,15 @@ const TreeLeafNode = ({
             </div>
         </div>
 
-        {/* 2. The Branch Connection (Desktop Only) - FIXED: Solid 2px Line */}
-        <div className="hidden md:flex flex-1 items-center relative -mx-1">
-            {/* 1. "items-center" on parent centers the child vertically.
-               2. We use a static div (not absolute) with h-[2px].
-               3. -mx-1 adds a tiny overlap to ensure no gaps between card and trunk.
-            */}
-            <div className={`w-full h-[2px] ${colorClass === 'blue' ? 'bg-blue-500/30' : 'bg-fuchsia-500/30'}`}></div>
-            
-            {/* Keep the pulse animation absolute so it sits ON TOP of the line */}
-            <div 
-                className={`absolute w-2 h-1 rounded-full animate-ping ${colorClass === 'blue' ? 'bg-blue-400' : 'bg-fuchsia-400'} opacity-50`} 
-                style={{ left: isLeft ? '10%' : '90%' }}
-            ></div>
+        {/* 2. The Branch Connection (Desktop Only) */}
+        <div className="hidden md:flex flex-1 h-[2px] relative">
+            <div className={`absolute top-1/2 w-full h-[1px] ${colorClass === 'blue' ? 'bg-blue-500/30' : 'bg-fuchsia-500/30'}`}></div>
+            <div className={`absolute top-1/2 w-2 h-1 rounded-full animate-ping ${colorClass === 'blue' ? 'bg-blue-400' : 'bg-fuchsia-400'} opacity-50`} style={{ left: isLeft ? '10%' : '90%' }}></div>
         </div>
 
         {/* 3. The Trunk Node */}
         <div className={`
-            absolute left-[10px] md:relative md:left-auto
+            absolute left-0 md:relative md:left-auto
             w-4 h-4 rounded-full border-2 z-10 bg-[#0a0a0a] 
             ${colorClass === 'blue' ? 'border-blue-500 shadow-[0_0_10px_#3b82f6]' : 'border-fuchsia-500 shadow-[0_0_10px_#d946ef]'}
         `}></div>
@@ -859,34 +850,34 @@ export const SectorView: React.FC<SectorViewProps> = ({
 
                     {/* Header - MOBILE OPTIMIZED 📱 */}
                     {/* Header - Optimized for both Phone & Laptop */}
-                    <div className="flex justify-between items-center p-4 gap-4 border-b border-white/10 bg-[#0f0f0f] shadow-2xl relative z-50">
+<div className="flex justify-between items-center p-4 gap-4 border-b border-white/10 bg-[#0f0f0f] shadow-2xl relative z-50">
+    
+    {/* 1. TITLE SECTION */}
+    {/* min-w-0 and overflow-hidden prevent text from pushing button off-screen */}
+    <div className="flex items-center gap-3 min-w-0 flex-1 overflow-hidden">
+        
+        {/* LAPTOP ONLY: Show "ARCHIVE PLAYER" text */}
+        <h3 className="font-bold text-white tracking-[0.2em] hidden sm:block shrink-0">
+            ARCHIVE PLAYER
+        </h3>
 
-                        {/* 1. TITLE SECTION */}
-                        {/* min-w-0 and overflow-hidden prevent text from pushing button off-screen */}
-                        <div className="flex items-center gap-3 min-w-0 flex-1 overflow-hidden">
+        {/* PHONE & LAPTOP: The Item Title */}
+        {/* truncated to ensure it doesn't overlap the cross button */}
+        <div className="flex items-center gap-2 text-xs text-zinc-400 bg-white/5 px-3 py-1 rounded-full border border-white/5 min-w-0 max-w-full">
+            <span className="uppercase truncate block">{cinemaItem.title}</span>
+        </div>
+    </div>
 
-                            {/* LAPTOP ONLY: Show "ARCHIVE PLAYER" text */}
-                            <h3 className="font-bold text-white tracking-[0.2em] hidden sm:block shrink-0">
-                                ARCHIVE PLAYER
-                            </h3>
-
-                            {/* PHONE & LAPTOP: The Item Title */}
-                            {/* truncated to ensure it doesn't overlap the cross button */}
-                            <div className="flex items-center gap-2 text-xs text-zinc-400 bg-white/5 px-3 py-1 rounded-full border border-white/5 min-w-0 max-w-full">
-                                <span className="uppercase truncate block">{cinemaItem.title}</span>
-                            </div>
-                        </div>
-
-                        {/* 2. CLOSE BUTTON SECTION */}
-                        {/* shrink-0 ensures this button NEVER disappears or gets squished */}
-                        <button
-                            onClick={() => { setCinemaMode(false); setCinemaItem(null); }}
-                            className="shrink-0 p-3 rounded-full bg-white/10 hover:bg-red-500/20 border border-white/10 hover:border-red-500/50 transition-all duration-300 z-50"
-                            title="Close Player (Esc)"
-                        >
-                            <X size={24} className="text-white group-hover:text-red-400 group-hover:rotate-90 transition-transform duration-300" />
-                        </button>
-                    </div>
+    {/* 2. CLOSE BUTTON SECTION */}
+    {/* shrink-0 ensures this button NEVER disappears or gets squished */}
+    <button 
+        onClick={() => { setCinemaMode(false); setCinemaItem(null); }} 
+        className="shrink-0 p-3 rounded-full bg-white/10 hover:bg-red-500/20 border border-white/10 hover:border-red-500/50 transition-all duration-300 z-50"
+        title="Close Player (Esc)"
+    >
+        <X size={24} className="text-white group-hover:text-red-400 group-hover:rotate-90 transition-transform duration-300" />
+    </button>
+</div>
 
                     {/* Video Area */}
                     <div className="flex-1 flex items-center justify-center p-2 sm:p-10 relative overflow-hidden">
