@@ -25,7 +25,7 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
   const isWizard = lineage === Lineage.WIZARD;
   
   // --- SECTOR CHECK ---
-  // STRICTLY Scope "Normal Player" changes to 'resources' sector as requested
+  // STRICTLY Scope "Normal Player" changes to 'resources' sector
   const isResourcesSector = item.sector === 'resources';
   const enableSmartTools = isResourcesSector || item.sector === 'lectures' || item.type === 'link_tree';
   const isLinkTree = item.type === 'link_tree';
@@ -42,7 +42,7 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
       // 1. Check Mobile
       const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
       
-      // 2. If Resource + Mobile -> Force Native (Normal) Default
+      // 2. If Resource + Mobile -> Force Native (Normal) Default to match Microsoft UI
       if (isResourcesSector && isMobile) return 'native';
       
       // 3. Otherwise load user preference
@@ -156,7 +156,7 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
 
   // --- VIDEO CONTROLS ---
   const togglePlay = () => {
-    if (isNativeMode) return; // Native controls handle this
+    if (isNativeMode) return; // Native/Microsoft controls handle this
     if (videoRef.current) {
         if (videoRef.current.paused) {
             videoRef.current.play();
