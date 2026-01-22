@@ -5,7 +5,7 @@ import {
   RotateCw, Moon, Sun, StickyNote, Eye, Layers, 
   Monitor, Smartphone, PenTool, Save, Trash2, AlignJustify, Loader2, Share2, 
   CornerDownRight, Calendar, User, ArrowRight, AlertTriangle, 
-  Play, Pause, Scan, Sliders, Eraser, Video, RefreshCw, Droplet, MousePointer2, Lock, Unlock
+  Play, Pause, Scan, Sliders, Eraser, Video, RefreshCw, Droplet, Lock, Unlock, SlidersHorizontal
 } from 'lucide-react';
 import DOMPurify from 'dompurify';
 import { trackActivity } from '../services/tracking';
@@ -53,9 +53,9 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
   const [selectionRect, setSelectionRect] = useState<{x: number, y: number, w: number, h: number} | null>(null);
   const [regionBrightness, setRegionBrightness] = useState(100);
 
-  // Context Menu
-  const [showContextMenu, setShowContextMenu] = useState(false);
-  const [menuPos, setMenuPos] = useState({ x: 0, y: 0 });
+  // Control Dock State
+  const [showControls, setShowControls] = useState(false);
+  const [menuPos, setMenuPos] = useState({ x: window.innerWidth / 2 - 150, y: window.innerHeight / 2 - 200 }); // Default center
 
   // Notebook State
   const [showNotes, setShowNotes] = useState(false);
@@ -65,7 +65,7 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
   // Refs
   const rulerRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null); 
-  const contextMenuRef = useRef<HTMLDivElement>(null);
+  const controlsRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   // --- INIT & TRACKING ---
@@ -106,13 +106,17 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
   // Click Outside to Close Menu
   useEffect(() => {
       const handleClickOutside = (e: MouseEvent) => {
-          if (showContextMenu && contextMenuRef.current && !contextMenuRef.current.contains(e.target as Node)) {
-              setShowContextMenu(false);
+          if (showControls && controlsRef.current && !controlsRef.current.contains(e.target as Node)) {
+              // Only close if we aren't clicking the toggle buttons
+              const target = e.target as HTMLElement;
+              if (!target.closest('.control-trigger')) {
+                  setShowControls(false);
+              }
           }
       };
       window.addEventListener('mousedown', handleClickOutside);
       return () => window.removeEventListener('mousedown', handleClickOutside);
-  }, [showContextMenu]);
+  }, [showControls]);
 
   const isValidUrl = (url?: string) => {
     if (!url) return false;
@@ -145,7 +149,7 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
         if (e.key === 'Escape') {
-            if (showContextMenu) setShowContextMenu(false);
+            if (showControls) setShowControls(false);
             else onClose();
         }
         if (e.code === 'Space' && isVideoFile && !showNotes) {
@@ -155,7 +159,7 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose, isVideoFile, showNotes, showContextMenu]);
+  }, [onClose, isVideoFile, showNotes, showControls]);
 
   const handleVideoStateChange = () => {
       if (videoRef.current) setIsPlaying(!videoRef.current.paused);
@@ -175,14 +179,15 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
       if (y + 400 > window.innerHeight) y = window.innerHeight - 410;
 
       setMenuPos({ x, y });
-      setShowContextMenu(true);
+      setShowControls(true);
   };
 
   // --- DRAG SELECTION HANDLERS ---
   const handleMouseDown = (e: React.MouseEvent) => {
     if ((!isSmartLayerActive && !isSelectionMode) || !containerRef.current) return;
     if ((e.target as HTMLElement).closest('button')) return;
-    if (showContextMenu && contextMenuRef.current?.contains(e.target as Node)) return; 
+    if ((e.target as HTMLElement).closest('input')) return;
+    if (showControls && controlsRef.current?.contains(e.target as Node)) return; 
     
     e.preventDefault();
     
@@ -218,7 +223,7 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
     if (selectionRect && (selectionRect.w < 10 || selectionRect.h < 10)) {
         setSelectionRect(null); 
     } else if (selectionRect) {
-        setTimeout(() => setShowContextMenu(true), 100);
+        setTimeout(() => setShowControls(true), 100);
         setIsSelectionMode(false); 
     }
   };
@@ -313,6 +318,25 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
 
                 <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto no-scrollbar">
                     
+                    {/* --- NEW CONTROLS ICON IN TOOLBAR --- */}
+                    {enableSmartTools && (
+                        <button 
+                            onClick={() => setShowControls(!showControls)}
+                            className={`control-trigger p-2 rounded transition-colors flex items-center gap-2 border 
+                                ${showControls 
+                                    ? (isWizard ? 'bg-emerald-600 text-black border-emerald-500' : 'bg-fuchsia-600 text-black border-fuchsia-500') 
+                                    : 'bg-white/5 border-white/10 hover:bg-white/10 text-white/70'}
+                            `}
+                            title="Open Smart Controls"
+                        >
+                            <SlidersHorizontal size={18} />
+                            <span className="text-xs font-bold hidden md:block">Controls</span>
+                        </button>
+                    )}
+
+                    <div className="w-px h-6 bg-white/10 mx-1 hidden sm:block"></div>
+
+                    {/* Standard Controls */}
                     <div className="flex items-center bg-black/20 rounded p-1">
                         <button onClick={() => setZoomLevel(z => Math.max(50, z - 10))} className="p-1.5 hover:bg-white/10 rounded text-white/70" title="Zoom Out"><ZoomOut size={16}/></button>
                         <span className="text-[10px] font-mono w-8 text-center hidden sm:block">{zoomLevel}%</span>
@@ -430,18 +454,14 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                                     </div>
                                 </div>
                                 
+                                {/* Button Next to Warning Text (As requested) */}
                                 {enableSmartTools && (
                                     <button 
-                                        onClick={() => setIsSmartLayerActive(!isSmartLayerActive)}
-                                        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all border shadow-lg shrink-0
-                                            ${isSmartLayerActive 
-                                                ? (isWizard ? 'bg-emerald-500 text-black border-emerald-400' : 'bg-fuchsia-500 text-black border-fuchsia-400')
-                                                : 'bg-white/10 border-white/20 hover:bg-white/20 text-white'
-                                            }
-                                        `}
+                                        onClick={() => setShowControls(true)}
+                                        className="control-trigger flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all border shadow-lg shrink-0 bg-white/10 border-white/20 hover:bg-white/20 text-white"
                                     >
-                                        {isSmartLayerActive ? <Unlock size={14}/> : <Lock size={14}/>}
-                                        <span>{isSmartLayerActive ? 'SMART MODE ON' : 'ENABLE SMART'}</span>
+                                        <SlidersHorizontal size={14}/>
+                                        <span>OPEN CONTROLS</span>
                                     </button>
                                 )}
                             </div>
@@ -515,22 +535,56 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                     </div>
                 )}
 
-                {/* --- CONTEXT MENU (Right Click) --- */}
-                {showContextMenu && (
+                {/* --- CONTROL DOCK (Floating Menu) --- */}
+                {showControls && (
                     <div 
-                        ref={contextMenuRef}
+                        ref={controlsRef}
                         className={`absolute z-[100] p-4 rounded-xl border backdrop-blur-xl shadow-2xl flex flex-col gap-4 animate-in fade-in zoom-in-95 duration-200
                             ${isWizard ? 'bg-black/95 border-emerald-500/50 shadow-emerald-900/50' : 'bg-black/95 border-fuchsia-500/50 shadow-fuchsia-900/50'}
                         `}
-                        style={{ left: menuPos.x, top: menuPos.y }}
+                        style={{ 
+                            left: '50%', 
+                            top: '50%', 
+                            transform: 'translate(-50%, -50%)',
+                            minWidth: '300px'
+                        }}
                         onMouseDown={(e) => e.stopPropagation()} 
                     >
                         <div className="flex items-center justify-between text-xs font-bold uppercase tracking-widest opacity-70 mb-1 border-b border-white/10 pb-2">
-                            <span>Smart Controls</span>
-                            <button onClick={handleResetFilters} className="p-1 hover:bg-white/10 rounded text-red-400" title="Reset All">
-                                <RefreshCw size={12}/>
-                            </button>
+                            <span className="flex items-center gap-2"><SlidersHorizontal size={14}/> Smart Controls</span>
+                            <div className="flex gap-2">
+                                <button onClick={handleResetFilters} className="p-1 hover:bg-white/10 rounded text-red-400" title="Reset All">
+                                    <RefreshCw size={14}/>
+                                </button>
+                                <button onClick={() => setShowControls(false)} className="p-1 hover:bg-white/10 rounded text-white" title="Close">
+                                    <X size={14}/>
+                                </button>
+                            </div>
                         </div>
+
+                        {/* Smart Layer Switch */}
+                        <button 
+                            onClick={() => setIsSmartLayerActive(!isSmartLayerActive)}
+                            className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-bold border transition-all
+                                ${isSmartLayerActive 
+                                    ? (isWizard ? 'bg-emerald-900/50 border-emerald-500 text-emerald-100' : 'bg-fuchsia-900/50 border-fuchsia-500 text-fuchsia-100')
+                                    : 'bg-white/5 border-white/10 text-white/50 hover:bg-white/10'
+                                }
+                            `}
+                        >
+                            <span className="flex items-center gap-2">
+                                {isSmartLayerActive ? <Lock size={14}/> : <Unlock size={14}/>}
+                                Iframe Interaction Lock
+                            </span>
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded ${isSmartLayerActive ? 'bg-emerald-500 text-black' : 'bg-black/50'}`}>
+                                {isSmartLayerActive ? 'ON' : 'OFF'}
+                            </span>
+                        </button>
+                        <p className="text-[10px] opacity-40 -mt-2 px-1">
+                            Turn ON to right-click or draw on the video. Turn OFF to click Play/Pause inside the video.
+                        </p>
+
+                        <div className="h-px bg-white/10 my-1"></div>
 
                         {/* Feature Toggles */}
                         <div className="grid grid-cols-4 gap-2">
@@ -543,13 +597,13 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                             <button onClick={() => setFilter(f => f === 'grayscale' ? 'none' : 'grayscale')} className={`p-2 rounded flex flex-col items-center gap-1 text-[10px] ${filter === 'grayscale' ? 'bg-zinc-500 text-white' : 'bg-white/5 hover:bg-white/10'}`}>
                                 <Droplet size={16}/> B&W
                             </button>
-                            <button onClick={() => { setIsSelectionMode(true); setShowContextMenu(false); }} className={`p-2 rounded flex flex-col items-center gap-1 text-[10px] bg-white/5 hover:bg-white/10 text-emerald-400`}>
+                            <button onClick={() => { setIsSelectionMode(true); setShowControls(false); }} className={`p-2 rounded flex flex-col items-center gap-1 text-[10px] bg-white/5 hover:bg-white/10 text-emerald-400`}>
                                 <Scan size={16}/> Scan
                             </button>
                         </div>
 
                         {/* Sliders */}
-                        <div className="space-y-3 pt-2 w-48">
+                        <div className="space-y-3 pt-2">
                             <div>
                                 <div className="flex justify-between text-[10px] mb-1 font-mono">
                                     <span>Brightness</span>
