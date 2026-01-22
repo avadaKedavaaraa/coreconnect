@@ -6,7 +6,7 @@ import {
   Monitor, Smartphone, PenTool, Save, Trash2, AlignJustify, Loader2, Share2, 
   CornerDownRight, Calendar, User, ArrowRight, AlertTriangle, 
   Play, Pause, Scan, Sliders, Eraser, Video, RefreshCw, Droplet, Lock, Unlock, SlidersHorizontal,
-  Settings, Type
+  Settings, Type, Palette, Shuffle
 } from 'lucide-react';
 import DOMPurify from 'dompurify';
 import { trackActivity } from '../services/tracking';
@@ -35,14 +35,15 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
       return 'google';
   });
 
-  // Load Saved Preferences
+  // --- PREFERENCES ---
   const [videoPlayerMode, setVideoPlayerMode] = useState<VideoPlayerMode>(() => {
       return (localStorage.getItem('core_video_mode') as VideoPlayerMode) || 'smart';
   });
 
-  const [forceGradient, setForceGradient] = useState(() => {
-      return localStorage.getItem('core_force_gradient') === 'true';
-  });
+  // GRADIENT STATE
+  const [enableGradientOverlay, setEnableGradientOverlay] = useState(false);
+  const [gradientColor1, setGradientColor1] = useState(isWizard ? '#34d399' : '#e879f9');
+  const [gradientColor2, setGradientColor2] = useState(isWizard ? '#10b981' : '#d946ef');
 
   // View States
   const [isFullScreen, setIsFullScreen] = useState(false);
@@ -84,9 +85,12 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
       localStorage.setItem('core_video_mode', videoPlayerMode);
   }, [videoPlayerMode]);
 
-  useEffect(() => {
-      localStorage.setItem('core_force_gradient', String(forceGradient));
-  }, [forceGradient]);
+  // --- HELPER: Random Color ---
+  const randomizeGradient = () => {
+      const randomColor = () => '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0');
+      setGradientColor1(randomColor());
+      setGradientColor2(randomColor());
+  };
 
   // --- INIT & TRACKING ---
   useEffect(() => {
@@ -150,7 +154,7 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
 
   // --- VIDEO CONTROLS ---
   const togglePlay = () => {
-    if (videoPlayerMode === 'native') return; // Let native controls handle it
+    if (videoPlayerMode === 'native') return; 
     if (videoRef.current) {
         if (videoRef.current.paused) {
             videoRef.current.play();
@@ -192,7 +196,6 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
-    // If native controls are on, don't intercept clicks unless Smart Layer is explicit
     if (videoPlayerMode === 'native' && !isSmartLayerActive && !isSelectionMode) return;
     
     if ((!isSmartLayerActive && !isSelectionMode) || !containerRef.current) return;
@@ -240,7 +243,7 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
       setZoomLevel(100);
       setSelectionRect(null);
       setRotation(0);
-      setForceGradient(false);
+      setEnableGradientOverlay(false);
   };
 
   const getFilterStyle = () => {
@@ -257,9 +260,7 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
 
   const customStyle = item.style || {};
   const accentColor = isWizard ? '#10b981' : '#d946ef';
-  const themeGradient = isWizard 
-    ? 'linear-gradient(to right, #34d399, #10b981)' 
-    : 'linear-gradient(to right, #e879f9, #d946ef)';
+  const themeGradient = `linear-gradient(to right, ${gradientColor1}, ${gradientColor2})`;
 
   const titleFont = customStyle.fontFamily === 'wizard' ? '"EB Garamond", serif' : customStyle.fontFamily === 'muggle' ? '"JetBrains Mono", monospace' : undefined;
 
@@ -281,7 +282,6 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
   });
 
   return (
-    /* NUCLEAR OPTION Z-INDEX: 2147483647 */
     <div className={`fixed top-0 left-0 right-0 bottom-0 z-[2147483647] flex items-center justify-center p-0 sm:p-4 animate-[fade-in_0.2s_ease-out]
         ${isFullScreen ? 'bg-black' : 'bg-black/90 backdrop-blur-xl'}
     `}>
@@ -296,6 +296,7 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
         <div className={`p-2 border-b flex flex-wrap items-center justify-between gap-2 shrink-0 z-30 relative backdrop-blur-md
             ${isWizard ? 'border-emerald-900/30 bg-emerald-950/40' : 'border-fuchsia-900/30 bg-fuchsia-950/40'}
         `}>
+            {/* ... (Existing Toolbar Code - no changes needed here) ... */}
             <div className="flex items-center gap-3 min-w-0 max-w-[40%]">
                 <div className={`p-2 rounded shrink-0 hidden sm:block ${isWizard ? 'bg-emerald-900/50 text-emerald-400' : 'bg-fuchsia-900/50 text-fuchsia-400'}`}>
                     <FileText size={18} />
@@ -305,7 +306,7 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                         {item.title}
                     </h3>
                     
-                    {/* Engine Switcher (Media only) */}
+                    {/* Engine Switcher */}
                     {isMediaView && (
                         <div className="flex gap-2 text-[10px] mt-0.5">
                             {!isGoogleDrive && (
@@ -389,7 +390,7 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
             {/* GLOBAL CONTENT CONTAINER */}
             <div 
                 ref={containerRef}
-                className={`flex-1 bg-zinc-900 relative w-full h-full overflow-hidden flex flex-col group ${forceGradient ? 'force-gradient-text' : ''}`}
+                className={`flex-1 bg-zinc-900 relative w-full h-full overflow-hidden flex flex-col group ${enableGradientOverlay ? 'force-gradient-text' : ''}`}
                 onContextMenu={handleContextMenu}
                 onMouseDown={handleMouseDown}
                 onMouseMove={handleMouseMove}
@@ -423,6 +424,15 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                                 className="w-full h-full transition-all duration-300 origin-center relative z-10 flex-1 flex items-center justify-center"
                                 style={{ transform: `scale(${zoomLevel / 100}) rotate(${rotation}deg)` }}
                             >
+                                {/* --- NEW: GRADIENT OVERLAY (THE MAGIC TRICK) --- */}
+                                {/* This overlays the iframe and tints white pixels to the gradient color */}
+                                {enableGradientOverlay && (
+                                    <div 
+                                        className="absolute inset-0 z-20 pointer-events-none mix-blend-color-burn opacity-90"
+                                        style={{ background: themeGradient }}
+                                    ></div>
+                                )}
+
                                 {isVideoFile ? (
                                     <video 
                                         ref={videoRef}
@@ -437,7 +447,6 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                                             filter: getFilterStyle(),
                                             cursor: isSmartLayerActive ? 'crosshair' : (videoPlayerMode === 'native' ? 'default' : 'pointer')
                                         }}
-                                        // NATIVE MODE CONTROLS TOGGLE
                                         controls={videoPlayerMode === 'native'}
                                     />
                                 ) : (
@@ -469,27 +478,16 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                         `}
                         style={{ filter: getFilterStyle() }} 
                     >
-                        {/* METADATA */}
-                        {!isLinkTree && (
-                            <div className="flex flex-wrap items-center gap-2 mb-3 text-[10px] uppercase tracking-widest font-bold opacity-70">
-                                <span className={`px-2 py-1 rounded border flex items-center gap-1 ${isWizard ? 'border-emerald-800 text-emerald-400' : 'border-fuchsia-800 text-fuchsia-400'}`}><CornerDownRight size={10} /> {item.sector || 'ARCHIVE'}</span>
-                                <span className="flex items-center gap-1"><Calendar size={10}/> {item.date}</span>
-                                <span className="flex items-center gap-1"><User size={10}/> {item.author || 'SYSTEM'}</span>
-                            </div>
-                        )}
-
-                        {/* TITLE */}
+                        {/* (No changes to text mode rendering, reused class takes care of it) */}
                         {!isLinkTree && (
                             <h2 className="text-2xl md:text-3xl font-bold leading-tight break-words mb-6" style={titleStyle}>{item.title}</h2>
                         )}
-                        
-                        {/* CONTENT AREA */}
                         <div 
                             className={isLinkTree 
-                                ? "w-full h-full [&_iframe]:w-full [&_iframe]:h-full [&_iframe]:border-0 [&_video]:w-full [&_video]:h-full" 
-                                : `prose prose-invert max-w-none safe-font text-lg leading-relaxed html-content ${isWizard ? 'prose-emerald selection:bg-emerald-900/50' : 'prose-fuchsia selection:bg-fuchsia-900/50'}`
+                                ? "w-full h-full" 
+                                : `prose prose-invert max-w-none safe-font text-lg leading-relaxed html-content ${isWizard ? 'prose-emerald' : 'prose-fuchsia'}`
                             }
-                            style={{ color: customStyle.contentColor || '#e4e4e7', fontFamily: '"Inter", "Segoe UI", sans-serif' }}
+                            style={{ color: customStyle.contentColor || '#e4e4e7' }}
                         >
                             {cleanContent ? <div className={isLinkTree ? 'w-full h-full' : ''} dangerouslySetInnerHTML={{__html: cleanContent}}></div> : <p className="italic opacity-50 text-center py-10">No additional text content provided.</p>}
                         </div>
@@ -506,32 +504,13 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
 
                 {/* --- UNIVERSAL OVERLAYS --- */}
                 {showRuler && (
-                    <div 
-                        ref={rulerRef}
-                        className={`absolute left-0 right-0 h-8 pointer-events-none z-30 mix-blend-difference opacity-50
-                            ${isWizard ? 'bg-emerald-500/30 border-y border-emerald-400' : 'bg-fuchsia-500/30 border-y border-fuchsia-400'}
-                        `}
-                        style={{ top: '50%' }}
-                    ></div>
+                    <div ref={rulerRef} className={`absolute left-0 right-0 h-8 pointer-events-none z-30 mix-blend-difference opacity-50 ${isWizard ? 'bg-emerald-500/30' : 'bg-fuchsia-500/30'}`} style={{ top: '50%' }}></div>
                 )}
-
                 {selectionRect && (
                     <div 
                         className="absolute border-2 border-dashed border-white/50 bg-transparent z-40 pointer-events-none"
-                        style={{
-                            left: selectionRect.x,
-                            top: selectionRect.y,
-                            width: selectionRect.w,
-                            height: selectionRect.h,
-                            backdropFilter: `invert(1) hue-rotate(180deg) brightness(${regionBrightness}%)`
-                        }}
-                    >
-                        <div className="absolute -top-8 right-0 flex gap-1 pointer-events-auto">
-                            <button onClick={(e) => { e.stopPropagation(); setSelectionRect(null); }} className="bg-red-500/80 p-1 rounded hover:bg-red-600 text-white">
-                                <X size={12} />
-                            </button>
-                        </div>
-                    </div>
+                        style={{ left: selectionRect.x, top: selectionRect.y, width: selectionRect.w, height: selectionRect.h, backdropFilter: `invert(1) hue-rotate(180deg) brightness(${regionBrightness}%)` }}
+                    ></div>
                 )}
 
                 {/* --- CONTROL DOCK --- */}
@@ -541,65 +520,79 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                         className={`fixed z-[2147483647] p-4 rounded-xl border backdrop-blur-xl shadow-2xl flex flex-col gap-4 animate-in fade-in zoom-in-95 duration-200 text-white
                             ${isWizard ? 'bg-black/95 border-emerald-500/50 shadow-emerald-900/50' : 'bg-black/95 border-fuchsia-500/50 shadow-fuchsia-900/50'}
                         `}
-                        style={{ 
-                            left: menuPos.x, 
-                            top: menuPos.y, 
-                            minWidth: '320px'
-                        }}
+                        style={{ left: menuPos.x, top: menuPos.y, minWidth: '320px' }}
                         onMouseDown={(e) => e.stopPropagation()} 
                     >
                         <div className="flex items-center justify-between text-xs font-bold uppercase tracking-widest opacity-70 mb-1 border-b border-white/10 pb-2">
                             <span className="flex items-center gap-2"><SlidersHorizontal size={14}/> Smart Controls</span>
                             <div className="flex gap-2">
-                                <button onClick={handleResetFilters} className="p-1 hover:bg-white/10 rounded text-red-400" title="Reset All">
-                                    <RefreshCw size={14}/>
-                                </button>
-                                <button onClick={(e) => { e.stopPropagation(); setShowControls(false); }} className="p-1 hover:bg-white/10 rounded text-white" title="Close">
-                                    <X size={14}/>
-                                </button>
+                                <button onClick={handleResetFilters} className="p-1 hover:bg-white/10 rounded text-red-400" title="Reset All"><RefreshCw size={14}/></button>
+                                <button onClick={(e) => { e.stopPropagation(); setShowControls(false); }} className="p-1 hover:bg-white/10 rounded text-white" title="Close"><X size={14}/></button>
                             </div>
                         </div>
 
-                        {/* --- NEW: VIDEO PLAYER MODE --- */}
+                        {/* --- ACCESSIBILITY: VIDEO PLAYER MODE --- */}
                         {isVideoFile && (
                              <div className="bg-white/5 p-2 rounded-lg border border-white/10">
                                 <label className="text-[10px] font-bold uppercase opacity-70 mb-2 block flex items-center gap-2">
                                     <Video size={12}/> Video Player Mode
                                 </label>
                                 <div className="flex bg-black/50 rounded-lg p-1">
-                                    <button 
-                                        onClick={() => setVideoPlayerMode('smart')}
-                                        className={`flex-1 py-1.5 text-[10px] rounded flex items-center justify-center gap-1 transition-all ${videoPlayerMode === 'smart' ? (isWizard ? 'bg-emerald-600 text-white' : 'bg-fuchsia-600 text-white') : 'text-white/50 hover:text-white'}`}
-                                    >
+                                    <button onClick={() => setVideoPlayerMode('smart')} className={`flex-1 py-1.5 text-[10px] rounded flex items-center justify-center gap-1 transition-all ${videoPlayerMode === 'smart' ? (isWizard ? 'bg-emerald-600 text-white' : 'bg-fuchsia-600 text-white') : 'text-white/50 hover:text-white'}`}>
                                         <Layers size={12}/> Smart
                                     </button>
-                                    <button 
-                                        onClick={() => setVideoPlayerMode('native')}
-                                        className={`flex-1 py-1.5 text-[10px] rounded flex items-center justify-center gap-1 transition-all ${videoPlayerMode === 'native' ? (isWizard ? 'bg-emerald-600 text-white' : 'bg-fuchsia-600 text-white') : 'text-white/50 hover:text-white'}`}
-                                    >
+                                    <button onClick={() => setVideoPlayerMode('native')} className={`flex-1 py-1.5 text-[10px] rounded flex items-center justify-center gap-1 transition-all ${videoPlayerMode === 'native' ? (isWizard ? 'bg-emerald-600 text-white' : 'bg-fuchsia-600 text-white') : 'text-white/50 hover:text-white'}`}>
                                         <Monitor size={12}/> Native
                                     </button>
                                 </div>
                             </div>
                         )}
 
-                        {/* --- NEW: FORCE GRADIENT TEXT TOGGLE --- */}
-                        {!isVideoFile && (
+                        {/* --- VISUALS: FORCE GRADIENT TEXT TOGGLE --- */}
+                        <div className="space-y-2">
                             <button 
-                                onClick={() => setForceGradient(!forceGradient)}
+                                onClick={() => setEnableGradientOverlay(!enableGradientOverlay)}
                                 className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-bold border transition-all
-                                    ${forceGradient 
+                                    ${enableGradientOverlay 
                                         ? (isWizard ? 'bg-emerald-900/50 border-emerald-500 text-emerald-100' : 'bg-fuchsia-900/50 border-fuchsia-500 text-fuchsia-100')
                                         : 'bg-white/5 border-white/10 text-white/50 hover:bg-white/10'
                                     }
                                 `}
                             >
-                                <span className="flex items-center gap-2"><Type size={14}/> Force Gradient Text</span>
-                                <span className={`text-[10px] px-1.5 py-0.5 rounded ${forceGradient ? 'bg-white text-black' : 'bg-black/50 text-white'}`}>
-                                    {forceGradient ? 'ON' : 'OFF'}
+                                <span className="flex items-center gap-2"><Palette size={14}/> Gradient Tint</span>
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded ${enableGradientOverlay ? 'bg-white text-black' : 'bg-black/50 text-white'}`}>
+                                    {enableGradientOverlay ? 'ON' : 'OFF'}
                                 </span>
                             </button>
-                        )}
+
+                            {/* GRADIENT COLORS PICKER (Only shows when ON) */}
+                            {enableGradientOverlay && (
+                                <div className="flex items-center gap-2 p-2 bg-black/30 rounded-lg border border-white/5 animate-in slide-in-from-top-2">
+                                    <input 
+                                        type="color" 
+                                        value={gradientColor1}
+                                        onChange={(e) => setGradientColor1(e.target.value)}
+                                        className="w-8 h-8 rounded cursor-pointer bg-transparent border-0 p-0"
+                                        title="Start Color"
+                                    />
+                                    <ArrowRight size={12} className="opacity-50"/>
+                                    <input 
+                                        type="color" 
+                                        value={gradientColor2}
+                                        onChange={(e) => setGradientColor2(e.target.value)}
+                                        className="w-8 h-8 rounded cursor-pointer bg-transparent border-0 p-0"
+                                        title="End Color"
+                                    />
+                                    <button 
+                                        onClick={randomizeGradient}
+                                        className="ml-auto p-1.5 rounded hover:bg-white/10 text-white/70 hover:text-white"
+                                        title="Randomize Colors"
+                                    >
+                                        <Shuffle size={14}/>
+                                    </button>
+                                </div>
+                            )}
+                        </div>
 
                         <div className="h-px bg-white/10 my-1"></div>
 
@@ -638,41 +631,25 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                 )}
             </div>
             
-            {/* ... Sidebar ... */}
+            {/* ... Sidebar (No changes) ... */}
             {showNotes && (
                 <div className={`w-80 border-l flex flex-col shrink-0 transition-all animate-[fade-in-left_0.2s] ${isWizard ? 'bg-[#050a05] border-emerald-900' : 'bg-[#09050f] border-fuchsia-900'}`}>
-                   {/* ... Notes UI ... */}
                     <div className={`p-4 border-b flex justify-between items-center ${isWizard ? 'border-emerald-900' : 'border-fuchsia-900'}`}>
                         <h4 className="font-bold flex items-center gap-2"><PenTool size={16}/> Study Notes</h4>
                         <div className="flex gap-1">
-                            <button onClick={() => {}} className={`p-1.5 rounded hover:bg-white/10 ${isWizard ? 'text-emerald-400' : 'text-fuchsia-400'}`} title="Save">
-                                <Save size={16}/>
-                            </button>
-                            <button onClick={() => setNotes('')} className="p-1.5 rounded hover:bg-red-900/30 text-red-400" title="Delete">
-                                <Trash2 size={16}/>
-                            </button>
+                            <button onClick={() => {}} className={`p-1.5 rounded hover:bg-white/10 ${isWizard ? 'text-emerald-400' : 'text-fuchsia-400'}`} title="Save"><Save size={16}/></button>
+                            <button onClick={() => setNotes('')} className="p-1.5 rounded hover:bg-red-900/30 text-red-400" title="Delete"><Trash2 size={16}/></button>
                         </div>
                     </div>
-                    
                     <div className="flex-1 p-4 relative">
-                        <textarea 
-                            value={notes}
-                            onChange={(e) => setNotes(e.target.value)}
-                            placeholder="Type your observations here..."
-                            className={`w-full h-full bg-transparent resize-none outline-none font-mono text-sm leading-relaxed
-                                ${isWizard 
-                                    ? 'text-emerald-100 placeholder:text-emerald-800' 
-                                    : 'text-fuchsia-100 placeholder:text-fuchsia-800'}
-                            `}
-                            spellCheck={false}
-                        />
+                        <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Type your observations here..." className={`w-full h-full bg-transparent resize-none outline-none font-mono text-sm leading-relaxed ${isWizard ? 'text-emerald-100 placeholder:text-emerald-800' : 'text-fuchsia-100 placeholder:text-fuchsia-800'}`} spellCheck={false}/>
                     </div>
                 </div>
             )}
         </div>
       </div>
   
-      {/* Global Styles for Animations + FORCE GRADIENT INJECTION */}
+      {/* Global Styles + DYNAMIC GRADIENT INJECTION */}
       <style dangerouslySetInnerHTML={{ __html: `
         @keyframes fade-in-left { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
         .no-scrollbar::-webkit-scrollbar { display: none; }
@@ -681,9 +658,12 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
         .prose a { color: ${accentColor}; text-decoration: underline; text-underline-offset: 4px; }
         .prose blockquote { border-left: 4px solid ${accentColor}; padding-left: 1em; font-style: italic; opacity: 0.8; }
         
-        /* FORCE GRADIENT TEXT CLASS */
-        .force-gradient-text, 
-        .force-gradient-text *:not(iframe):not(video):not(img) {
+        /* FORCE GRADIENT TEXT (HTML) 
+           This targets actual text content in Text Mode / Link Trees
+        */
+        .force-gradient-text .html-content *, 
+        .force-gradient-text h1, .force-gradient-text h2, .force-gradient-text h3, 
+        .force-gradient-text p, .force-gradient-text span, .force-gradient-text a {
             background-image: ${themeGradient} !important;
             -webkit-background-clip: text !important;
             background-clip: text !important;
