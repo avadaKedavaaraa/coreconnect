@@ -194,14 +194,9 @@ export const SectorView: React.FC<SectorViewProps> = ({
 
     // --- HANDLER ---
     const handlePlayItem = (item: CarouselItem) => {
-        // If content has iframe/div (embed code), use Cinema Mode. 
-        // If it is just a URL, open in new tab.
-        if (item.content && (item.content.includes('<iframe') || item.content.includes('<div'))) {
-            setCinemaItem(item);
-            setCinemaMode(true);
-        } else if (item.fileUrl) {
-            window.open(item.fileUrl, '_blank');
-        }
+        // Redirect ALL playback to the main ItemViewer.
+        // This ensures the Smart Controls (Dark Mode, etc.) you just added are used.
+        onViewItem(item);
     };
 
     // State
