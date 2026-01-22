@@ -23,8 +23,8 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
   const isWizard = lineage === Lineage.WIZARD;
   
   // --- SECTOR CHECK ---
-  // Enable Smart Tools for Resources AND Lectures (or any sector you want)
-  const enableSmartTools = item.sector === 'resources' || item.sector === 'lectures';
+  // Enable Smart Tools for Resources AND Lectures (SharePoint/Tree items)
+  const enableSmartTools = item.sector === 'resources' || item.sector === 'lectures' || item.type === 'link_tree';
 
   // --- STATE ---
   const [engine, setEngine] = useState<RenderEngine>(() => {
@@ -129,6 +129,7 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
   const safePdfUrl = isValidUrl(item.fileUrl) ? item.fileUrl! : "";
   const isVideoFile = item.type === 'video' || (safePdfUrl && safePdfUrl.match(/\.(mp4|webm|ogg|mov)$/i));
   const isGoogleDrive = safePdfUrl.includes('drive.google.com');
+  // NOTE: 'link_tree' is purposely excluded from MediaView so it uses the Text/Embed view
   const isMediaView = (item.type === 'file' || item.type === 'video' || item.type === 'link' || item.isLecture) && !!safePdfUrl;
 
   // --- VIDEO CONTROLS ---
@@ -322,7 +323,7 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                     {enableSmartTools && (
                         <button 
                             onClick={() => setShowControls(!showControls)}
-                            className={`control-trigger p-2 rounded transition-colors flex items-center gap-2 border 
+                            className={`control-trigger p-2 rounded transition-colors flex items-center gap-2 border shrink-0
                                 ${showControls 
                                     ? (isWizard ? 'bg-emerald-600 text-black border-emerald-500' : 'bg-fuchsia-600 text-black border-fuchsia-500') 
                                     : 'bg-white/5 border-white/10 hover:bg-white/10 text-white/70'}
@@ -330,7 +331,8 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                             title="Open Smart Controls"
                         >
                             <SlidersHorizontal size={18} />
-                            <span className="text-xs font-bold hidden md:block">Controls</span>
+                            {/* Updated: Added whitespace-nowrap and hidden on sm to prevent UI conflict */}
+                            <span className="text-xs font-bold hidden md:block whitespace-nowrap">Controls</span>
                         </button>
                     )}
 
@@ -442,7 +444,7 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                         </div>
                         <h2 className="text-2xl md:text-3xl font-bold leading-tight break-words mb-6" style={titleStyle}>{item.title}</h2>
                         
-                        {/* --- NEW LOGIN WARNING BAR WITH TRIGGER --- */}
+                        {/* --- LOGIN WARNING BAR --- */}
                         {(item.content && item.content.includes('iframe')) && (
                             <div className={`p-3 rounded-lg border mb-6 flex flex-wrap items-center justify-between gap-4 animate-[fade-in_0.3s_ease-out]
                                 ${isWizard ? 'bg-amber-900/20 border-amber-700/50' : 'bg-amber-900/20 border-amber-700/50'}
@@ -454,7 +456,6 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                                     </div>
                                 </div>
                                 
-                                {/* Button Next to Warning Text (As requested) */}
                                 {enableSmartTools && (
                                     <button 
                                         onClick={() => setShowControls(true)}
@@ -467,7 +468,12 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                             </div>
                         )}
 
-                        {item.image && <div className="rounded-xl overflow-hidden shadow-2xl border border-white/10 relative group"><img src={item.image} alt={item.title} className="w-full h-auto max-h-[500px] object-cover" /></div>}
+                        {/* --- FIXED: Hide Image for Link Tree Items (Thumbnail only shown in menu) --- */}
+                        {item.image && item.type !== 'link_tree' && (
+                            <div className="rounded-xl overflow-hidden shadow-2xl border border-white/10 relative group">
+                                <img src={item.image} alt={item.title} className="w-full h-auto max-h-[500px] object-cover" />
+                            </div>
+                        )}
                         
                         <div className={`prose prose-invert max-w-none safe-font text-lg leading-relaxed html-content ${isWizard ? 'prose-emerald selection:bg-emerald-900/50' : 'prose-fuchsia selection:bg-fuchsia-900/50'}`} style={{ color: customStyle.contentColor || '#e4e4e7', fontFamily: '"Inter", "Segoe UI", sans-serif' }}>
                             {cleanContent ? <div dangerouslySetInnerHTML={{__html: cleanContent}}></div> : <p className="italic opacity-50 text-center py-10">No additional text content provided.</p>}
@@ -487,12 +493,11 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                     </div>
                 )}
 
-                {/* --- GLASS LAYER (THE FIX) --- */}
-                {/* This transparent div sits ON TOP of everything when Smart Mode is ON */}
+                {/* --- GLASS LAYER --- */}
                 {isSmartLayerActive && (
                     <div 
                         className="absolute inset-0 z-30 cursor-crosshair bg-transparent"
-                        onContextMenu={handleContextMenu} // CATCH RIGHT CLICK HERE
+                        onContextMenu={handleContextMenu}
                     ></div>
                 )}
 
@@ -536,10 +541,11 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                 )}
 
                 {/* --- CONTROL DOCK (Floating Menu) --- */}
+                {/* Updated: Added text-white to ensure visibility on black background */}
                 {showControls && (
                     <div 
                         ref={controlsRef}
-                        className={`absolute z-[100] p-4 rounded-xl border backdrop-blur-xl shadow-2xl flex flex-col gap-4 animate-in fade-in zoom-in-95 duration-200
+                        className={`absolute z-[100] p-4 rounded-xl border backdrop-blur-xl shadow-2xl flex flex-col gap-4 animate-in fade-in zoom-in-95 duration-200 text-white
                             ${isWizard ? 'bg-black/95 border-emerald-500/50 shadow-emerald-900/50' : 'bg-black/95 border-fuchsia-500/50 shadow-fuchsia-900/50'}
                         `}
                         style={{ 
@@ -576,11 +582,11 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                                 {isSmartLayerActive ? <Lock size={14}/> : <Unlock size={14}/>}
                                 Iframe Interaction Lock
                             </span>
-                            <span className={`text-[10px] px-1.5 py-0.5 rounded ${isSmartLayerActive ? 'bg-emerald-500 text-black' : 'bg-black/50'}`}>
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded ${isSmartLayerActive ? 'bg-emerald-500 text-black' : 'bg-black/50 text-white'}`}>
                                 {isSmartLayerActive ? 'ON' : 'OFF'}
                             </span>
                         </button>
-                        <p className="text-[10px] opacity-40 -mt-2 px-1">
+                        <p className="text-[10px] opacity-40 -mt-2 px-1 text-zinc-400">
                             Turn ON to right-click or draw on the video. Turn OFF to click Play/Pause inside the video.
                         </p>
 
@@ -605,7 +611,7 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                         {/* Sliders */}
                         <div className="space-y-3 pt-2">
                             <div>
-                                <div className="flex justify-between text-[10px] mb-1 font-mono">
+                                <div className="flex justify-between text-[10px] mb-1 font-mono text-zinc-300">
                                     <span>Brightness</span>
                                     <span>{videoBrightness}%</span>
                                 </div>
@@ -618,7 +624,7 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                             </div>
                             
                             <div>
-                                <div className="flex justify-between text-[10px] mb-1 font-mono">
+                                <div className="flex justify-between text-[10px] mb-1 font-mono text-zinc-300">
                                     <span>Scale</span>
                                     <span>{zoomLevel}%</span>
                                 </div>
@@ -659,10 +665,10 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                 <div className={`p-4 border-b flex justify-between items-center ${isWizard ? 'border-emerald-900' : 'border-fuchsia-900'}`}>
                     <h4 className="font-bold flex items-center gap-2"><PenTool size={16}/> Study Notes</h4>
                     <div className="flex gap-1">
-                        <button onClick={handleSaveNotes} className={`p-1.5 rounded hover:bg-white/10 ${isWizard ? 'text-emerald-400' : 'text-fuchsia-400'}`} title="Save">
+                        <button onClick={() => {}} className={`p-1.5 rounded hover:bg-white/10 ${isWizard ? 'text-emerald-400' : 'text-fuchsia-400'}`} title="Save">
                             <Save size={16}/>
                         </button>
-                        <button onClick={handleClearNotes} className="p-1.5 rounded hover:bg-red-900/30 text-red-400" title="Delete">
+                        <button onClick={() => setNotes('')} className="p-1.5 rounded hover:bg-red-900/30 text-red-400" title="Delete">
                             <Trash2 size={16}/>
                         </button>
                     </div>
