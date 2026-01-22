@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect } from 'react';
 import { Lineage, type CarouselItem } from '../types';
-import { Download, Heart, Sparkles, Trash2, ChevronLeft, ChevronRight, Pin } from 'lucide-react';
+import { Download, Heart, Sparkles, Trash2, ChevronLeft, ChevronRight, Pin, Video } from 'lucide-react';
 import DOMPurify from 'dompurify';
 
 interface CarouselProps {
@@ -130,7 +129,7 @@ const Carousel: React.FC<CarouselProps> = ({ items, lineage, onExtract, isAdmin,
               fontFamily: titleFont
           };
 
-          // Allow rich HTML in cards (Styles, Images, Tables, etc.)
+          // Allow rich HTML in cards
           const cleanContent = DOMPurify.sanitize(item.content, {
               ADD_TAGS: ['style', 'iframe', 'img', 'b', 'i', 'em', 'strong', 'a', 'p', 'br', 'ul', 'li', 'ol', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'code', 'pre', 'div', 'span', 'table', 'thead', 'tbody', 'tr', 'td', 'th', 'hr', 'button', 'input', 'label', 'form', 'audio', 'video', 'source', 'track'],
               ADD_ATTR: ['target', 'href', 'src', 'frameborder', 'allow', 'allowfullscreen', 'style', 'class', 'id', 'width', 'height', 'align', 'controls', 'autoplay', 'loop', 'muted', 'poster', 'type']
@@ -149,7 +148,7 @@ const Carousel: React.FC<CarouselProps> = ({ items, lineage, onExtract, isAdmin,
                         ? 'opacity-100 z-50 scale-105 shadow-[0_0_5px_rgba(16,185,129,0.2)] md:shadow-[0_0_60px_rgba(16,185,129,0.5)] border-emerald-500 pointer-events-auto' 
                         : 'opacity-100 z-50 scale-105 shadow-[0_0_5px_rgba(217,70,239,0.2)] md:shadow-[0_0_60px_rgba(217,70,239,0.5)] border-fuchsia-500 pointer-events-auto')
                     : (isMobile 
-                        ? 'opacity-0 z-0 pointer-events-none hidden' // Completely hide on mobile if not active to prevent conflict
+                        ? 'opacity-0 z-0 pointer-events-none hidden' 
                         : 'opacity-40 grayscale blur-[1px] z-0 pointer-events-none'
                       )
                 }
@@ -158,7 +157,6 @@ const Carousel: React.FC<CarouselProps> = ({ items, lineage, onExtract, isAdmin,
                 transform: `rotateY(${angle}deg) translateZ(${radius}px)`,
               }}
               onClick={(e) => { 
-                  // CRITICAL FIX: Only active card handles click to preview. 
                   if (isActive) {
                       e.stopPropagation(); 
                       onExtract(item);
@@ -176,7 +174,7 @@ const Carousel: React.FC<CarouselProps> = ({ items, lineage, onExtract, isAdmin,
               {/* --- CARD CONTENT LAYER --- */}
               <div className="relative z-10 w-full h-full flex flex-col select-none">
                   
-                  {/* Header: Date + Badge */}
+                  {/* Header: Date + Badges */}
                   <div className="flex justify-between items-start mb-2 shrink-0">
                       <span className={`text-[10px] font-bold uppercase tracking-widest opacity-60 font-mono text-white`}>
                           {item.date}
@@ -187,6 +185,15 @@ const Carousel: React.FC<CarouselProps> = ({ items, lineage, onExtract, isAdmin,
                                   <Pin size={10} fill="currentColor" />
                               </div>
                           )}
+                          
+                          {/* --- NEW LECTURE BADGE --- */}
+                          {item.isLecture && (
+                              <div className={`flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded ${lineage === Lineage.WIZARD ? 'bg-indigo-600 text-indigo-100' : 'bg-cyan-400 text-black'}`}>
+                                  <Video size={10} />
+                                  <span className="hidden sm:inline">LECTURE</span>
+                              </div>
+                          )}
+
                           {item.isUnread && (
                               <div className={`px-2 py-0.5 text-[10px] font-bold rounded ${lineage === Lineage.WIZARD ? 'bg-emerald-600 text-black' : 'bg-fuchsia-600 text-black'}`}>NEW</div>
                           )}
@@ -201,7 +208,7 @@ const Carousel: React.FC<CarouselProps> = ({ items, lineage, onExtract, isAdmin,
                       >
                           {item.title || 'Untitled'}
                       </h2>
-                      {/* Content Container - With Custom HTML Support & Scrolling */}
+                      {/* Content Container */}
                       <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar">
                           <div 
                             className="text-xs text-white/70 font-sans leading-relaxed html-content"
@@ -231,7 +238,7 @@ const Carousel: React.FC<CarouselProps> = ({ items, lineage, onExtract, isAdmin,
                             `}
                           >
                               {lineage === Lineage.WIZARD ? <Sparkles size={12}/> : <Download size={12}/>}
-                              <span>READ</span>
+                              <span>{item.isLecture ? 'WATCH' : 'READ'}</span>
                           </button>
                       )}
                   </div>
@@ -251,7 +258,7 @@ const Carousel: React.FC<CarouselProps> = ({ items, lineage, onExtract, isAdmin,
         })}
       </div>
       
-      {/* Navigation Controls - Hidden on Mobile (Swipe), Visible on Desktop */}
+      {/* Navigation Controls */}
       <div className="hidden md:block">
         <button 
           onClick={(e) => { e.stopPropagation(); setActiveIndex(prev => (prev - 1 + safeLength) % safeLength); }}
@@ -273,13 +280,11 @@ const Carousel: React.FC<CarouselProps> = ({ items, lineage, onExtract, isAdmin,
         </button>
       </div>
 
-      {/* GLOBAL STYLE FOR HTML CONTENT RESTORATION */}
+      {/* GLOBAL STYLE */}
       <style dangerouslySetInnerHTML={{
         __html: `
           .preserve-3d { transform-style: preserve-3d; }
           .perspective-container { perspective: 1500px; }
-          
-          /* RESTORE DEFAULT HTML SPACING & LISTS */
           .html-content p { margin-bottom: 0.75em; min-height: 1em; }
           .html-content ul { list-style: disc outside; margin-left: 1.5em; margin-bottom: 0.75em; }
           .html-content ol { list-style: decimal outside; margin-left: 1.5em; margin-bottom: 0.75em; }

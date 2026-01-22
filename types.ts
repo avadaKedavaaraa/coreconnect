@@ -62,9 +62,11 @@ export interface CarouselItem {
   type: 'announcement' | 'file' | 'video' | 'task' | 'mixed' | 'link' | 'code' | 'link_tree';
   sector?: string;
   
-  // --- NEW FIELD ADDED HERE ---
   batch?: 'AICS' | 'CSDA' | 'General';
   
+  // --- NEW FIELD ADDED HERE ---
+  isLecture?: boolean;   // Identifies if this video is a lecture (enables smart player features)
+
   style?: ItemStyle;
   subject?: string;
   isUnread?: boolean;
@@ -153,7 +155,6 @@ export interface GlobalConfig {
   telegramLink?: string; 
   schedules?: LectureRule[]; 
   
-  // --- NEW CONFIG FIELD ---
   updatePopup?: UpdateAnnouncement;
 
   cursorStyle?: 'classic' | 'minimal' | 'blade' | 'enchanted';

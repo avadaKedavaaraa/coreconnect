@@ -2,8 +2,10 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Lineage, type CarouselItem } from '../types';
 import { 
   X, FileText, ExternalLink, Maximize2, Minimize2, ZoomIn, ZoomOut, 
-  RotateCw, Moon, Sun, StickyNote, Eye, EyeOff, Layers, 
-  Monitor, Smartphone, PenTool, Save, Trash2, AlignJustify, Loader2, Share2, CornerDownRight, Calendar, User, Tag, ArrowRight, AlertTriangle
+  RotateCw, Moon, Sun, StickyNote, Eye, Layers, 
+  Monitor, Smartphone, PenTool, Save, Trash2, AlignJustify, Loader2, Share2, 
+  CornerDownRight, Calendar, User, ArrowRight, AlertTriangle, 
+  Play, Pause, Scan, Sliders, Eraser
 } from 'lucide-react';
 import DOMPurify from 'dompurify';
 import { trackActivity } from '../services/tracking';
@@ -21,21 +23,31 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
   const isWizard = lineage === Lineage.WIZARD;
   
   // --- STATE ---
-  // Default to Google (Cloud) for stability, unless it's a local dev file
   const [engine, setEngine] = useState<RenderEngine>(() => {
       const url = item.fileUrl || '';
       if (url.includes('localhost') || url.includes('127.0.0.1')) return 'native';
       return 'google';
   });
 
+  // View States
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(100);
   const [rotation, setRotation] = useState(0);
   const [filter, setFilter] = useState<VisualFilter>('none');
   const [showRuler, setShowRuler] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState(false); // New Error State
+  const [loadError, setLoadError] = useState(false);
   
+  // Video Specific States
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [videoBrightness, setVideoBrightness] = useState(100);
+  
+  // Smart Region Selection (Smart Dark Mode)
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [dragStart, setDragStart] = useState<{x: number, y: number} | null>(null);
+  const [selectionRect, setSelectionRect] = useState<{x: number, y: number, w: number, h: number} | null>(null);
+  const [regionBrightness, setRegionBrightness] = useState(100); // Brightness of the dark mode area
+
   // Notebook State
   const [showNotes, setShowNotes] = useState(false);
   const [notes, setNotes] = useState('');
@@ -45,20 +57,21 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
   const rulerRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const videoContainerRef = useRef<HTMLDivElement>(null);
 
   // --- INIT & TRACKING ---
   useEffect(() => {
     setIsLoading(true);
     setLoadError(false);
     
-    // Auto-switch engine based on URL type
+    // Auto-switch engine based on URL
     if (item.fileUrl) {
         const url = item.fileUrl;
         const isDrive = url.includes('drive.google.com');
         const isLocal = url.includes('localhost');
         
-        // Force Google Engine for Drive & External PDFs (Fixes CORS issues)
-        if (isDrive || (!isLocal && !item.fileUrl.endsWith('.pdf'))) { 
+        if (isDrive || (!isLocal && !item.fileUrl.endsWith('.pdf') && !item.type.includes('video'))) { 
             setEngine('google'); 
         } else if (isLocal) {
             setEngine('native');
@@ -69,7 +82,7 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
     const saved = localStorage.getItem(`core_notes_${item.id}`);
     if (saved) setNotes(saved);
 
-    // TRACKING ACTIVITY
+    // TRACKING
     try {
         const profile = JSON.parse(localStorage.getItem('core_connect_profile') || '{}');
         if (profile.id) {
@@ -79,23 +92,6 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
 
   }, [item.id]);
 
-  // Close on Escape key
-  useEffect(() => {
-    const handleEsc = (e: KeyboardEvent) => {
-        if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', handleEsc);
-    return () => window.removeEventListener('keydown', handleEsc);
-  }, [onClose]);
-
-  // Prevent background scrolling
-  useEffect(() => {
-      document.body.style.overflow = 'hidden';
-      return () => { document.body.style.overflow = ''; };
-  }, []);
-
-  // --- HANDLERS ---
-  
   const isValidUrl = (url?: string) => {
     if (!url) return false;
     try {
@@ -108,41 +104,102 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
   const isVideo = item.type === 'video' || (safePdfUrl && safePdfUrl.match(/\.(mp4|webm|ogg|mov)$/i));
   const isGoogleDrive = safePdfUrl.includes('drive.google.com');
   const isMediaView = (item.type === 'file' || item.type === 'video' || item.type === 'link') && !!safePdfUrl;
+
+  // --- VIDEO CONTROLS ---
+
+  // Handle Play/Pause logic
+  const togglePlay = () => {
+    if (videoRef.current) {
+        if (videoRef.current.paused) {
+            videoRef.current.play();
+            setIsPlaying(true);
+        } else {
+            videoRef.current.pause();
+            setIsPlaying(false);
+        }
+    }
+  };
+
+  // Keyboard Shortcuts (Spacebar)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') onClose();
+        
+        // Only trigger spacebar if it's a video and we aren't typing in notes
+        if (e.code === 'Space' && isVideo && !showNotes) {
+            e.preventDefault(); // Stop page scrolling
+            togglePlay();
+        }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose, isVideo, showNotes]);
+
+  // Sync state if video controls are used natively
+  const handleVideoStateChange = () => {
+      if (videoRef.current) setIsPlaying(!videoRef.current.paused);
+  };
+
+  // --- SMART REGION SELECTION HANDLERS ---
   
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (!isSelectionMode || !videoContainerRef.current) return;
+    e.preventDefault();
+    
+    // Get coordinates relative to the video container
+    const rect = videoContainerRef.current.getBoundingClientRect();
+    // Adjust for zoom scaling if necessary (rect includes scale)
+    const x = (e.clientX - rect.left) / (zoomLevel / 100);
+    const y = (e.clientY - rect.top) / (zoomLevel / 100);
+    
+    setDragStart({ x, y });
+    setSelectionRect({ x, y, w: 0, h: 0 });
+  };
+
+  const handleMouseMoveSelection = (e: React.MouseEvent) => {
+    if (!isSelectionMode || !dragStart || !videoContainerRef.current) return;
+    
+    const rect = videoContainerRef.current.getBoundingClientRect();
+    const currentX = (e.clientX - rect.left) / (zoomLevel / 100);
+    const currentY = (e.clientY - rect.top) / (zoomLevel / 100);
+    
+    setSelectionRect({
+        x: Math.min(dragStart.x, currentX),
+        y: Math.min(dragStart.y, currentY),
+        w: Math.abs(currentX - dragStart.x),
+        h: Math.abs(currentY - dragStart.y)
+    });
+  };
+
+  const handleMouseUp = () => {
+    setDragStart(null);
+    if (selectionRect && (selectionRect.w < 10 || selectionRect.h < 10)) {
+        setSelectionRect(null); // Clear tiny accidental selections
+    }
+  };
+
+  // --- STANDARD HANDLERS ---
+
   // Robust Embed URL Generator
   const getEmbedUrl = (url: string, engineType: RenderEngine) => {
       if (!url) return '';
-
-      // 1. Handle Google Drive Links
       if (url.includes('drive.google.com')) {
           let id = '';
           const parts = url.split('/');
           const dIndex = parts.indexOf('d');
-          if (dIndex !== -1 && parts[dIndex + 1]) {
-              id = parts[dIndex + 1].split(/[?&]/)[0]; 
-          }
+          if (dIndex !== -1 && parts[dIndex + 1]) id = parts[dIndex + 1].split(/[?&]/)[0]; 
           if (!id) {
-             try {
-                 const urlObj = new URL(url);
-                 id = urlObj.searchParams.get('id') || '';
-             } catch(e) {}
+             try { const urlObj = new URL(url); id = urlObj.searchParams.get('id') || ''; } catch(e) {}
           }
           if (id) return `https://drive.google.com/file/d/${id}/preview`;
           return url.replace(/\/view.*$/, '/preview').replace(/\/edit.*$/, '/preview');
       }
-      
-      // 2. Handle Standard PDFs via Google Viewer (Bypasses CORS)
-      if (engineType === 'google') {
-          return `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`;
-      }
-      
-      // 3. Native (Direct Link)
+      if (engineType === 'google') return `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`;
       return url;
   };
 
   const currentSrc = getEmbedUrl(safePdfUrl, engine);
 
-  // Note Saving
   const handleSaveNotes = () => {
       localStorage.setItem(`core_notes_${item.id}`, notes);
       setSavedStatus('Saved!');
@@ -156,7 +213,7 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
       }
   };
 
-  const handleMouseMove = (e: React.MouseEvent) => {
+  const handleMouseMoveRuler = (e: React.MouseEvent) => {
       if (showRuler && rulerRef.current && containerRef.current) {
           const rect = containerRef.current.getBoundingClientRect();
           const y = e.clientY - rect.top;
@@ -166,13 +223,19 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
 
   // --- STYLES ---
   const getFilterStyle = () => {
+      let f = '';
+      // Apply Global Filter
       switch(filter) {
-          case 'invert': return 'invert(1) hue-rotate(180deg)';
-          case 'sepia': return 'sepia(0.8) contrast(1.2)';
-          case 'grayscale': return 'grayscale(1)';
-          case 'contrast': return 'contrast(1.5) saturate(1.5)';
-          default: return 'none';
+          case 'invert': f += 'invert(1) hue-rotate(180deg) '; break;
+          case 'sepia': f += 'sepia(0.8) contrast(1.2) '; break;
+          case 'grayscale': f += 'grayscale(1) '; break;
+          case 'contrast': f += 'contrast(1.5) saturate(1.5) '; break;
       }
+      // Apply Video Brightness
+      if (videoBrightness !== 100) {
+          f += `brightness(${videoBrightness}%) `;
+      }
+      return f;
   };
 
   const customStyle = item.style || {};
@@ -230,7 +293,6 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                                     <button 
                                         onClick={() => { setEngine('native'); setIsLoading(true); setLoadError(false); }} 
                                         className={`flex items-center gap-1 hover:underline ${engine === 'native' ? 'opacity-100 font-bold' : 'opacity-50'}`}
-                                        title="Use built-in browser viewer (Fast, but blocky)"
                                     >
                                         <Monitor size={10}/> Native
                                     </button>
@@ -239,7 +301,6 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                                 <button 
                                     onClick={() => { setEngine('google'); setIsLoading(true); setLoadError(false); }} 
                                     className={`flex items-center gap-1 hover:underline ${engine === 'google' || isGoogleDrive ? 'opacity-100 font-bold' : 'opacity-50'}`}
-                                    title="Use Cloud Viewer (Compatible, but slower)"
                                 >
                                     <Smartphone size={10}/> Cloud
                                 </button>
@@ -250,8 +311,6 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
 
                 {/* Main Controls */}
                 <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto no-scrollbar">
-                    
-                    {/* View Controls Group */}
                     {isMediaView && (
                         <>
                             <div className="flex items-center bg-black/20 rounded p-1">
@@ -267,20 +326,21 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                                 <button onClick={() => setFilter(f => f === 'sepia' ? 'none' : 'sepia')} className={`p-1.5 rounded ${filter === 'sepia' ? 'bg-amber-700 text-amber-100' : 'text-white/70'}`} title="Sepia Mode"><Sun size={16}/></button>
                                 <button onClick={() => setFilter(f => f === 'contrast' ? 'none' : 'contrast')} className={`p-1.5 rounded ${filter === 'contrast' ? 'bg-white text-black' : 'text-white/70'}`} title="High Contrast"><Eye size={16}/></button>
                             </div>
-
-                            <button 
-                                onClick={() => setShowRuler(!showRuler)} 
-                                className={`p-2 hover:bg-white/10 rounded transition-colors ${showRuler ? (isWizard ? 'text-emerald-400 bg-emerald-900/30' : 'text-fuchsia-400 bg-fuchsia-900/30') : 'text-white/70'}`} 
-                                title="Toggle Reading Ruler"
-                            >
-                                <AlignJustify size={18}/>
-                            </button>
+                            
+                            {/* Ruler Toggle - Only if not video (since video has controls there) or handle differently */}
+                            {!isVideo && (
+                                <button 
+                                    onClick={() => setShowRuler(!showRuler)} 
+                                    className={`p-2 hover:bg-white/10 rounded transition-colors ${showRuler ? (isWizard ? 'text-emerald-400 bg-emerald-900/30' : 'text-fuchsia-400 bg-fuchsia-900/30') : 'text-white/70'}`} 
+                                >
+                                    <AlignJustify size={18}/>
+                                </button>
+                            )}
 
                             <div className="w-px h-6 bg-white/10 mx-1 hidden sm:block"></div>
                         </>
                     )}
 
-                    {/* Sidebar Toggle */}
                     <button 
                         onClick={() => setShowNotes(!showNotes)} 
                         className={`p-2 rounded transition-colors flex items-center gap-2
@@ -288,7 +348,6 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                                 ? (isWizard ? 'bg-emerald-600 text-black' : 'bg-fuchsia-600 text-black') 
                                 : 'hover:bg-white/10 text-white/70'}
                         `}
-                        title="Notebook"
                     >
                         <StickyNote size={18} />
                         <span className="text-xs font-bold hidden md:block">Notes</span>
@@ -306,15 +365,14 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                 </div>
             </div>
 
-            {/* Document Container */}
+            {/* Document/Video Container */}
             <div 
                 ref={containerRef}
                 className="flex-1 bg-zinc-900 relative w-full overflow-hidden flex flex-col"
-                onMouseMove={handleMouseMove}
+                onMouseMove={handleMouseMoveRuler}
             >
                 {isMediaView ? (
                     <>
-                        {/* LOADING OVERLAY */}
                         {isLoading && !loadError && (
                             <div className={`absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm transition-opacity duration-300`}>
                                 <Loader2 className={`w-12 h-12 mb-4 animate-spin ${isWizard ? 'text-emerald-500' : 'text-fuchsia-500'}`} />
@@ -324,81 +382,159 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                             </div>
                         )}
 
-                        {/* ERROR OVERLAY */}
                         {loadError && (
                             <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/90 p-6 text-center">
                                 <AlertTriangle size={48} className="text-yellow-500 mb-4" />
                                 <h3 className="text-xl font-bold text-white mb-2">Display Error</h3>
                                 <p className="text-zinc-400 text-sm mb-6 max-w-md">
-                                    The embedded viewer could not load this file. This usually happens with secure files or strict browser privacy settings.
+                                    The embedded viewer could not load this file.
                                 </p>
-                                <a 
-                                    href={safePdfUrl} 
-                                    target="_blank" 
-                                    rel="noreferrer"
-                                    className={`px-6 py-3 rounded-full font-bold flex items-center gap-2 ${isWizard ? 'bg-emerald-600 text-black hover:bg-emerald-500' : 'bg-fuchsia-600 text-black hover:bg-fuchsia-500'}`}
-                                >
+                                <a href={safePdfUrl} target="_blank" rel="noreferrer" className={`px-6 py-3 rounded-full font-bold flex items-center gap-2 ${isWizard ? 'bg-emerald-600 text-black' : 'bg-fuchsia-600 text-black'}`}>
                                     <ExternalLink size={18} /> OPEN FILE EXTERNALLY
                                 </a>
-                                {engine === 'native' && (
-                                     <button 
-                                        onClick={() => { setEngine('google'); setLoadError(false); setIsLoading(true); }}
-                                        className="mt-4 text-xs text-white/50 hover:text-white underline"
-                                     >
-                                         Try switching to Cloud Viewer
-                                     </button>
-                                )}
                             </div>
                         )}
 
-                        {/* Viewer Area */}
                         {!loadError && (
                             <div 
-                                className="w-full h-full transition-all duration-300 origin-center relative z-10 flex-1"
-                                style={{ 
-                                    transform: `scale(${zoomLevel / 100}) rotate(${rotation}deg)`,
-                                    filter: getFilterStyle()
-                                }}
+                                className="w-full h-full transition-all duration-300 origin-center relative z-10 flex-1 flex items-center justify-center"
+                                style={{ transform: `scale(${zoomLevel / 100}) rotate(${rotation}deg)` }}
                             >
                                 {isVideo ? (
-                                    <div className="flex-1 bg-black flex items-center justify-center p-4 w-full h-full">
-                                        <video src={safePdfUrl} controls className="max-w-full max-h-full rounded shadow-lg w-full" onLoadStart={() => setIsLoading(true)} onLoadedData={() => setIsLoading(false)} onError={() => setLoadError(true)} />
-                                    </div>
-                                ) : (engine === 'native' && !isGoogleDrive) ? (
-                                    <object
-                                        data={currentSrc}
-                                        type="application/pdf"
-                                        className="w-full h-full"
-                                        onLoad={() => setIsLoading(false)}
-                                        onError={() => {
-                                            // Fallback to Google if Native fails
-                                            console.warn("Native load failed, switching to Google");
-                                            setEngine('google');
-                                        }}
+                                    // --- ENHANCED VIDEO PLAYER ---
+                                    <div 
+                                        ref={videoContainerRef}
+                                        className="relative group max-w-full max-h-full"
+                                        onMouseDown={handleMouseDown}
+                                        onMouseMove={handleMouseMoveSelection}
+                                        onMouseUp={handleMouseUp}
                                     >
-                                        <iframe 
-                                            src={getEmbedUrl(safePdfUrl, 'google')} 
-                                            className="w-full h-full border-0"
-                                            title="PDF Viewer Fallback"
-                                            onLoad={() => setIsLoading(false)}
+                                        <video 
+                                            ref={videoRef}
+                                            src={safePdfUrl} 
+                                            className="max-w-full max-h-[85vh] shadow-2xl" 
+                                            onLoadStart={() => setIsLoading(true)} 
+                                            onLoadedData={() => setIsLoading(false)} 
                                             onError={() => setLoadError(true)}
+                                            onPlay={handleVideoStateChange}
+                                            onPause={handleVideoStateChange}
+                                            style={{ 
+                                                filter: getFilterStyle(),
+                                                cursor: isSelectionMode ? 'crosshair' : 'default'
+                                            }}
                                         />
-                                    </object>
+
+                                        {/* SMART SELECTION OVERLAY */}
+                                        {selectionRect && (
+                                            <div 
+                                                className="absolute border-2 border-dashed border-white/50 bg-transparent z-10"
+                                                style={{
+                                                    left: selectionRect.x,
+                                                    top: selectionRect.y,
+                                                    width: selectionRect.w,
+                                                    height: selectionRect.h,
+                                                    // This applies the smart invert logic to the video content BEHIND this div
+                                                    backdropFilter: `invert(1) hue-rotate(180deg) brightness(${regionBrightness}%)`
+                                                }}
+                                            >
+                                                {/* Selection Controls (only show when mouse over or large enough) */}
+                                                <div className="absolute -top-8 right-0 flex gap-1">
+                                                     <button 
+                                                        onClick={(e) => { e.stopPropagation(); setSelectionRect(null); }}
+                                                        className="bg-red-500/80 p-1 rounded hover:bg-red-600 text-white"
+                                                     >
+                                                         <X size={12} />
+                                                     </button>
+                                                </div>
+                                            </div>
+                                        )}
+                                        
+                                        {/* Dragging Preview Box */}
+                                        {isSelectionMode && dragStart && (
+                                            <div className="absolute inset-0 z-20 bg-transparent pointer-events-none">
+                                                <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-black/70 px-3 py-1 rounded text-xs text-white">
+                                                    Drag to select area for Dark Mode
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* FLOATING VIDEO CONTROLS */}
+                                        <div className={`absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-4 px-4 py-2 rounded-xl backdrop-blur-md border shadow-xl z-30 transition-all duration-300 opacity-0 group-hover:opacity-100 ${isWizard ? 'bg-black/60 border-emerald-500/30' : 'bg-black/60 border-fuchsia-500/30'}`}>
+                                            
+                                            {/* Play/Pause */}
+                                            <button onClick={togglePlay} className={`p-2 rounded-full hover:scale-110 transition-transform ${isWizard ? 'bg-emerald-500 text-black' : 'bg-fuchsia-500 text-black'}`}>
+                                                {isPlaying ? <Pause size={20} fill="currentColor"/> : <Play size={20} fill="currentColor" className="ml-1"/>}
+                                            </button>
+
+                                            <div className="w-px h-8 bg-white/20"></div>
+
+                                            {/* Video Brightness */}
+                                            <div className="flex flex-col items-center gap-1">
+                                                <div className="flex items-center gap-2 text-[10px] text-white/70 font-mono">
+                                                    <Sun size={10} /> VIDEO
+                                                </div>
+                                                <input 
+                                                    type="range" min="30" max="200" 
+                                                    value={videoBrightness} 
+                                                    onChange={(e) => setVideoBrightness(Number(e.target.value))}
+                                                    className={`w-24 h-1 rounded-lg appearance-none cursor-pointer ${isWizard ? 'bg-emerald-900/50 accent-emerald-500' : 'bg-fuchsia-900/50 accent-fuchsia-500'}`}
+                                                />
+                                            </div>
+
+                                            <div className="w-px h-8 bg-white/20"></div>
+
+                                            {/* Smart Selection Toggle */}
+                                            <button 
+                                                onClick={() => setIsSelectionMode(!isSelectionMode)}
+                                                className={`p-2 rounded transition-colors flex flex-col items-center gap-0.5 ${isSelectionMode ? (isWizard ? 'text-emerald-400 bg-emerald-900/40' : 'text-fuchsia-400 bg-fuchsia-900/40') : 'text-white/50 hover:text-white'}`}
+                                                title="Select area to apply Smart Dark Mode"
+                                            >
+                                                <Scan size={20} />
+                                            </button>
+
+                                            {/* Region Brightness (Only if Selection Active) */}
+                                            {selectionRect && (
+                                                <div className="flex flex-col items-center gap-1 animate-in fade-in slide-in-from-right-4">
+                                                    <div className="flex items-center gap-2 text-[10px] text-white/70 font-mono">
+                                                        <Moon size={10} /> DARK AREA
+                                                    </div>
+                                                    <input 
+                                                        type="range" min="50" max="200" 
+                                                        value={regionBrightness} 
+                                                        onChange={(e) => setRegionBrightness(Number(e.target.value))}
+                                                        className={`w-24 h-1 rounded-lg appearance-none cursor-pointer ${isWizard ? 'bg-emerald-900/50 accent-emerald-500' : 'bg-fuchsia-900/50 accent-fuchsia-500'}`}
+                                                    />
+                                                </div>
+                                            )}
+
+                                            {selectionRect && (
+                                                 <button 
+                                                    onClick={() => setSelectionRect(null)}
+                                                    className="p-2 text-white/50 hover:text-red-400"
+                                                    title="Clear Selection"
+                                                >
+                                                    <Eraser size={18} />
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
                                 ) : (
-                                    <iframe 
-                                        src={currentSrc} 
-                                        className="w-full h-full border-0 bg-white"
-                                        title="Cloud Viewer"
-                                        allow="autoplay" 
-                                        onLoad={() => setIsLoading(false)}
-                                        onError={() => setLoadError(true)}
-                                    />
+                                    // --- STANDARD VIEWER (PDF/IMAGE) ---
+                                    <div className="w-full h-full" style={{ filter: getFilterStyle() }}>
+                                        {engine === 'native' && !isGoogleDrive ? (
+                                            <object data={currentSrc} type="application/pdf" className="w-full h-full" onLoad={() => setIsLoading(false)}>
+                                                <iframe src={getEmbedUrl(safePdfUrl, 'google')} className="w-full h-full border-0" title="PDF Viewer" />
+                                            </object>
+                                        ) : (
+                                            <iframe src={currentSrc} className="w-full h-full border-0 bg-white" title="Cloud Viewer" allow="autoplay" onLoad={() => setIsLoading(false)} onError={() => setLoadError(true)} />
+                                        )}
+                                    </div>
                                 )}
                             </div>
                         )}
 
-                        {/* Reading Ruler */}
-                        {showRuler && (
+                        {/* Reading Ruler (Non-Video Only) */}
+                        {showRuler && !isVideo && (
                             <div 
                                 ref={rulerRef}
                                 className={`absolute left-0 right-0 h-8 pointer-events-none z-30 mix-blend-difference opacity-50
@@ -409,21 +545,18 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                         )}
                     </>
                 ) : (
-                    // TEXT-ONLY MODE
+                    // --- TEXT MODE ---
                     <div className={`flex-1 overflow-y-auto p-6 md:p-10 space-y-8 relative ${isWizard ? 'scrollbar-wizard' : 'scrollbar-muggle'}`}>
-                        <div className="flex flex-wrap items-center gap-2 mb-3 text-[10px] uppercase tracking-widest font-bold opacity-70">
+                         <div className="flex flex-wrap items-center gap-2 mb-3 text-[10px] uppercase tracking-widest font-bold opacity-70">
                             <span className={`px-2 py-1 rounded border flex items-center gap-1 ${isWizard ? 'border-emerald-800 text-emerald-400' : 'border-fuchsia-800 text-fuchsia-400'}`}><CornerDownRight size={10} /> {item.sector || 'ARCHIVE'}</span>
                             <span className="flex items-center gap-1"><Calendar size={10}/> {item.date}</span>
                             <span className="flex items-center gap-1"><User size={10}/> {item.author || 'SYSTEM'}</span>
                         </div>
                         <h2 className="text-2xl md:text-3xl font-bold leading-tight break-words mb-6" style={titleStyle}>{item.title}</h2>
-
                         {item.image && <div className="rounded-xl overflow-hidden shadow-2xl border border-white/10 relative group"><img src={item.image} alt={item.title} className="w-full h-auto max-h-[500px] object-cover" /></div>}
-                        
                         <div ref={contentRef} className={`prose prose-invert max-w-none safe-font text-lg leading-relaxed html-content ${isWizard ? 'prose-emerald selection:bg-emerald-900/50' : 'prose-fuchsia selection:bg-fuchsia-900/50'}`} style={{ color: customStyle.contentColor || '#e4e4e7', fontFamily: '"Inter", "Segoe UI", sans-serif' }}>
                             {cleanContent ? <div dangerouslySetInnerHTML={{__html: cleanContent}}></div> : <p className="italic opacity-50 text-center py-10">No additional text content provided.</p>}
                         </div>
-                        
                         {safePdfUrl && (
                             <div className="mt-8 pt-8 border-t border-white/10">
                                 <a href={safePdfUrl} target="_blank" rel="noreferrer" className={`flex items-center justify-between p-4 rounded-xl border transition-all hover:scale-[1.01] group ${isWizard ? 'bg-emerald-900/20 border-emerald-500/30 hover:bg-emerald-900/30 hover:border-emerald-500' : 'bg-fuchsia-900/20 border-fuchsia-500/30 hover:bg-fuchsia-900/30 hover:border-fuchsia-500'}`}>
@@ -489,17 +622,9 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
         @keyframes fade-in-left { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        
         .safe-font { font-family: "Inter", system-ui, sans-serif !important; }
         .prose a { color: ${accentColor}; text-decoration: underline; text-underline-offset: 4px; }
-        .prose a:hover { opacity: 0.8; }
         .prose blockquote { border-left: 4px solid ${accentColor}; padding-left: 1em; font-style: italic; opacity: 0.8; }
-        .prose code { background: rgba(255,255,255,0.1); padding: 0.2em 0.4em; rounded: 4px; font-family: monospace; }
-        .prose pre { background: #000; padding: 1em; rounded: 8px; overflow-x: auto; }
-        .html-content p { margin-bottom: 0.75em; min-height: 1em; }
-        .html-content ul { list-style: disc outside; margin-left: 1.5em; margin-bottom: 0.75em; }
-        .html-content ol { list-style: decimal outside; margin-left: 1.5em; margin-bottom: 0.75em; }
-        .html-content li { margin-bottom: 0.25em; }
       `}} />
     </div>
   );
