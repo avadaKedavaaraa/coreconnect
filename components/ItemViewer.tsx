@@ -151,7 +151,7 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
     const handleKeyDown = (e: KeyboardEvent) => {
         if (e.key === 'Escape') {
             if (showControls) setShowControls(false);
-            else onClose();
+            // onClose(); // Removed close on escape
         }
         if (e.code === 'Space' && isVideoFile && !showNotes) {
             e.preventDefault(); 
@@ -288,9 +288,9 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
         {/* --- LEFT: MAIN VIEWER --- */}
         <div className="flex-1 flex flex-col relative min-w-0">
             
-            {/* Toolbar */}
-            <div className={`p-2 border-b flex flex-wrap items-center justify-between gap-2 shrink-0 z-30 relative
-                ${isWizard ? 'border-emerald-900 bg-emerald-950/80' : 'border-fuchsia-900 bg-fuchsia-950/80'}
+            {/* Toolbar - Glassmorphism applied */}
+            <div className={`p-2 border-b flex flex-wrap items-center justify-between gap-2 shrink-0 z-30 relative backdrop-blur-md
+                ${isWizard ? 'border-emerald-900/30 bg-emerald-950/40' : 'border-fuchsia-900/30 bg-fuchsia-950/40'}
             `}>
                 <div className="flex items-center gap-3 min-w-0 max-w-[40%]">
                     <div className={`p-2 rounded shrink-0 hidden sm:block ${isWizard ? 'bg-emerald-900/50 text-emerald-400' : 'bg-fuchsia-900/50 text-fuchsia-400'}`}>
@@ -331,7 +331,6 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                             title="Open Smart Controls"
                         >
                             <SlidersHorizontal size={18} />
-                            {/* Updated: Added whitespace-nowrap and hidden on sm to prevent UI conflict */}
                             <span className="text-xs font-bold hidden md:block whitespace-nowrap">Controls</span>
                         </button>
                     )}
@@ -355,13 +354,28 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                         <StickyNote size={18} />
                         <span className="text-xs font-bold hidden md:block">Notes</span>
                     </button>
+
+                    {/* --- NEW: Attached Resource Icon beside Notes --- */}
+                    {safePdfUrl && !isMediaView && (
+                        <a 
+                            href={safePdfUrl} 
+                            target="_blank" 
+                            rel="noreferrer" 
+                            className={`p-2 rounded transition-colors flex items-center gap-2 hover:bg-white/10 text-white/70`}
+                            title="Open Attached Resource"
+                        >
+                            {isGoogleDrive ? <Share2 size={18}/> : <ExternalLink size={18}/>}
+                            <span className="text-xs font-bold hidden md:block">Resource</span>
+                        </a>
+                    )}
+
                     <div className="w-px h-6 bg-white/10 mx-1 hidden sm:block"></div>
+
                     <button onClick={() => setIsFullScreen(!isFullScreen)} className="p-2 hover:bg-white/10 rounded text-white/70 hidden sm:block">
                         {isFullScreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
                     </button>
-                    <button onClick={onClose} className="p-2 hover:bg-red-500/20 rounded text-white/70 hover:text-red-400">
-                        <X size={20} />
-                    </button>
+
+                    {/* --- REMOVED: Close Button (The "cross part") --- */}
                 </div>
             </div>
 
@@ -479,17 +493,7 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                             {cleanContent ? <div dangerouslySetInnerHTML={{__html: cleanContent}}></div> : <p className="italic opacity-50 text-center py-10">No additional text content provided.</p>}
                         </div>
 
-                        {safePdfUrl && (
-                            <div className="mt-8 pt-8 border-t border-white/10">
-                                <a href={safePdfUrl} target="_blank" rel="noreferrer" className={`flex items-center justify-between p-4 rounded-xl border transition-all hover:scale-[1.01] group ${isWizard ? 'bg-emerald-900/20 border-emerald-500/30 hover:bg-emerald-900/30 hover:border-emerald-500' : 'bg-fuchsia-900/20 border-fuchsia-500/30 hover:bg-fuchsia-900/30 hover:border-fuchsia-500'}`}>
-                                    <div className="flex items-center gap-3">
-                                        <div className={`p-2 rounded-full ${isWizard ? 'bg-emerald-500/20 text-emerald-400' : 'bg-fuchsia-500/20 text-fuchsia-400'}`}>{isGoogleDrive ? <Share2 size={20}/> : <ExternalLink size={20}/>}</div>
-                                        <div><div className={`font-bold text-sm ${isWizard ? 'text-emerald-100' : 'text-fuchsia-100'}`}>Attached Resource</div><div className="text-xs opacity-50 truncate max-w-[200px] sm:max-w-md">{safePdfUrl}</div></div>
-                                    </div>
-                                    <ArrowRight size={20} className={`transform transition-transform group-hover:translate-x-1 ${isWizard ? 'text-emerald-500' : 'text-fuchsia-500'}`} />
-                                </a>
-                            </div>
-                        )}
+                        {/* --- REMOVED: Large Attached Resource Card --- */}
                     </div>
                 )}
 
