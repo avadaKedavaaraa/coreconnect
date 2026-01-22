@@ -745,11 +745,11 @@ function App() {
         onTouchEnd={handleTouchEnd}
         style={{ filter: visualFilter }}
     >
-      <div className={`absolute inset-0 z-50 pointer-events-none ${isWizard ? 'parchment-grain' : 'crt-scanlines'}`}></div>
+      {/* Line removed to stop flickering */}
       <LiveBackground lineage={lineage} />
 
       <Sidebar 
-        lineage={lineage} sectors={sectors} selectedSectorId={activeSectorId} 
+        lineage={lineage} sectors={sectors} selectedSectorId={activeSectorId}
         onSelectSector={setActiveSectorId} isOpen={sidebarOpen} setIsOpen={setSidebarOpen}
         onOpenSettings={() => { setAdminInitialTab('database'); setAdminPanelOpen(true); }} config={globalConfig}
       />
