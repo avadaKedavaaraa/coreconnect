@@ -23,8 +23,8 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
   const isWizard = lineage === Lineage.WIZARD;
   
   // --- SECTOR CHECK ---
-  // Smart Tools ONLY for "Academic Resources" (id: 'resources')
-  const enableSmartTools = item.sector === 'resources';
+  // Enable Smart Tools for Resources AND Lectures (or any sector you want)
+  const enableSmartTools = item.sector === 'resources' || item.sector === 'lectures';
 
   // --- STATE ---
   const [engine, setEngine] = useState<RenderEngine>(() => {
