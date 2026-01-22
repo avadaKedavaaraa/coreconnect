@@ -68,7 +68,7 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
         const url = item.fileUrl;
         const isDrive = url.includes('drive.google.com');
         const isLocal = url.includes('localhost');
-        const isSharePoint = url.includes('sharepoint.com') || url.includes('point'); // Basic detection
+        const isSharePoint = url.includes('sharepoint.com') || url.includes('point');
         
         // CRITICAL FIX: SharePoint/Stream must NOT use 'google' engine. It must be 'native' (iframe).
         if (isSharePoint) {
@@ -476,67 +476,70 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                     </div>
                 )}
 
-                {/* FLOATING UNIVERSAL CONTROLS (Always Available) */}
-                <div className={`absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-4 px-4 py-2 rounded-xl backdrop-blur-md border shadow-xl z-50 transition-all duration-300 opacity-0 group-hover:opacity-100 ${isWizard ? 'bg-black/80 border-emerald-500/30' : 'bg-black/80 border-fuchsia-500/30'}`}>
+                {/* --- IFRAME-PROOF HOVER CONTROLS (Z-INDEX TRICK) --- */}
+                <div className={`absolute bottom-0 left-0 right-0 h-32 z-50 flex items-end justify-center pb-6 bg-gradient-to-t from-black/80 to-transparent transition-opacity duration-300 opacity-0 hover:opacity-100 group-hover:opacity-100`}>
                     
-                    {/* Play/Pause (Native Video Only) */}
-                    {isVideoFile && (
-                        <>
-                            <button onClick={togglePlay} className={`p-2 rounded-full hover:scale-110 transition-transform ${isWizard ? 'bg-emerald-500 text-black' : 'bg-fuchsia-500 text-black'}`}>
-                                {isPlaying ? <Pause size={20} fill="currentColor"/> : <Play size={20} fill="currentColor" className="ml-1"/>}
-                            </button>
-                            <div className="w-px h-8 bg-white/20"></div>
-                        </>
-                    )}
+                    <div className={`flex items-center gap-4 px-4 py-2 rounded-xl backdrop-blur-md border shadow-xl ${isWizard ? 'bg-black/80 border-emerald-500/30' : 'bg-black/80 border-fuchsia-500/30'}`}>
+                        
+                        {/* Play/Pause (Native Video Only) */}
+                        {isVideoFile && (
+                            <>
+                                <button onClick={togglePlay} className={`p-2 rounded-full hover:scale-110 transition-transform ${isWizard ? 'bg-emerald-500 text-black' : 'bg-fuchsia-500 text-black'}`}>
+                                    {isPlaying ? <Pause size={20} fill="currentColor"/> : <Play size={20} fill="currentColor" className="ml-1"/>}
+                                </button>
+                                <div className="w-px h-8 bg-white/20"></div>
+                            </>
+                        )}
 
-                    {/* Brightness */}
-                    <div className="flex flex-col items-center gap-1">
-                        <div className="flex items-center gap-2 text-[10px] text-white/70 font-mono">
-                            <Sun size={10} /> BRIGHTNESS
-                        </div>
-                        <input 
-                            type="range" min="30" max="200" 
-                            value={videoBrightness} 
-                            onChange={(e) => setVideoBrightness(Number(e.target.value))}
-                            className={`w-24 h-1 rounded-lg appearance-none cursor-pointer ${isWizard ? 'bg-emerald-900/50 accent-emerald-500' : 'bg-fuchsia-900/50 accent-fuchsia-500'}`}
-                        />
-                    </div>
-
-                    <div className="w-px h-8 bg-white/20"></div>
-
-                    {/* Smart Selection Toggle */}
-                    <button 
-                        onClick={() => setIsSelectionMode(!isSelectionMode)}
-                        className={`p-2 rounded transition-colors flex flex-col items-center gap-0.5 ${isSelectionMode ? (isWizard ? 'text-emerald-400 bg-emerald-900/40' : 'text-fuchsia-400 bg-fuchsia-900/40') : 'text-white/50 hover:text-white'}`}
-                        title="Select area to apply Smart Dark Mode"
-                    >
-                        <Scan size={20} />
-                    </button>
-
-                    {/* Region Brightness (Only if Selection Active) */}
-                    {selectionRect && (
-                        <div className="flex flex-col items-center gap-1 animate-in fade-in slide-in-from-right-4">
+                        {/* Brightness */}
+                        <div className="flex flex-col items-center gap-1">
                             <div className="flex items-center gap-2 text-[10px] text-white/70 font-mono">
-                                <Moon size={10} /> DARK AREA
+                                <Sun size={10} /> BRIGHTNESS
                             </div>
                             <input 
-                                type="range" min="50" max="200" 
-                                value={regionBrightness} 
-                                onChange={(e) => setRegionBrightness(Number(e.target.value))}
+                                type="range" min="30" max="200" 
+                                value={videoBrightness} 
+                                onChange={(e) => setVideoBrightness(Number(e.target.value))}
                                 className={`w-24 h-1 rounded-lg appearance-none cursor-pointer ${isWizard ? 'bg-emerald-900/50 accent-emerald-500' : 'bg-fuchsia-900/50 accent-fuchsia-500'}`}
                             />
                         </div>
-                    )}
 
-                    {selectionRect && (
-                            <button 
-                            onClick={() => setSelectionRect(null)}
-                            className="p-2 text-white/50 hover:text-red-400"
-                            title="Clear Selection"
+                        <div className="w-px h-8 bg-white/20"></div>
+
+                        {/* Smart Selection Toggle */}
+                        <button 
+                            onClick={() => setIsSelectionMode(!isSelectionMode)}
+                            className={`p-2 rounded transition-colors flex flex-col items-center gap-0.5 ${isSelectionMode ? (isWizard ? 'text-emerald-400 bg-emerald-900/40' : 'text-fuchsia-400 bg-fuchsia-900/40') : 'text-white/50 hover:text-white'}`}
+                            title="Select area to apply Smart Dark Mode"
                         >
-                            <Eraser size={18} />
+                            <Scan size={20} />
                         </button>
-                    )}
+
+                        {/* Region Brightness (Only if Selection Active) */}
+                        {selectionRect && (
+                            <div className="flex flex-col items-center gap-1 animate-in fade-in slide-in-from-right-4">
+                                <div className="flex items-center gap-2 text-[10px] text-white/70 font-mono">
+                                    <Moon size={10} /> DARK AREA
+                                </div>
+                                <input 
+                                    type="range" min="50" max="200" 
+                                    value={regionBrightness} 
+                                    onChange={(e) => setRegionBrightness(Number(e.target.value))}
+                                    className={`w-24 h-1 rounded-lg appearance-none cursor-pointer ${isWizard ? 'bg-emerald-900/50 accent-emerald-500' : 'bg-fuchsia-900/50 accent-fuchsia-500'}`}
+                                />
+                            </div>
+                        )}
+
+                        {selectionRect && (
+                                <button 
+                                onClick={() => setSelectionRect(null)}
+                                className="p-2 text-white/50 hover:text-red-400"
+                                title="Clear Selection"
+                            >
+                                <Eraser size={18} />
+                            </button>
+                        )}
+                    </div>
                 </div>
 
             </div>
