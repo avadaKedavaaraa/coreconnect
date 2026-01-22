@@ -25,7 +25,7 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
   const isWizard = lineage === Lineage.WIZARD;
   
   // --- SECTOR CHECK ---
-  // STRICTLY Scope "Normal Player" changes to 'resources' sector
+  // STRICTLY Scope "Normal Player" changes to 'resources' sector as requested
   const isResourcesSector = item.sector === 'resources';
   const enableSmartTools = isResourcesSector || item.sector === 'lectures' || item.type === 'link_tree';
   const isLinkTree = item.type === 'link_tree';
@@ -38,18 +38,19 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
   });
 
   // --- PREFERENCES: VIDEO PLAYER MODE ---
-  // Check if mobile for default behavior
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
-
   const [videoPlayerMode, setVideoPlayerMode] = useState<VideoPlayerMode>(() => {
-      // If it's a Resource on Mobile, DEFAULT to 'native' (Normal Player)
+      // 1. Check Mobile
+      const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+      
+      // 2. If Resource + Mobile -> Force Native (Normal) Default
       if (isResourcesSector && isMobile) return 'native';
       
+      // 3. Otherwise load user preference
       const saved = localStorage.getItem('core_video_mode') as VideoPlayerMode;
       return saved || 'smart';
   });
 
-  // Save Preference
+  // Save Preference locally when changed in viewer
   useEffect(() => {
       localStorage.setItem('core_video_mode', videoPlayerMode);
   }, [videoPlayerMode]);
