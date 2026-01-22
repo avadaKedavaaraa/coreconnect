@@ -165,8 +165,6 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
   const handleContextMenu = (e: React.MouseEvent) => {
       if (!enableSmartTools) return;
       
-      // If Smart Layer is NOT active, we can't catch iframe clicks.
-      // But if we are clicking the "Glass", we can.
       e.preventDefault(); 
       
       let x = e.clientX;
@@ -182,7 +180,6 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
 
   // --- DRAG SELECTION HANDLERS ---
   const handleMouseDown = (e: React.MouseEvent) => {
-    // We only drag if Smart Layer is Active OR Selection Mode is explicitly ON
     if ((!isSmartLayerActive && !isSelectionMode) || !containerRef.current) return;
     if ((e.target as HTMLElement).closest('button')) return;
     if (showContextMenu && contextMenuRef.current?.contains(e.target as Node)) return; 
@@ -221,8 +218,6 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
     if (selectionRect && (selectionRect.w < 10 || selectionRect.h < 10)) {
         setSelectionRect(null); 
     } else if (selectionRect) {
-        // Automatically open menu to let user adjust brightness of the box
-        // But delay slightly to not conflict with click
         setTimeout(() => setShowContextMenu(true), 100);
         setIsSelectionMode(false); 
     }
@@ -299,6 +294,7 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                         <h3 className={`font-bold text-xs sm:text-sm truncate ${isWizard ? 'text-emerald-100' : 'text-fuchsia-100'}`}>
                             {item.title}
                         </h3>
+                        {/* Engine Switcher */}
                         {isMediaView && (
                             <div className="flex gap-2 text-[10px] mt-0.5">
                                 {!isGoogleDrive && (
@@ -317,25 +313,6 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
 
                 <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto no-scrollbar">
                     
-                    {/* SMART TOGGLE (Only for Resources) */}
-                    {enableSmartTools && (
-                        <button 
-                            onClick={() => setIsSmartLayerActive(!isSmartLayerActive)}
-                            className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition-all border
-                                ${isSmartLayerActive 
-                                    ? (isWizard ? 'bg-emerald-500 text-black border-emerald-400' : 'bg-fuchsia-500 text-black border-fuchsia-400')
-                                    : 'bg-white/5 border-white/10 hover:bg-white/10 text-white/70'
-                                }
-                            `}
-                        >
-                            {isSmartLayerActive ? <Unlock size={14}/> : <Lock size={14}/>}
-                            <span className="hidden sm:block">{isSmartLayerActive ? 'SMART MODE ON' : 'ENABLE SMART'}</span>
-                        </button>
-                    )}
-
-                    <div className="w-px h-6 bg-white/10 mx-1 hidden sm:block"></div>
-
-                    {/* Standard Controls */}
                     <div className="flex items-center bg-black/20 rounded p-1">
                         <button onClick={() => setZoomLevel(z => Math.max(50, z - 10))} className="p-1.5 hover:bg-white/10 rounded text-white/70" title="Zoom Out"><ZoomOut size={16}/></button>
                         <span className="text-[10px] font-mono w-8 text-center hidden sm:block">{zoomLevel}%</span>
@@ -440,6 +417,36 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                             <span className="flex items-center gap-1"><User size={10}/> {item.author || 'SYSTEM'}</span>
                         </div>
                         <h2 className="text-2xl md:text-3xl font-bold leading-tight break-words mb-6" style={titleStyle}>{item.title}</h2>
+                        
+                        {/* --- NEW LOGIN WARNING BAR WITH TRIGGER --- */}
+                        {(item.content && item.content.includes('iframe')) && (
+                            <div className={`p-3 rounded-lg border mb-6 flex flex-wrap items-center justify-between gap-4 animate-[fade-in_0.3s_ease-out]
+                                ${isWizard ? 'bg-amber-900/20 border-amber-700/50' : 'bg-amber-900/20 border-amber-700/50'}
+                            `}>
+                                <div className="flex items-start gap-3">
+                                    <AlertTriangle size={18} className="text-amber-400 mt-0.5 shrink-0" />
+                                    <div className="text-xs text-amber-200/90 leading-relaxed max-w-xl">
+                                        If the video shows a login screen, please ensure you are logged into your college account.
+                                    </div>
+                                </div>
+                                
+                                {enableSmartTools && (
+                                    <button 
+                                        onClick={() => setIsSmartLayerActive(!isSmartLayerActive)}
+                                        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all border shadow-lg shrink-0
+                                            ${isSmartLayerActive 
+                                                ? (isWizard ? 'bg-emerald-500 text-black border-emerald-400' : 'bg-fuchsia-500 text-black border-fuchsia-400')
+                                                : 'bg-white/10 border-white/20 hover:bg-white/20 text-white'
+                                            }
+                                        `}
+                                    >
+                                        {isSmartLayerActive ? <Unlock size={14}/> : <Lock size={14}/>}
+                                        <span>{isSmartLayerActive ? 'SMART MODE ON' : 'ENABLE SMART'}</span>
+                                    </button>
+                                )}
+                            </div>
+                        )}
+
                         {item.image && <div className="rounded-xl overflow-hidden shadow-2xl border border-white/10 relative group"><img src={item.image} alt={item.title} className="w-full h-auto max-h-[500px] object-cover" /></div>}
                         
                         <div className={`prose prose-invert max-w-none safe-font text-lg leading-relaxed html-content ${isWizard ? 'prose-emerald selection:bg-emerald-900/50' : 'prose-fuchsia selection:bg-fuchsia-900/50'}`} style={{ color: customStyle.contentColor || '#e4e4e7', fontFamily: '"Inter", "Segoe UI", sans-serif' }}>
