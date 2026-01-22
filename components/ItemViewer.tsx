@@ -31,8 +31,9 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
 
   // --- STATE ---
   const [engine, setEngine] = useState<RenderEngine>(() => {
+      // Default to Native for SharePoint/Local, Cloud for Drive
       const url = item.fileUrl || '';
-      if (url.includes('localhost') || url.includes('127.0.0.1')) return 'native';
+      if (url.includes('sharepoint') || url.includes('localhost') || url.includes('127.0.0.1')) return 'native';
       return 'google';
   });
 
@@ -108,6 +109,7 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
       const handleClickOutside = (e: MouseEvent) => {
           if (showControls && controlsRef.current && !controlsRef.current.contains(e.target as Node)) {
               const target = e.target as HTMLElement;
+              // Don't close if clicking the trigger button
               if (!target.closest('.control-trigger')) {
                   setShowControls(false);
               }
@@ -213,7 +215,8 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
     }
   };
 
-  const handleResetFilters = () => {
+  const handleResetFilters = (e: React.MouseEvent) => {
+      e.stopPropagation();
       setVideoBrightness(100);
       setFilter('none');
       setZoomLevel(100);
@@ -224,7 +227,8 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
   const getFilterStyle = () => {
       let f = '';
       switch(filter) {
-          case 'invert': f += 'invert(1) hue-rotate(180deg) '; break;
+          // Tweaked Invert to reduce "gradient text" effect (High Contrast)
+          case 'invert': f += 'invert(1) hue-rotate(180deg) contrast(0.9) '; break;
           case 'sepia': f += 'sepia(0.8) contrast(1.2) '; break;
           case 'grayscale': f += 'grayscale(1) '; break;
           case 'contrast': f += 'contrast(1.5) saturate(1.5) '; break;
@@ -256,7 +260,8 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
   });
 
   return (
-    <div className={`fixed z-[130] flex items-center justify-center p-0 sm:p-4 animate-[fade-in_0.2s_ease-out]
+    // UPDATED Z-INDEX TO 5000 TO BEAT SIDEBAR
+    <div className={`fixed z-[5000] flex items-center justify-center p-0 sm:p-4 animate-[fade-in_0.2s_ease-out]
         ${isFullScreen ? 'inset-0 bg-black' : 'inset-0 bg-black/90 backdrop-blur-xl'}
     `}>
       <div 
@@ -355,7 +360,6 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
 
                 <div className="w-px h-6 bg-white/10 mx-1 hidden sm:block"></div>
 
-                {/* APP FULLSCREEN BUTTON - RECOMMENDED */}
                 <button onClick={() => setIsFullScreen(!isFullScreen)} className="p-2 hover:bg-white/10 rounded text-white/70 hidden sm:block" title="App Fullscreen (Keeps Controls)">
                     {isFullScreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
                 </button>
@@ -421,10 +425,10 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                                             filter: getFilterStyle(),
                                             cursor: isSmartLayerActive ? 'crosshair' : 'default'
                                         }}
+                                        controls // Ensure native controls are present for direct files
                                     />
                                 ) : (
                                     <div className="w-full h-full" style={{ filter: getFilterStyle(), cursor: isSmartLayerActive ? 'crosshair' : 'default' }}>
-                                        {/* Use <object> ONLY for PDF to allow plugins, otherwise direct iframe for better video support */}
                                         {engine === 'native' && !isGoogleDrive ? (
                                             isPdf ? (
                                                 <object data={safePdfUrl} type="application/pdf" className="w-full h-full" onLoad={() => setIsLoading(false)}>
@@ -590,7 +594,14 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                                 <button onClick={handleResetFilters} className="p-1 hover:bg-white/10 rounded text-red-400" title="Reset All">
                                     <RefreshCw size={14}/>
                                 </button>
-                                <button onClick={() => setShowControls(false)} className="p-1 hover:bg-white/10 rounded text-white" title="Close">
+                                <button 
+                                    onClick={(e) => { 
+                                        e.stopPropagation(); 
+                                        setShowControls(false); 
+                                    }} 
+                                    className="p-1 hover:bg-white/10 rounded text-white" 
+                                    title="Close"
+                                >
                                     <X size={14}/>
                                 </button>
                             </div>
