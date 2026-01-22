@@ -850,39 +850,40 @@ export const SectorView: React.FC<SectorViewProps> = ({
 
                     {/* Header - MOBILE OPTIMIZED 📱 */}
                     {/* Header - Optimized for both Phone & Laptop */}
-<div className="flex justify-between items-center p-4 gap-4 border-b border-white/10 bg-[#0f0f0f] shadow-2xl relative z-50">
-    
-    {/* 1. TITLE SECTION */}
-    {/* min-w-0 and overflow-hidden prevent text from pushing button off-screen */}
-    <div className="flex items-center gap-3 min-w-0 flex-1 overflow-hidden">
-        
-        {/* LAPTOP ONLY: Show "ARCHIVE PLAYER" text */}
-        <h3 className="font-bold text-white tracking-[0.2em] hidden sm:block shrink-0">
-            ARCHIVE PLAYER
-        </h3>
+                    <div className="flex justify-between items-center p-4 gap-4 border-b border-white/10 bg-[#0f0f0f] shadow-2xl relative z-50">
 
-        {/* PHONE & LAPTOP: The Item Title */}
-        {/* truncated to ensure it doesn't overlap the cross button */}
-        <div className="flex items-center gap-2 text-xs text-zinc-400 bg-white/5 px-3 py-1 rounded-full border border-white/5 min-w-0 max-w-full">
-            <span className="uppercase truncate block">{cinemaItem.title}</span>
-        </div>
-    </div>
+                        {/* 1. TITLE SECTION */}
+                        {/* min-w-0 and overflow-hidden prevent text from pushing button off-screen */}
+                        <div className="flex items-center gap-3 min-w-0 flex-1 overflow-hidden">
 
-    {/* 2. CLOSE BUTTON SECTION */}
-    {/* shrink-0 ensures this button NEVER disappears or gets squished */}
-    <button 
-        onClick={() => { setCinemaMode(false); setCinemaItem(null); }} 
-        className="shrink-0 p-3 rounded-full bg-white/10 hover:bg-red-500/20 border border-white/10 hover:border-red-500/50 transition-all duration-300 z-50"
-        title="Close Player (Esc)"
-    >
-        <X size={24} className="text-white group-hover:text-red-400 group-hover:rotate-90 transition-transform duration-300" />
-    </button>
-</div>
+                            {/* LAPTOP ONLY: Show "ARCHIVE PLAYER" text */}
+                            <h3 className="font-bold text-white tracking-[0.2em] hidden sm:block shrink-0">
+                                ARCHIVE PLAYER
+                            </h3>
+
+                            {/* PHONE & LAPTOP: The Item Title */}
+                            {/* truncated to ensure it doesn't overlap the cross button */}
+                            <div className="flex items-center gap-2 text-xs text-zinc-400 bg-white/5 px-3 py-1 rounded-full border border-white/5 min-w-0 max-w-full">
+                                <span className="uppercase truncate block">{cinemaItem.title}</span>
+                            </div>
+                        </div>
+
+                        {/* 2. CLOSE BUTTON SECTION */}
+                        {/* shrink-0 ensures this button NEVER disappears or gets squished */}
+                        <button
+                            onClick={() => { setCinemaMode(false); setCinemaItem(null); }}
+                            className="shrink-0 p-3 rounded-full bg-white/10 hover:bg-red-500/20 border border-white/10 hover:border-red-500/50 transition-all duration-300 z-50"
+                            title="Close Player (Esc)"
+                        >
+                            <X size={24} className="text-white group-hover:text-red-400 group-hover:rotate-90 transition-transform duration-300" />
+                        </button>
+                    </div>
 
                     {/* Video Area */}
                     <div className="flex-1 flex items-center justify-center p-2 sm:p-10 relative overflow-hidden">
                         <div className="w-full max-w-6xl aspect-video bg-black shadow-2xl rounded-xl border border-white/10 overflow-hidden relative group">
                             <div
+                                key={cinemaItem.id}  // 👈 THIS IS THE FIX
                                 className="w-full h-full"
                                 dangerouslySetInnerHTML={{
                                     __html: DOMPurify.sanitize(cinemaItem.content, {
