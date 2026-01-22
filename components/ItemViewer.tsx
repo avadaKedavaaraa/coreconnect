@@ -25,7 +25,9 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
   const isWizard = lineage === Lineage.WIZARD;
   
   // --- SECTOR CHECK ---
-  const enableSmartTools = item.sector === 'resources' || item.sector === 'lectures' || item.type === 'link_tree';
+  // STRICTLY Scope "Normal Player" changes to 'resources' sector
+  const isResourcesSector = item.sector === 'resources';
+  const enableSmartTools = isResourcesSector || item.sector === 'lectures' || item.type === 'link_tree';
   const isLinkTree = item.type === 'link_tree';
 
   // --- STATE ---
@@ -36,8 +38,15 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
   });
 
   // --- PREFERENCES: VIDEO PLAYER MODE ---
+  // Check if mobile for default behavior
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+
   const [videoPlayerMode, setVideoPlayerMode] = useState<VideoPlayerMode>(() => {
-      return (localStorage.getItem('core_video_mode') as VideoPlayerMode) || 'smart';
+      // If it's a Resource on Mobile, DEFAULT to 'native' (Normal Player)
+      if (isResourcesSector && isMobile) return 'native';
+      
+      const saved = localStorage.getItem('core_video_mode') as VideoPlayerMode;
+      return saved || 'smart';
   });
 
   // Save Preference
@@ -139,13 +148,14 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
   const isPdf = safePdfUrl.toLowerCase().endsWith('.pdf');
   const isGoogleDrive = safePdfUrl.includes('drive.google.com');
   const isMediaView = (item.type === 'file' || item.type === 'video' || item.type === 'link' || item.isLecture) && !!safePdfUrl;
-  
-  // Clean Mode (Native Player) Logic
-  const isNativeMode = isVideoFile && videoPlayerMode === 'native';
+
+  // --- MODE LOGIC ---
+  // Only apply Native Mode changes if it's a Resource AND user selected Native Mode
+  const isNativeMode = isVideoFile && isResourcesSector && videoPlayerMode === 'native';
 
   // --- VIDEO CONTROLS ---
   const togglePlay = () => {
-    if (isNativeMode) return;
+    if (isNativeMode) return; // Native controls handle this
     if (videoRef.current) {
         if (videoRef.current.paused) {
             videoRef.current.play();
@@ -189,7 +199,7 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
   const handleMouseDown = (e: React.MouseEvent) => {
     // In Native Mode, only intercept if Smart Layer is explicitly ACTIVE
     if (isNativeMode && !isSmartLayerActive && !isSelectionMode) return;
-
+    
     if ((!isSmartLayerActive && !isSelectionMode) || !containerRef.current) return;
     if ((e.target as HTMLElement).closest('button')) return;
     if ((e.target as HTMLElement).closest('input')) return;
@@ -272,6 +282,7 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
   });
 
   return (
+    // Z-INDEX MAX to cover everything in Native Mode
     <div className={`fixed top-0 left-0 right-0 bottom-0 z-[2147483647] flex items-center justify-center p-0 sm:p-4 animate-[fade-in_0.2s_ease-out]
         ${isFullScreen || isNativeMode ? 'bg-black' : 'bg-black/90 backdrop-blur-xl'}
     `}>
@@ -317,6 +328,26 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
 
                 <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto no-scrollbar">
                     
+                    {/* --- NEW: PLAYER MODE TOGGLE IN TOP NAVBAR (Only for Resources) --- */}
+                    {isVideoFile && isResourcesSector && (
+                         <div className="flex items-center bg-black/20 rounded p-1 mr-2 border border-white/5">
+                            <button 
+                                onClick={() => setVideoPlayerMode('smart')} 
+                                className={`p-1.5 rounded transition-all ${videoPlayerMode === 'smart' ? 'bg-white/20 text-white' : 'text-white/40 hover:text-white'}`}
+                                title="Smart Player"
+                            >
+                                <Layers size={14} />
+                            </button>
+                            <button 
+                                onClick={() => setVideoPlayerMode('native')} 
+                                className={`p-1.5 rounded transition-all ${videoPlayerMode === 'native' ? 'bg-white/20 text-white' : 'text-white/40 hover:text-white'}`}
+                                title="Normal Player"
+                            >
+                                <Monitor size={14} />
+                            </button>
+                         </div>
+                    )}
+
                     {enableSmartTools && (
                         <button 
                             onClick={() => setShowControls(!showControls)}
@@ -474,7 +505,7 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                         `}
                         style={{ filter: getFilterStyle() }} 
                     >
-                        {/* (Text content omitted for brevity - logic remains same) */}
+                        {/* (No changes to text logic) */}
                         {!isLinkTree && (
                             <h2 className="text-2xl md:text-3xl font-bold leading-tight break-words mb-6" style={titleStyle}>{item.title}</h2>
                         )}
@@ -497,39 +528,18 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
 
                 {/* --- UNIVERSAL OVERLAYS --- */}
                 {showRuler && (
-                    <div 
-                        ref={rulerRef}
-                        className={`absolute left-0 right-0 h-8 pointer-events-none z-30 mix-blend-difference opacity-50
-                            ${isWizard ? 'bg-emerald-500/30 border-y border-emerald-400' : 'bg-fuchsia-500/30 border-y border-fuchsia-400'}
-                        `}
-                        style={{ top: '50%' }}
-                    ></div>
+                    <div ref={rulerRef} className={`absolute left-0 right-0 h-8 pointer-events-none z-30 mix-blend-difference opacity-50 ${isWizard ? 'bg-emerald-500/30 border-y border-emerald-400' : 'bg-fuchsia-500/30 border-y border-fuchsia-400'}`} style={{ top: '50%' }}></div>
                 )}
-
                 {selectionRect && (
-                    <div 
-                        className="absolute border-2 border-dashed border-white/50 bg-transparent z-40 pointer-events-none"
-                        style={{
-                            left: selectionRect.x,
-                            top: selectionRect.y,
-                            width: selectionRect.w,
-                            height: selectionRect.h,
-                            backdropFilter: `invert(1) hue-rotate(180deg) brightness(${regionBrightness}%)`
-                        }}
-                    >
-                        <div className="absolute -top-8 right-0 flex gap-1 pointer-events-auto">
-                            <button onClick={(e) => { e.stopPropagation(); setSelectionRect(null); }} className="bg-red-500/80 p-1 rounded hover:bg-red-600 text-white">
-                                <X size={12} />
-                            </button>
+                    <div className="absolute border-2 border-dashed border-white/50 bg-transparent z-40 pointer-events-none" style={{ left: selectionRect.x, top: selectionRect.y, width: selectionRect.w, height: selectionRect.h, backdropFilter: `invert(1) hue-rotate(180deg) brightness(${regionBrightness}%)` }}>
+                         <div className="absolute -top-8 right-0 flex gap-1 pointer-events-auto">
+                            <button onClick={(e) => { e.stopPropagation(); setSelectionRect(null); }} className="bg-red-500/80 p-1 rounded hover:bg-red-600 text-white"><X size={12} /></button>
                         </div>
                     </div>
                 )}
-                
                 {isSelectionMode && dragStart && (
                     <div className="absolute inset-0 z-50 bg-transparent pointer-events-none">
-                        <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-black/70 px-3 py-1 rounded text-xs text-white">
-                            Drag to select area for Dark Mode
-                        </div>
+                        <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-black/70 px-3 py-1 rounded text-xs text-white">Drag to select area for Dark Mode</div>
                     </div>
                 )}
 
@@ -540,142 +550,65 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                         className={`fixed z-[2147483647] p-4 rounded-xl border backdrop-blur-xl shadow-2xl flex flex-col gap-4 animate-in fade-in zoom-in-95 duration-200 text-white
                             ${isWizard ? 'bg-black/95 border-emerald-500/50 shadow-emerald-900/50' : 'bg-black/95 border-fuchsia-500/50 shadow-fuchsia-900/50'}
                         `}
-                        style={{ 
-                            left: menuPos.x, 
-                            top: menuPos.y, 
-                            minWidth: '320px'
-                        }}
+                        style={{ left: menuPos.x, top: menuPos.y, minWidth: '320px' }}
                         onMouseDown={(e) => e.stopPropagation()} 
                     >
                         <div className="flex items-center justify-between text-xs font-bold uppercase tracking-widest opacity-70 mb-1 border-b border-white/10 pb-2">
                             <span className="flex items-center gap-2"><SlidersHorizontal size={14}/> Smart Controls</span>
                             <div className="flex gap-2">
-                                <button onClick={handleResetFilters} className="p-1 hover:bg-white/10 rounded text-red-400" title="Reset All">
-                                    <RefreshCw size={14}/>
-                                </button>
-                                <button onClick={(e) => { e.stopPropagation(); setShowControls(false); }} className="p-1 hover:bg-white/10 rounded text-white" title="Close">
-                                    <X size={14}/>
-                                </button>
+                                <button onClick={handleResetFilters} className="p-1 hover:bg-white/10 rounded text-red-400" title="Reset All"><RefreshCw size={14}/></button>
+                                <button onClick={(e) => { e.stopPropagation(); setShowControls(false); }} className="p-1 hover:bg-white/10 rounded text-white" title="Close"><X size={14}/></button>
                             </div>
                         </div>
 
-                        {/* Smart Layer Switch (Frame Interaction Lock) */}
-                        <button 
-                            onClick={() => setIsSmartLayerActive(!isSmartLayerActive)}
-                            className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-bold border transition-all
-                                ${isSmartLayerActive 
-                                    ? (isWizard ? 'bg-emerald-900/50 border-emerald-500 text-emerald-100' : 'bg-fuchsia-900/50 border-fuchsia-500 text-fuchsia-100')
-                                    : 'bg-white/5 border-white/10 text-white/50 hover:bg-white/10'
-                                }
-                            `}
-                        >
-                            <span className="flex items-center gap-2">
-                                {isSmartLayerActive ? <Lock size={14}/> : <Unlock size={14}/>}
-                                Iframe Interaction Lock
-                            </span>
-                            <span className={`text-[10px] px-1.5 py-0.5 rounded ${isSmartLayerActive ? 'bg-emerald-500 text-black' : 'bg-black/50 text-white'}`}>
-                                {isSmartLayerActive ? 'ON' : 'OFF'}
-                            </span>
+                        {/* Smart Layer Switch */}
+                        <button onClick={() => setIsSmartLayerActive(!isSmartLayerActive)} className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-bold border transition-all ${isSmartLayerActive ? (isWizard ? 'bg-emerald-900/50 border-emerald-500 text-emerald-100' : 'bg-fuchsia-900/50 border-fuchsia-500 text-fuchsia-100') : 'bg-white/5 border-white/10 text-white/50 hover:bg-white/10'}`}>
+                            <span className="flex items-center gap-2">{isSmartLayerActive ? <Lock size={14}/> : <Unlock size={14}/>} Iframe Interaction Lock</span>
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded ${isSmartLayerActive ? 'bg-emerald-500 text-black' : 'bg-black/50 text-white'}`}>{isSmartLayerActive ? 'ON' : 'OFF'}</span>
                         </button>
-                        <p className="text-[10px] opacity-40 -mt-2 px-1 text-zinc-400">
-                            Turn ON to right-click/draw. Turn OFF for native controls.
-                        </p>
-
+                        <p className="text-[10px] opacity-40 -mt-2 px-1 text-zinc-400">Turn ON to right-click/draw. Turn OFF for native controls.</p>
                         <div className="h-px bg-white/10 my-1"></div>
 
-                        {/* --- VIDEO PLAYER MODE --- */}
-                        {isVideoFile && (
+                        {/* --- VIDEO PLAYER MODE (Resources Only) --- */}
+                        {isVideoFile && isResourcesSector && (
                              <div className="bg-white/5 p-2 rounded-lg border border-white/10">
-                                <label className="text-[10px] font-bold uppercase opacity-70 mb-2 block flex items-center gap-2">
-                                    <Video size={12}/> Video Player Mode
-                                </label>
+                                <label className="text-[10px] font-bold uppercase opacity-70 mb-2 block flex items-center gap-2"><Video size={12}/> Video Player Mode</label>
                                 <div className="flex bg-black/50 rounded-lg p-1">
-                                    <button 
-                                        onClick={() => setVideoPlayerMode('smart')}
-                                        className={`flex-1 py-1.5 text-[10px] rounded flex items-center justify-center gap-1 transition-all ${videoPlayerMode === 'smart' ? (isWizard ? 'bg-emerald-600 text-white' : 'bg-fuchsia-600 text-white') : 'text-white/50 hover:text-white'}`}
-                                    >
-                                        <Layers size={12}/> Smart
-                                    </button>
-                                    <button 
-                                        onClick={() => setVideoPlayerMode('native')}
-                                        className={`flex-1 py-1.5 text-[10px] rounded flex items-center justify-center gap-1 transition-all ${videoPlayerMode === 'native' ? (isWizard ? 'bg-emerald-600 text-white' : 'bg-fuchsia-600 text-white') : 'text-white/50 hover:text-white'}`}
-                                    >
-                                        <Monitor size={12}/> Native
-                                    </button>
+                                    <button onClick={() => setVideoPlayerMode('smart')} className={`flex-1 py-1.5 text-[10px] rounded flex items-center justify-center gap-1 transition-all ${videoPlayerMode === 'smart' ? (isWizard ? 'bg-emerald-600 text-white' : 'bg-fuchsia-600 text-white') : 'text-white/50 hover:text-white'}`}><Layers size={12}/> Smart</button>
+                                    <button onClick={() => setVideoPlayerMode('native')} className={`flex-1 py-1.5 text-[10px] rounded flex items-center justify-center gap-1 transition-all ${videoPlayerMode === 'native' ? (isWizard ? 'bg-emerald-600 text-white' : 'bg-fuchsia-600 text-white') : 'text-white/50 hover:text-white'}`}><Monitor size={12}/> Normal</button>
                                 </div>
                             </div>
                         )}
-
                         <div className="h-px bg-white/10 my-1"></div>
 
                         {/* Feature Toggles */}
                         <div className="grid grid-cols-4 gap-2">
-                            <button onClick={() => setFilter(f => f === 'invert' ? 'none' : 'invert')} className={`p-2 rounded flex flex-col items-center gap-1 text-[10px] ${filter === 'invert' ? 'bg-white text-black' : 'bg-white/5 hover:bg-white/10'}`}>
-                                <Moon size={16}/> Dark
-                            </button>
-                            <button onClick={() => setFilter(f => f === 'sepia' ? 'none' : 'sepia')} className={`p-2 rounded flex flex-col items-center gap-1 text-[10px] ${filter === 'sepia' ? 'bg-amber-700 text-amber-100' : 'bg-white/5 hover:bg-white/10'}`}>
-                                <Sun size={16}/> Sepia
-                            </button>
-                            <button onClick={() => setFilter(f => f === 'grayscale' ? 'none' : 'grayscale')} className={`p-2 rounded flex flex-col items-center gap-1 text-[10px] ${filter === 'grayscale' ? 'bg-zinc-500 text-white' : 'bg-white/5 hover:bg-white/10'}`}>
-                                <Droplet size={16}/> B&W
-                            </button>
-                            <button onClick={() => { setIsSelectionMode(true); setShowControls(false); }} className={`p-2 rounded flex flex-col items-center gap-1 text-[10px] bg-white/5 hover:bg-white/10 text-emerald-400`}>
-                                <Scan size={16}/> Scan
-                            </button>
+                            <button onClick={() => setFilter(f => f === 'invert' ? 'none' : 'invert')} className={`p-2 rounded flex flex-col items-center gap-1 text-[10px] ${filter === 'invert' ? 'bg-white text-black' : 'bg-white/5 hover:bg-white/10'}`}><Moon size={16}/> Dark</button>
+                            <button onClick={() => setFilter(f => f === 'sepia' ? 'none' : 'sepia')} className={`p-2 rounded flex flex-col items-center gap-1 text-[10px] ${filter === 'sepia' ? 'bg-amber-700 text-amber-100' : 'bg-white/5 hover:bg-white/10'}`}><Sun size={16}/> Sepia</button>
+                            <button onClick={() => setFilter(f => f === 'grayscale' ? 'none' : 'grayscale')} className={`p-2 rounded flex flex-col items-center gap-1 text-[10px] ${filter === 'grayscale' ? 'bg-zinc-500 text-white' : 'bg-white/5 hover:bg-white/10'}`}><Droplet size={16}/> B&W</button>
+                            <button onClick={() => { setIsSelectionMode(true); setShowControls(false); }} className={`p-2 rounded flex flex-col items-center gap-1 text-[10px] bg-white/5 hover:bg-white/10 text-emerald-400`}><Scan size={16}/> Scan</button>
                         </div>
                         
                         {/* Sliders */}
                         <div className="space-y-3 pt-2">
-                            <div>
-                                <div className="flex justify-between text-[10px] mb-1 font-mono text-zinc-300">
-                                    <span>Brightness</span>
-                                    <span>{videoBrightness}%</span>
-                                </div>
-                                <input 
-                                    type="range" min="30" max="200" 
-                                    value={videoBrightness} 
-                                    onChange={(e) => setVideoBrightness(Number(e.target.value))}
-                                    className={`w-full h-1 rounded-lg appearance-none cursor-pointer ${isWizard ? 'bg-emerald-900/50 accent-emerald-500' : 'bg-fuchsia-900/50 accent-fuchsia-500'}`}
-                                />
-                            </div>
-                            
-                            <div>
-                                <div className="flex justify-between text-[10px] mb-1 font-mono text-zinc-300">
-                                    <span>Scale</span>
-                                    <span>{zoomLevel}%</span>
-                                </div>
-                                <input 
-                                    type="range" min="50" max="200" 
-                                    value={zoomLevel} 
-                                    onChange={(e) => setZoomLevel(Number(e.target.value))}
-                                    className={`w-full h-1 rounded-lg appearance-none cursor-pointer ${isWizard ? 'bg-emerald-900/50 accent-emerald-500' : 'bg-fuchsia-900/50 accent-fuchsia-500'}`}
-                                />
-                            </div>
-
-                            {/* SCAN REGION SLIDER - Only appears when box is drawn */}
+                            <div><div className="flex justify-between text-[10px] mb-1 font-mono text-zinc-300"><span>Brightness</span><span>{videoBrightness}%</span></div><input type="range" min="30" max="200" value={videoBrightness} onChange={(e) => setVideoBrightness(Number(e.target.value))} className={`w-full h-1 rounded-lg appearance-none cursor-pointer ${isWizard ? 'bg-emerald-900/50 accent-emerald-500' : 'bg-fuchsia-900/50 accent-fuchsia-500'}`}/></div>
+                            <div><div className="flex justify-between text-[10px] mb-1 font-mono text-zinc-300"><span>Scale</span><span>{zoomLevel}%</span></div><input type="range" min="50" max="200" value={zoomLevel} onChange={(e) => setZoomLevel(Number(e.target.value))} className={`w-full h-1 rounded-lg appearance-none cursor-pointer ${isWizard ? 'bg-emerald-900/50 accent-emerald-500' : 'bg-fuchsia-900/50 accent-fuchsia-500'}`}/></div>
                             {selectionRect && (
                                 <div className="animate-in fade-in slide-in-from-left-2 pt-2 border-t border-white/10">
-                                    <div className="flex justify-between text-[10px] mb-1 font-mono text-emerald-400">
-                                        <span>Dark Box Brightness</span>
-                                        <span>{regionBrightness}%</span>
-                                    </div>
-                                    <input 
-                                        type="range" min="50" max="200" 
-                                        value={regionBrightness} 
-                                        onChange={(e) => setRegionBrightness(Number(e.target.value))}
-                                        className={`w-full h-1 rounded-lg appearance-none cursor-pointer ${isWizard ? 'bg-emerald-900/50 accent-emerald-500' : 'bg-fuchsia-900/50 accent-fuchsia-500'}`}
-                                    />
+                                    <div className="flex justify-between text-[10px] mb-1 font-mono text-emerald-400"><span>Dark Box Brightness</span><span>{regionBrightness}%</span></div>
+                                    <input type="range" min="50" max="200" value={regionBrightness} onChange={(e) => setRegionBrightness(Number(e.target.value))} className={`w-full h-1 rounded-lg appearance-none cursor-pointer ${isWizard ? 'bg-emerald-900/50 accent-emerald-500' : 'bg-fuchsia-900/50 accent-fuchsia-500'}`}/>
                                 </div>
                             )}
                         </div>
                     </div>
                 )}
             </div>
-            
-            {/* ... Sidebar ... */}
+
+            {/* --- RIGHT: NOTEBOOK SIDEBAR --- */}
             {showNotes && (
-                <div className={`w-80 border-l flex flex-col shrink-0 transition-all animate-[fade-in-left_0.2s] ${isWizard ? 'bg-[#050a05] border-emerald-900' : 'bg-[#09050f] border-fuchsia-900'}`}>
-                   {/* ... Notes UI ... */}
+                <div className={`w-80 border-l flex flex-col shrink-0 transition-all animate-[fade-in-left_0.2s]
+                    ${isWizard ? 'bg-[#050a05] border-emerald-900' : 'bg-[#09050f] border-fuchsia-900'}
+                `}>
                     <div className={`p-4 border-b flex justify-between items-center ${isWizard ? 'border-emerald-900' : 'border-fuchsia-900'}`}>
                         <h4 className="font-bold flex items-center gap-2"><PenTool size={16}/> Study Notes</h4>
                         <div className="flex gap-1">
@@ -700,6 +633,15 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                             `}
                             spellCheck={false}
                         />
+                        {savedStatus && (
+                            <div className="absolute bottom-4 right-4 text-xs text-green-400 font-bold animate-pulse">
+                                {savedStatus}
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="p-3 text-[10px] opacity-40 text-center border-t border-white/5">
+                        Notes are saved locally to your device.
                     </div>
                 </div>
             )}
