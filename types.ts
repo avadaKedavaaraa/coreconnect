@@ -160,6 +160,19 @@ export interface GlobalConfig {
   cursorStyle?: 'classic' | 'minimal' | 'blade' | 'enchanted';
   defaultFont?: string;
   sortOrder?: 'newest' | 'oldest' | 'alphabetical' | 'manual'; // Fallback global sort
+
+  // --- NEW THEME SETTINGS ---
+  themeSettings?: {
+    useGradient: boolean;
+    wizardPrimary: string;
+    wizardSecondary: string;
+    mugglePrimary: string;
+    muggleSecondary: string;
+    
+    // Optional: Background overrides
+    wizardBackgroundHex?: string; 
+    muggleBackgroundHex?: string;
+  };
 }
 
 export const FONT_LIBRARY = [

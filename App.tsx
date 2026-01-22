@@ -737,14 +737,46 @@ function App() {
     const cursorClass = `cursor-${cursorStyle}-${isWizard ? 'wizard' : 'muggle'}`;
     const visualFilter = `brightness(${profile.brightness || 100}%) contrast(${profile.contrast || 100}%)`;
     const a11yClass = profile.highContrast ? 'contrast-125 brightness-110 saturate-150' : '';
-    const accentColor = profile.themeColor || (isWizard ? '#10b981' : '#d946ef');
+
+    // --- NEW: DYNAMIC THEME LOGIC ---
+    // 1. Get Settings with Fallbacks
+    const themeSettings = globalConfig.themeSettings || {
+        wizardPrimary: '#10b981',   // Default Emerald
+        wizardSecondary: '#064e3b',
+        mugglePrimary: '#a855f7',   // Default Purple
+        muggleSecondary: '#581c87',
+        useGradient: false
+    };
+
+    // 2. Determine Current Mode Colors
+    const currentPrimary = isWizard ? themeSettings.wizardPrimary : themeSettings.mugglePrimary;
+    const currentSecondary = isWizard ? themeSettings.wizardSecondary : themeSettings.muggleSecondary;
+
+    // 3. Determine Background Color
+    // (We use your new Purple dark background '#0f0518' as the default for Muggle)
+    const currentBg = isWizard
+        ? (themeSettings.wizardBackgroundHex || '#050a05')
+        : (themeSettings.muggleBackgroundHex || '#0f0518');
+
+    // 4. Set Accent Color (User Profile Preference overrides Global Config)
+    const accentColor = profile.themeColor || currentPrimary;
 
     return (
         <div
-            className={`flex h-[100dvh] overflow-hidden transition-colors duration-1000 relative ${isWizard ? 'bg-[#050a05]' : 'bg-[#09050f]'} ${cursorClass} ${a11yClass}`}
+            // REMOVED hardcoded bg-[#...] classes here. We use inline style for background now.
+            className={`flex h-[100dvh] overflow-hidden transition-colors duration-1000 relative ${cursorClass} ${a11yClass}`}
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
-            style={{ filter: visualFilter }}
+            style={{
+                filter: visualFilter,
+                backgroundColor: currentBg, // <--- APPLIES DYNAMIC BACKGROUND
+
+                // OPTIONAL: Inject CSS variables if you want to use them in CSS
+                // @ts-ignore
+                '--theme-primary': accentColor,
+                // @ts-ignore
+                '--theme-secondary': currentSecondary
+            }}
         >
             {/* FIXED: Only show texture if Wizard, otherwise show nothing (No Scanlines) */}
             {isWizard && (
@@ -779,7 +811,15 @@ function App() {
                     <div className="px-6 py-8 md:px-12 md:py-12 text-center relative">
                         <h2
                             className={`text-3xl md:text-5xl font-bold mb-4 tracking-wider ${isWizard ? 'font-wizardTitle text-emerald-100' : 'font-muggle text-fuchsia-100'}`}
-                            style={{ color: profile.themeColor ? accentColor : undefined }}
+                            style={{ 
+                                // NEW: Handle Gradient Text or Solid Color
+                                color: profile.themeColor ? accentColor : (themeSettings.useGradient ? 'transparent' : accentColor),
+                                backgroundImage: themeSettings.useGradient 
+                                    ? `linear-gradient(to right, ${currentPrimary}, ${currentSecondary})` 
+                                    : 'none',
+                                WebkitBackgroundClip: themeSettings.useGradient ? 'text' : 'border-box',
+                                backgroundClip: themeSettings.useGradient ? 'text' : 'border-box'
+                            }}
                         >
                             {isWizard ? activeSector.wizardName : activeSector.muggleName}
                         </h2>

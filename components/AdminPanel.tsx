@@ -1373,7 +1373,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                                     <h2 className="text-2xl font-bold" style={previewTitleStyle}>{itemForm.title || 'Untitled'}</h2>
                                                     {itemForm.isPinned && <Pin size={16} className="text-yellow-400 fill-yellow-400 shrink-0" />}
                                                 </div>
-                                                
+
                                                 <div
                                                     className="text-sm opacity-80 whitespace-pre-wrap font-sans html-content"
                                                     style={{ color: itemForm.style?.contentColor }}
@@ -2080,11 +2080,171 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
                             {/* CONFIG TAB - UPDATED WITH UPDATE POPUP */}
                             {activeTab === 'config' && (
-                                // ... Existing Config Code ...
-                                <div className="space-y-6 max-w-3xl">
-                                    <div className="p-6 rounded border bg-white/5 border-white/10 space-y-6">
+                                <div className="space-y-6 max-w-4xl mx-auto pb-24">
+                                    <div className="p-6 rounded-xl border bg-white/5 border-white/10 space-y-8 shadow-2xl">
 
-                                        {/* NEW: UPDATE POPUP MANAGER */}
+                                        {/* --- 1. NEW THEME CUSTOMIZATION SECTION --- */}
+                                        <div className="space-y-6">
+                                            <div className="flex justify-between items-center border-b border-white/10 pb-4">
+                                                <div>
+                                                    <h3 className="font-bold text-xl text-white flex items-center gap-2">
+                                                        <PenTool size={20} className="text-yellow-400" />
+                                                        Global Theme Colors
+                                                    </h3>
+                                                    <p className="text-xs opacity-50">Customize the core identity colors for both modes.</p>
+                                                </div>
+
+                                                {/* Gradient Toggle */}
+                                                <div className="flex items-center gap-3 bg-black/40 px-4 py-2 rounded-full border border-white/10">
+                                                    <label className="text-sm font-bold cursor-pointer" htmlFor="grad-toggle">Enable Gradients</label>
+                                                    <input
+                                                        id="grad-toggle"
+                                                        type="checkbox"
+                                                        checked={editedConfig.themeSettings?.useGradient ?? false}
+                                                        onChange={e => setEditedConfig({
+                                                            ...editedConfig,
+                                                            themeSettings: { ...(editedConfig.themeSettings || { wizardPrimary: '#10b981', wizardSecondary: '#064e3b', mugglePrimary: '#d946ef', muggleSecondary: '#701a75' }), useGradient: e.target.checked }
+                                                        })}
+                                                        className="w-5 h-5 accent-blue-500 cursor-pointer"
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                                {/* WIZARD THEME EDITOR */}
+                                                <div className="p-6 rounded-xl border border-emerald-500/30 bg-emerald-950/10 space-y-4">
+                                                    <h4 className="font-bold text-emerald-400 uppercase tracking-widest text-xs border-b border-emerald-500/20 pb-2 mb-4">Wizard Mode Palette</h4>
+
+                                                    <div className="flex gap-4">
+                                                        <div className="space-y-2 flex-1">
+                                                            <label className="text-[10px] uppercase opacity-50">Primary Color</label>
+                                                            <div className="flex items-center gap-2 bg-black/40 p-2 rounded border border-white/10">
+                                                                <input
+                                                                    type="color"
+                                                                    value={editedConfig.themeSettings?.wizardPrimary || '#10b981'}
+                                                                    onChange={e => setEditedConfig({
+                                                                        ...editedConfig,
+                                                                        themeSettings: { ...(editedConfig.themeSettings || { wizardPrimary: '#10b981', wizardSecondary: '#064e3b', mugglePrimary: '#d946ef', muggleSecondary: '#701a75', useGradient: false }), wizardPrimary: e.target.value }
+                                                                    })}
+                                                                    className="w-8 h-8 rounded cursor-pointer bg-transparent border-none"
+                                                                />
+                                                                <span className="text-xs font-mono opacity-70">{editedConfig.themeSettings?.wizardPrimary || '#10b981'}</span>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className={`space-y-2 flex-1 transition-opacity ${editedConfig.themeSettings?.useGradient ? 'opacity-100' : 'opacity-30 pointer-events-none'}`}>
+                                                            <label className="text-[10px] uppercase opacity-50">Secondary (Gradient)</label>
+                                                            <div className="flex items-center gap-2 bg-black/40 p-2 rounded border border-white/10">
+                                                                <input
+                                                                    type="color"
+                                                                    value={editedConfig.themeSettings?.wizardSecondary || '#064e3b'}
+                                                                    onChange={e => setEditedConfig({
+                                                                        ...editedConfig,
+                                                                        themeSettings: { ...(editedConfig.themeSettings || { wizardPrimary: '#10b981', wizardSecondary: '#064e3b', mugglePrimary: '#d946ef', muggleSecondary: '#701a75', useGradient: false }), wizardSecondary: e.target.value }
+                                                                    })}
+                                                                    className="w-8 h-8 rounded cursor-pointer bg-transparent border-none"
+                                                                />
+                                                                <span className="text-xs font-mono opacity-70">{editedConfig.themeSettings?.wizardSecondary || '#064e3b'}</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* LIVE PREVIEW BOX */}
+                                                    <div className="mt-4">
+                                                        <label className="text-[10px] uppercase opacity-50 block mb-2">Live UI Preview</label>
+                                                        <div className="h-24 rounded-lg flex items-center justify-center shadow-lg relative overflow-hidden group border border-white/10">
+                                                            {/* Dynamic Background */}
+                                                            <div
+                                                                className="absolute inset-0 opacity-20"
+                                                                style={{
+                                                                    background: editedConfig.themeSettings?.useGradient
+                                                                        ? `linear-gradient(135deg, ${editedConfig.themeSettings?.wizardPrimary || '#10b981'}, ${editedConfig.themeSettings?.wizardSecondary || '#064e3b'})`
+                                                                        : (editedConfig.themeSettings?.wizardPrimary || '#10b981')
+                                                                }}
+                                                            ></div>
+
+                                                            {/* Dynamic Button */}
+                                                            <button
+                                                                className="px-6 py-2 rounded-full font-bold text-white shadow-lg transform group-hover:scale-105 transition-transform"
+                                                                style={{
+                                                                    background: editedConfig.themeSettings?.useGradient
+                                                                        ? `linear-gradient(to right, ${editedConfig.themeSettings?.wizardPrimary || '#10b981'}, ${editedConfig.themeSettings?.wizardSecondary || '#064e3b'})`
+                                                                        : (editedConfig.themeSettings?.wizardPrimary || '#10b981')
+                                                                }}
+                                                            >
+                                                                Wizard Action
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* MUGGLE THEME EDITOR */}
+                                                <div className="p-6 rounded-xl border border-fuchsia-500/30 bg-fuchsia-950/10 space-y-4">
+                                                    <h4 className="font-bold text-fuchsia-400 uppercase tracking-widest text-xs border-b border-fuchsia-500/20 pb-2 mb-4">Muggle Mode Palette</h4>
+
+                                                    <div className="flex gap-4">
+                                                        <div className="space-y-2 flex-1">
+                                                            <label className="text-[10px] uppercase opacity-50">Primary Color</label>
+                                                            <div className="flex items-center gap-2 bg-black/40 p-2 rounded border border-white/10">
+                                                                <input
+                                                                    type="color"
+                                                                    value={editedConfig.themeSettings?.mugglePrimary || '#d946ef'}
+                                                                    onChange={e => setEditedConfig({
+                                                                        ...editedConfig,
+                                                                        themeSettings: { ...(editedConfig.themeSettings || { wizardPrimary: '#10b981', wizardSecondary: '#064e3b', mugglePrimary: '#d946ef', muggleSecondary: '#701a75', useGradient: false }), mugglePrimary: e.target.value }
+                                                                    })}
+                                                                    className="w-8 h-8 rounded cursor-pointer bg-transparent border-none"
+                                                                />
+                                                                <span className="text-xs font-mono opacity-70">{editedConfig.themeSettings?.mugglePrimary || '#d946ef'}</span>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className={`space-y-2 flex-1 transition-opacity ${editedConfig.themeSettings?.useGradient ? 'opacity-100' : 'opacity-30 pointer-events-none'}`}>
+                                                            <label className="text-[10px] uppercase opacity-50">Secondary (Gradient)</label>
+                                                            <div className="flex items-center gap-2 bg-black/40 p-2 rounded border border-white/10">
+                                                                <input
+                                                                    type="color"
+                                                                    value={editedConfig.themeSettings?.muggleSecondary || '#701a75'}
+                                                                    onChange={e => setEditedConfig({
+                                                                        ...editedConfig,
+                                                                        themeSettings: { ...(editedConfig.themeSettings || { wizardPrimary: '#10b981', wizardSecondary: '#064e3b', mugglePrimary: '#d946ef', muggleSecondary: '#701a75', useGradient: false }), muggleSecondary: e.target.value }
+                                                                    })}
+                                                                    className="w-8 h-8 rounded cursor-pointer bg-transparent border-none"
+                                                                />
+                                                                <span className="text-xs font-mono opacity-70">{editedConfig.themeSettings?.muggleSecondary || '#701a75'}</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* LIVE PREVIEW BOX */}
+                                                    <div className="mt-4">
+                                                        <label className="text-[10px] uppercase opacity-50 block mb-2">Live UI Preview</label>
+                                                        <div className="h-24 rounded-lg flex items-center justify-center shadow-lg relative overflow-hidden group border border-white/10">
+                                                            <div
+                                                                className="absolute inset-0 opacity-20"
+                                                                style={{
+                                                                    background: editedConfig.themeSettings?.useGradient
+                                                                        ? `linear-gradient(135deg, ${editedConfig.themeSettings?.mugglePrimary || '#d946ef'}, ${editedConfig.themeSettings?.muggleSecondary || '#701a75'})`
+                                                                        : (editedConfig.themeSettings?.mugglePrimary || '#d946ef')
+                                                                }}
+                                                            ></div>
+                                                            <button
+                                                                className="px-6 py-2 rounded-full font-bold text-white shadow-lg transform group-hover:scale-105 transition-transform"
+                                                                style={{
+                                                                    background: editedConfig.themeSettings?.useGradient
+                                                                        ? `linear-gradient(to right, ${editedConfig.themeSettings?.mugglePrimary || '#d946ef'}, ${editedConfig.themeSettings?.muggleSecondary || '#701a75'})`
+                                                                        : (editedConfig.themeSettings?.mugglePrimary || '#d946ef')
+                                                                }}
+                                                            >
+                                                                Muggle Action
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* --- 2. UPDATE POPUP MANAGER --- */}
                                         <div className="bg-purple-900/10 border border-purple-500/30 rounded-xl p-4 space-y-4">
                                             <div className="flex items-center gap-2 border-b border-purple-500/30 pb-2 mb-2">
                                                 <Sparkles className="text-purple-400" size={20} />
@@ -2133,6 +2293,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                             </div>
                                         </div>
 
+                                        {/* --- 3. IDENTITY & BRANDING --- */}
                                         <h3 className="font-bold text-lg border-b border-white/10 pb-2">Identity & Branding</h3>
                                         <div className="grid grid-cols-2 gap-4">
                                             <div>
@@ -2153,6 +2314,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                             </div>
                                         </div>
 
+                                        {/* --- 4. LOGOS & IMAGES --- */}
                                         <div className="space-y-4">
                                             <h4 className="text-xs font-bold uppercase opacity-50">Logos & Images</h4>
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -2187,6 +2349,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                             </div>
                                         </div>
 
+                                        {/* --- 5. AUDIO ALARMS --- */}
                                         <div className="space-y-4 pt-4 border-t border-white/10">
                                             <h4 className="text-xs font-bold uppercase opacity-50 flex items-center gap-2"><BellRing size={14} /> Audio Alarms</h4>
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -2201,6 +2364,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                             </div>
                                         </div>
 
+                                        {/* --- 6. GATE & SYSTEM --- */}
                                         <div className="space-y-4 pt-4 border-t border-white/10">
                                             <h3 className="font-bold text-lg border-b border-white/10 pb-2">Gate & System</h3>
                                             <div className="grid grid-cols-2 gap-4">
@@ -2219,9 +2383,16 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                             </div>
                                         </div>
 
-                                        <button onClick={handleSaveConfig} disabled={isSavingConfig} className="w-full py-3 bg-blue-600 rounded font-bold hover:bg-blue-500 flex justify-center items-center gap-2">
-                                            {isSavingConfig ? <Loader2 className="animate-spin" /> : <Save size={18} />} SAVE CONFIGURATION
-                                        </button>
+                                        {/* --- 7. STICKY SAVE BUTTON --- */}
+                                        <div className="sticky bottom-0 p-4 bg-black/80 backdrop-blur border-t border-white/10 flex justify-end">
+                                            <button
+                                                onClick={handleSaveConfig}
+                                                disabled={isSavingConfig}
+                                                className="px-8 py-3 bg-blue-600 rounded-lg font-bold hover:bg-blue-500 flex items-center gap-2 shadow-lg hover:shadow-blue-900/20 transition-all active:scale-95"
+                                            >
+                                                {isSavingConfig ? <Loader2 className="animate-spin" /> : <Save size={18} />} SAVE ALL CONFIGURATION
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             )}
