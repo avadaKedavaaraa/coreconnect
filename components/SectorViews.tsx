@@ -883,12 +883,19 @@ export const SectorView: React.FC<SectorViewProps> = ({
                     <div className="flex-1 flex items-center justify-center p-2 sm:p-10 relative overflow-hidden">
                         <div className="w-full max-w-6xl aspect-video bg-black shadow-2xl rounded-xl border border-white/10 overflow-hidden relative group">
                             <div
-                                key={cinemaItem.id}  // 👈 THIS IS THE FIX
+                                key={cinemaItem.id} /* 👈 Forces a fresh player for every video */
                                 className="w-full h-full"
                                 dangerouslySetInnerHTML={{
                                     __html: DOMPurify.sanitize(cinemaItem.content, {
-                                        ADD_TAGS: ['iframe', 'div', 'style'],
-                                        ADD_ATTR: ['allow', 'allowfullscreen', 'frameborder', 'scrolling', 'style', 'width', 'height', 'src']
+                                        /* 👇 ALLOW MORE TAGS so the player doesn't break */
+                                        ADD_TAGS: ['iframe', 'div', 'style', 'script', 'link'],
+
+                                        /* 👇 ALLOW MORE ATTRIBUTES (Crucial for Microsoft Stream) */
+                                        ADD_ATTR: [
+                                            'allow', 'allowfullscreen', 'frameborder', 'scrolling',
+                                            'style', 'width', 'height', 'src', 'id', 'class',
+                                            'name', 'sandbox', 'referrerpolicy', 'loading', 'title'
+                                        ]
                                     })
                                 }}
                             />
