@@ -883,26 +883,9 @@ export const SectorView: React.FC<SectorViewProps> = ({
                     <div className="flex-1 flex items-center justify-center p-2 sm:p-10 relative overflow-hidden">
                         <div className="w-full max-w-6xl aspect-video bg-black shadow-2xl rounded-xl border border-white/10 overflow-hidden relative group">
                             <div
-                                key={cinemaItem.id} /* Forces a fresh player */
+                                key={cinemaItem.id}
                                 className="w-full h-full"
-                                dangerouslySetInnerHTML={{
-                                    __html: DOMPurify.sanitize(cinemaItem.content, {
-                                        /* 1. ALLOW ALL TAGS from your embed code */
-                                        ADD_TAGS: ['iframe', 'div', 'style', 'span', 'img'],
-
-                                        /* 2. ALLOW ALL ATTRIBUTES from your embed code + common ones */
-                                        ADD_ATTR: [
-                                            'allow', 'allowfullscreen', 'frameborder', 'scrolling',
-                                            'style', 'width', 'height', 'src', 'title',
-                                            'class', 'id', 'name', 'referrerpolicy', 'sandbox', 'loading'
-                                        ],
-
-                                        /* 3. FORCE KEEPING CSS (Critical for the "black screen" layout issue) */
-                                        FORBID_TAGS: [],
-                                        FORBID_ATTR: [],
-                                        WHOLE_DOCUMENT: false,
-                                    })
-                                }}
+                                dangerouslySetInnerHTML={{ __html: cinemaItem.content }}
                             />
                         </div>
                     </div>
