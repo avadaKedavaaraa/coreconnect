@@ -127,6 +127,7 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
 
   const safePdfUrl = isValidUrl(item.fileUrl) ? item.fileUrl! : "";
   const isVideoFile = item.type === 'video' || (safePdfUrl && safePdfUrl.match(/\.(mp4|webm|ogg|mov)$/i));
+  const isPdf = safePdfUrl.toLowerCase().endsWith('.pdf');
   const isGoogleDrive = safePdfUrl.includes('drive.google.com');
   const isMediaView = (item.type === 'file' || item.type === 'video' || item.type === 'link' || item.isLecture) && !!safePdfUrl;
 
@@ -233,7 +234,6 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
   };
 
   const customStyle = item.style || {};
-  // --- DEFINING ACCENT COLOR HERE TO FIX ERROR ---
   const accentColor = isWizard ? '#10b981' : '#d946ef';
   
   const titleFont = customStyle.fontFamily === 'wizard' ? '"EB Garamond", serif' : customStyle.fontFamily === 'muggle' ? '"JetBrains Mono", monospace' : undefined;
@@ -266,7 +266,7 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
         `}
       >
         
-        {/* --- TOOLBAR (NOW AT TOP DUE TO flex-col) --- */}
+        {/* --- TOOLBAR --- */}
         <div className={`p-2 border-b flex flex-wrap items-center justify-between gap-2 shrink-0 z-30 relative backdrop-blur-md
             ${isWizard ? 'border-emerald-900/30 bg-emerald-950/40' : 'border-fuchsia-900/30 bg-fuchsia-950/40'}
         `}>
@@ -355,7 +355,8 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
 
                 <div className="w-px h-6 bg-white/10 mx-1 hidden sm:block"></div>
 
-                <button onClick={() => setIsFullScreen(!isFullScreen)} className="p-2 hover:bg-white/10 rounded text-white/70 hidden sm:block">
+                {/* APP FULLSCREEN BUTTON - RECOMMENDED */}
+                <button onClick={() => setIsFullScreen(!isFullScreen)} className="p-2 hover:bg-white/10 rounded text-white/70 hidden sm:block" title="App Fullscreen (Keeps Controls)">
                     {isFullScreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
                 </button>
                 
@@ -366,7 +367,7 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
             </div>
         </div>
 
-        {/* --- CONTENT + SIDEBAR WRAPPER (ROW LAYOUT) --- */}
+        {/* --- CONTENT + SIDEBAR WRAPPER --- */}
         <div className="flex flex-1 overflow-hidden relative">
 
             {/* GLOBAL CONTENT CONTAINER */}
@@ -423,12 +424,17 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                                     />
                                 ) : (
                                     <div className="w-full h-full" style={{ filter: getFilterStyle(), cursor: isSmartLayerActive ? 'crosshair' : 'default' }}>
+                                        {/* Use <object> ONLY for PDF to allow plugins, otherwise direct iframe for better video support */}
                                         {engine === 'native' && !isGoogleDrive ? (
-                                            <object data={safePdfUrl} type="application/pdf" className="w-full h-full" onLoad={() => setIsLoading(false)}>
-                                                <iframe src={safePdfUrl} className="w-full h-full border-0" title="PDF Viewer" />
-                                            </object>
+                                            isPdf ? (
+                                                <object data={safePdfUrl} type="application/pdf" className="w-full h-full" onLoad={() => setIsLoading(false)}>
+                                                    <iframe src={safePdfUrl} className="w-full h-full border-0" title="Native Viewer" />
+                                                </object>
+                                            ) : (
+                                                <iframe src={safePdfUrl} className="w-full h-full border-0" title="Native Viewer" onLoad={() => setIsLoading(false)} />
+                                            )
                                         ) : (
-                                            <iframe src={safePdfUrl} className="w-full h-full border-0 bg-white" title="Cloud Viewer" allow="autoplay" onLoad={() => setIsLoading(false)} onError={() => setLoadError(true)} />
+                                            <iframe src={safePdfUrl} className="w-full h-full border-0 bg-white" title="Cloud Viewer" allow="autoplay; fullscreen" onLoad={() => setIsLoading(false)} onError={() => setLoadError(true)} />
                                         )}
                                     </div>
                                 )}
@@ -446,7 +452,7 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                         `}
                         style={{ filter: getFilterStyle() }} 
                     >
-                        {/* METADATA (Hidden for Link Tree) */}
+                        {/* METADATA */}
                         {!isLinkTree && (
                             <div className="flex flex-wrap items-center gap-2 mb-3 text-[10px] uppercase tracking-widest font-bold opacity-70">
                                 <span className={`px-2 py-1 rounded border flex items-center gap-1 ${isWizard ? 'border-emerald-800 text-emerald-400' : 'border-fuchsia-800 text-fuchsia-400'}`}><CornerDownRight size={10} /> {item.sector || 'ARCHIVE'}</span>
@@ -455,12 +461,12 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                             </div>
                         )}
 
-                        {/* TITLE (Hidden for Link Tree) */}
+                        {/* TITLE */}
                         {!isLinkTree && (
                             <h2 className="text-2xl md:text-3xl font-bold leading-tight break-words mb-6" style={titleStyle}>{item.title}</h2>
                         )}
                         
-                        {/* LOGIN WARNING (Hidden for Link Tree) */}
+                        {/* LOGIN WARNING */}
                         {!isLinkTree && (item.content && item.content.includes('iframe')) && (
                             <div className={`p-3 rounded-lg border mb-6 flex flex-wrap items-center justify-between gap-4 animate-[fade-in_0.3s_ease-out]
                                 ${isWizard ? 'bg-amber-900/20 border-amber-700/50' : 'bg-amber-900/20 border-amber-700/50'}
@@ -484,7 +490,7 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                             </div>
                         )}
 
-                        {/* IMAGE (Already Hidden for Link Tree in your code) */}
+                        {/* IMAGE */}
                         {item.image && item.type !== 'link_tree' && (
                             <div className="rounded-xl overflow-hidden shadow-2xl border border-white/10 relative group">
                                 <img src={item.image} alt={item.title} className="w-full h-auto max-h-[500px] object-cover" />
@@ -502,7 +508,7 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                             {cleanContent ? <div className={isLinkTree ? 'w-full h-full' : ''} dangerouslySetInnerHTML={{__html: cleanContent}}></div> : <p className="italic opacity-50 text-center py-10">No additional text content provided.</p>}
                         </div>
 
-                        {/* LARGE RESOURCE CARD (Hidden for Link Tree - Icon in Toolbar is used instead) */}
+                        {/* RESOURCE LINK */}
                         {!isLinkTree && safePdfUrl && (
                             <div className="mt-8 pt-8 border-t border-white/10">
                                 <a href={safePdfUrl} target="_blank" rel="noreferrer" className={`flex items-center justify-between p-4 rounded-xl border transition-all hover:scale-[1.01] group ${isWizard ? 'bg-emerald-900/20 border-emerald-500/30 hover:bg-emerald-900/30 hover:border-emerald-500' : 'bg-fuchsia-900/20 border-fuchsia-500/30 hover:bg-fuchsia-900/30 hover:border-fuchsia-500'}`}>
@@ -564,17 +570,16 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                     </div>
                 )}
 
-                {/* --- CONTROL DOCK (Floating Menu) --- */}
+                {/* --- CONTROL DOCK (Now Fixed Positioning to survive Fullscreen) --- */}
                 {showControls && (
                     <div 
                         ref={controlsRef}
-                        className={`absolute z-[100] p-4 rounded-xl border backdrop-blur-xl shadow-2xl flex flex-col gap-4 animate-in fade-in zoom-in-95 duration-200 text-white
+                        className={`fixed z-[9999] p-4 rounded-xl border backdrop-blur-xl shadow-2xl flex flex-col gap-4 animate-in fade-in zoom-in-95 duration-200 text-white
                             ${isWizard ? 'bg-black/95 border-emerald-500/50 shadow-emerald-900/50' : 'bg-black/95 border-fuchsia-500/50 shadow-fuchsia-900/50'}
                         `}
                         style={{ 
-                            left: '50%', 
-                            top: '50%', 
-                            transform: 'translate(-50%, -50%)',
+                            left: menuPos.x, 
+                            top: menuPos.y, 
                             minWidth: '300px'
                         }}
                         onMouseDown={(e) => e.stopPropagation()} 
@@ -610,7 +615,7 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                             </span>
                         </button>
                         <p className="text-[10px] opacity-40 -mt-2 px-1 text-zinc-400">
-                            Turn ON to right-click or draw on the video. Turn OFF to click Play/Pause inside the video.
+                            Turn ON to draw/right-click. Turn OFF to use native video controls.
                         </p>
 
                         <div className="h-px bg-white/10 my-1"></div>
