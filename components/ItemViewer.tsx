@@ -5,7 +5,7 @@ import {
   RotateCw, Moon, Sun, StickyNote, Eye, Layers, 
   Monitor, Smartphone, PenTool, Save, Trash2, AlignJustify, Loader2, Share2, 
   CornerDownRight, Calendar, User, ArrowRight, AlertTriangle, 
-  Play, Pause, Scan, Sliders, Eraser, Video, RefreshCw, Droplet
+  Play, Pause, Scan, Sliders, Eraser, Video, RefreshCw, Droplet, MousePointer2, Lock, Unlock
 } from 'lucide-react';
 import DOMPurify from 'dompurify';
 import { trackActivity } from '../services/tracking';
@@ -23,7 +23,7 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
   const isWizard = lineage === Lineage.WIZARD;
   
   // --- SECTOR CHECK ---
-  // Only enable Smart Tools for "Academic Resources" (id: 'resources')
+  // Smart Tools ONLY for "Academic Resources" (id: 'resources')
   const enableSmartTools = item.sector === 'resources';
 
   // --- STATE ---
@@ -46,14 +46,15 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [videoBrightness, setVideoBrightness] = useState(100);
   
-  // Smart Region Selection (Universal)
+  // Smart Interaction States
+  const [isSmartLayerActive, setIsSmartLayerActive] = useState(false); // THE GLASS LAYER SWITCH
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [dragStart, setDragStart] = useState<{x: number, y: number} | null>(null);
   const [selectionRect, setSelectionRect] = useState<{x: number, y: number, w: number, h: number} | null>(null);
   const [regionBrightness, setRegionBrightness] = useState(100);
 
-  // CONTEXT MENU STATE (Right Click)
-  const [showControls, setShowControls] = useState(false);
+  // Context Menu
+  const [showContextMenu, setShowContextMenu] = useState(false);
   const [menuPos, setMenuPos] = useState({ x: 0, y: 0 });
 
   // Notebook State
@@ -63,8 +64,8 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
 
   // Refs
   const rulerRef = useRef<HTMLDivElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null); // GLOBAL Container
-  const controlsRef = useRef<HTMLDivElement>(null); // Ref for the control box
+  const containerRef = useRef<HTMLDivElement>(null); 
+  const contextMenuRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   // --- INIT & TRACKING ---
@@ -105,13 +106,13 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
   // Click Outside to Close Menu
   useEffect(() => {
       const handleClickOutside = (e: MouseEvent) => {
-          if (showControls && controlsRef.current && !controlsRef.current.contains(e.target as Node)) {
-              setShowControls(false);
+          if (showContextMenu && contextMenuRef.current && !contextMenuRef.current.contains(e.target as Node)) {
+              setShowContextMenu(false);
           }
       };
-      window.addEventListener('mousedown', handleClickOutside); // mousedown catches clicks faster than click
+      window.addEventListener('mousedown', handleClickOutside);
       return () => window.removeEventListener('mousedown', handleClickOutside);
-  }, [showControls]);
+  }, [showContextMenu]);
 
   const isValidUrl = (url?: string) => {
     if (!url) return false;
@@ -144,7 +145,7 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
         if (e.key === 'Escape') {
-            if (showControls) setShowControls(false);
+            if (showContextMenu) setShowContextMenu(false);
             else onClose();
         }
         if (e.code === 'Space' && isVideoFile && !showNotes) {
@@ -154,39 +155,37 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose, isVideoFile, showNotes, showControls]);
+  }, [onClose, isVideoFile, showNotes, showContextMenu]);
 
   const handleVideoStateChange = () => {
       if (videoRef.current) setIsPlaying(!videoRef.current.paused);
   };
 
-  // --- CONTEXT MENU HANDLER (The "Right Click") ---
+  // --- CONTEXT MENU HANDLER (Requires Smart Layer) ---
   const handleContextMenu = (e: React.MouseEvent) => {
-      // ONLY ALLOW FOR ACADEMIC RESOURCES
       if (!enableSmartTools) return;
-
-      e.preventDefault(); // Stop browser menu
       
-      // Calculate position (keep inside viewport)
+      // If Smart Layer is NOT active, we can't catch iframe clicks.
+      // But if we are clicking the "Glass", we can.
+      e.preventDefault(); 
+      
       let x = e.clientX;
       let y = e.clientY;
       
-      // Adjust if close to edge
+      // Keep menu in bounds
       if (x + 250 > window.innerWidth) x = window.innerWidth - 260;
-      if (y + 300 > window.innerHeight) y = window.innerHeight - 310;
+      if (y + 400 > window.innerHeight) y = window.innerHeight - 410;
 
       setMenuPos({ x, y });
-      setShowControls(true);
+      setShowContextMenu(true);
   };
 
-  // --- UNIVERSAL SMART REGION SELECTION ---
-  
+  // --- DRAG SELECTION HANDLERS ---
   const handleMouseDown = (e: React.MouseEvent) => {
-    // Only trigger if selection mode is ON and we are NOT clicking a button
-    if (!isSelectionMode || !containerRef.current) return;
+    // We only drag if Smart Layer is Active OR Selection Mode is explicitly ON
+    if ((!isSmartLayerActive && !isSelectionMode) || !containerRef.current) return;
     if ((e.target as HTMLElement).closest('button')) return;
-    if ((e.target as HTMLElement).closest('input')) return;
-    if (showControls && controlsRef.current?.contains(e.target as Node)) return; // Don't drag if clicking menu
+    if (showContextMenu && contextMenuRef.current?.contains(e.target as Node)) return; 
     
     e.preventDefault();
     
@@ -203,11 +202,9 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
     const rect = containerRef.current.getBoundingClientRect();
     const currentY = e.clientY - rect.top;
 
-    if (showRuler && rulerRef.current) {
-        rulerRef.current.style.top = `${currentY}px`;
-    }
+    if (showRuler && rulerRef.current) rulerRef.current.style.top = `${currentY}px`;
 
-    if (!isSelectionMode || !dragStart) return;
+    if (!dragStart) return;
     
     const currentX = e.clientX - rect.left;
     
@@ -224,46 +221,14 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
     if (selectionRect && (selectionRect.w < 10 || selectionRect.h < 10)) {
         setSelectionRect(null); 
     } else if (selectionRect) {
-        // Automatically reopen controls after selecting (convenience)
-        setShowControls(true);
-        setIsSelectionMode(false); // Turn off selection mode after one draw
+        // Automatically open menu to let user adjust brightness of the box
+        // But delay slightly to not conflict with click
+        setTimeout(() => setShowContextMenu(true), 100);
+        setIsSelectionMode(false); 
     }
   };
 
-  // --- STANDARD HANDLERS ---
-
-  const getEmbedUrl = (url: string, engineType: RenderEngine) => {
-      if (!url) return '';
-      if (url.includes('drive.google.com')) {
-          let id = '';
-          const parts = url.split('/');
-          const dIndex = parts.indexOf('d');
-          if (dIndex !== -1 && parts[dIndex + 1]) id = parts[dIndex + 1].split(/[?&]/)[0]; 
-          if (!id) {
-             try { const urlObj = new URL(url); id = urlObj.searchParams.get('id') || ''; } catch(e) {}
-          }
-          if (id) return `https://drive.google.com/file/d/${id}/preview`;
-          return url.replace(/\/view.*$/, '/preview').replace(/\/edit.*$/, '/preview');
-      }
-      if (engineType === 'google') return `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`;
-      return url;
-  };
-
-  const currentSrc = getEmbedUrl(safePdfUrl, engine);
-
-  const handleSaveNotes = () => {
-      localStorage.setItem(`core_notes_${item.id}`, notes);
-      setSavedStatus('Saved!');
-      setTimeout(() => setSavedStatus(''), 2000);
-  };
-
-  const handleClearNotes = () => {
-      if(confirm('Clear notes for this file?')) {
-          setNotes('');
-          localStorage.removeItem(`core_notes_${item.id}`);
-      }
-  };
-
+  // --- RESET ---
   const handleResetFilters = () => {
       setVideoBrightness(100);
       setFilter('none');
@@ -334,7 +299,6 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                         <h3 className={`font-bold text-xs sm:text-sm truncate ${isWizard ? 'text-emerald-100' : 'text-fuchsia-100'}`}>
                             {item.title}
                         </h3>
-                        {/* Engine Switcher */}
                         {isMediaView && (
                             <div className="flex gap-2 text-[10px] mt-0.5">
                                 {!isGoogleDrive && (
@@ -352,7 +316,26 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                 </div>
 
                 <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto no-scrollbar">
-                    {/* Basic Controls (Always visible) */}
+                    
+                    {/* SMART TOGGLE (Only for Resources) */}
+                    {enableSmartTools && (
+                        <button 
+                            onClick={() => setIsSmartLayerActive(!isSmartLayerActive)}
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition-all border
+                                ${isSmartLayerActive 
+                                    ? (isWizard ? 'bg-emerald-500 text-black border-emerald-400' : 'bg-fuchsia-500 text-black border-fuchsia-400')
+                                    : 'bg-white/5 border-white/10 hover:bg-white/10 text-white/70'
+                                }
+                            `}
+                        >
+                            {isSmartLayerActive ? <Unlock size={14}/> : <Lock size={14}/>}
+                            <span className="hidden sm:block">{isSmartLayerActive ? 'SMART MODE ON' : 'ENABLE SMART'}</span>
+                        </button>
+                    )}
+
+                    <div className="w-px h-6 bg-white/10 mx-1 hidden sm:block"></div>
+
+                    {/* Standard Controls */}
                     <div className="flex items-center bg-black/20 rounded p-1">
                         <button onClick={() => setZoomLevel(z => Math.max(50, z - 10))} className="p-1.5 hover:bg-white/10 rounded text-white/70" title="Zoom Out"><ZoomOut size={16}/></button>
                         <span className="text-[10px] font-mono w-8 text-center hidden sm:block">{zoomLevel}%</span>
@@ -382,13 +365,13 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
             {/* GLOBAL CONTENT CONTAINER */}
             <div 
                 ref={containerRef}
-                className="flex-1 bg-zinc-900 relative w-full overflow-hidden flex flex-col group cursor-context-menu"
+                className="flex-1 bg-zinc-900 relative w-full overflow-hidden flex flex-col group"
                 onContextMenu={handleContextMenu}
                 onMouseDown={handleMouseDown}
                 onMouseMove={handleMouseMove}
                 onMouseUp={handleMouseUp}
             >
-                {/* 1. MEDIA MODE (Raw File / PDF / Video URL) */}
+                {/* 1. MEDIA MODE */}
                 {isMediaView ? (
                     <>
                         {isLoading && !loadError && (
@@ -428,11 +411,11 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                                         onPause={handleVideoStateChange}
                                         style={{ 
                                             filter: getFilterStyle(),
-                                            cursor: isSelectionMode ? 'crosshair' : 'default'
+                                            cursor: isSmartLayerActive ? 'crosshair' : 'default'
                                         }}
                                     />
                                 ) : (
-                                    <div className="w-full h-full" style={{ filter: getFilterStyle(), cursor: isSelectionMode ? 'crosshair' : 'default' }}>
+                                    <div className="w-full h-full" style={{ filter: getFilterStyle(), cursor: isSmartLayerActive ? 'crosshair' : 'default' }}>
                                         {engine === 'native' && !isGoogleDrive ? (
                                             <object data={currentSrc} type="application/pdf" className="w-full h-full" onLoad={() => setIsLoading(false)}>
                                                 <iframe src={getEmbedUrl(safePdfUrl, 'google')} className="w-full h-full border-0" title="PDF Viewer" />
@@ -446,7 +429,7 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                         )}
                     </>
                 ) : (
-                    // 2. TEXT MODE (Includes SharePoint Embeds in `content`)
+                    // 2. TEXT MODE (Includes SharePoint Embeds)
                     <div 
                         className={`flex-1 overflow-y-auto p-6 md:p-10 space-y-8 relative ${isWizard ? 'scrollbar-wizard' : 'scrollbar-muggle'}`}
                         style={{ filter: getFilterStyle() }} 
@@ -459,7 +442,6 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                         <h2 className="text-2xl md:text-3xl font-bold leading-tight break-words mb-6" style={titleStyle}>{item.title}</h2>
                         {item.image && <div className="rounded-xl overflow-hidden shadow-2xl border border-white/10 relative group"><img src={item.image} alt={item.title} className="w-full h-auto max-h-[500px] object-cover" /></div>}
                         
-                        {/* THE CONTENT (Embeds live here) */}
                         <div className={`prose prose-invert max-w-none safe-font text-lg leading-relaxed html-content ${isWizard ? 'prose-emerald selection:bg-emerald-900/50' : 'prose-fuchsia selection:bg-fuchsia-900/50'}`} style={{ color: customStyle.contentColor || '#e4e4e7', fontFamily: '"Inter", "Segoe UI", sans-serif' }}>
                             {cleanContent ? <div dangerouslySetInnerHTML={{__html: cleanContent}}></div> : <p className="italic opacity-50 text-center py-10">No additional text content provided.</p>}
                         </div>
@@ -478,9 +460,17 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                     </div>
                 )}
 
+                {/* --- GLASS LAYER (THE FIX) --- */}
+                {/* This transparent div sits ON TOP of everything when Smart Mode is ON */}
+                {isSmartLayerActive && (
+                    <div 
+                        className="absolute inset-0 z-30 cursor-crosshair bg-transparent"
+                        onContextMenu={handleContextMenu} // CATCH RIGHT CLICK HERE
+                    ></div>
+                )}
+
                 {/* --- UNIVERSAL OVERLAYS --- */}
 
-                {/* Reading Ruler */}
                 {showRuler && (
                     <div 
                         ref={rulerRef}
@@ -491,7 +481,6 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                     ></div>
                 )}
 
-                {/* Smart Selection Box */}
                 {selectionRect && (
                     <div 
                         className="absolute border-2 border-dashed border-white/50 bg-transparent z-40 pointer-events-none"
@@ -504,10 +493,7 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                         }}
                     >
                         <div className="absolute -top-8 right-0 flex gap-1 pointer-events-auto">
-                            <button 
-                                onClick={(e) => { e.stopPropagation(); setSelectionRect(null); }}
-                                className="bg-red-500/80 p-1 rounded hover:bg-red-600 text-white"
-                            >
+                            <button onClick={(e) => { e.stopPropagation(); setSelectionRect(null); }} className="bg-red-500/80 p-1 rounded hover:bg-red-600 text-white">
                                 <X size={12} />
                             </button>
                         </div>
@@ -522,15 +508,15 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                     </div>
                 )}
 
-                {/* --- RIGHT-CLICK CONTROL DOCK --- */}
-                {showControls && (
+                {/* --- CONTEXT MENU (Right Click) --- */}
+                {showContextMenu && (
                     <div 
-                        ref={controlsRef}
+                        ref={contextMenuRef}
                         className={`absolute z-[100] p-4 rounded-xl border backdrop-blur-xl shadow-2xl flex flex-col gap-4 animate-in fade-in zoom-in-95 duration-200
-                            ${isWizard ? 'bg-black/90 border-emerald-500/50 shadow-emerald-900/30' : 'bg-black/90 border-fuchsia-500/50 shadow-fuchsia-900/30'}
+                            ${isWizard ? 'bg-black/95 border-emerald-500/50 shadow-emerald-900/50' : 'bg-black/95 border-fuchsia-500/50 shadow-fuchsia-900/50'}
                         `}
                         style={{ left: menuPos.x, top: menuPos.y }}
-                        onMouseDown={(e) => e.stopPropagation()} // Prevent dragging the background when clicking menu
+                        onMouseDown={(e) => e.stopPropagation()} 
                     >
                         <div className="flex items-center justify-between text-xs font-bold uppercase tracking-widest opacity-70 mb-1 border-b border-white/10 pb-2">
                             <span>Smart Controls</span>
@@ -550,13 +536,13 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                             <button onClick={() => setFilter(f => f === 'grayscale' ? 'none' : 'grayscale')} className={`p-2 rounded flex flex-col items-center gap-1 text-[10px] ${filter === 'grayscale' ? 'bg-zinc-500 text-white' : 'bg-white/5 hover:bg-white/10'}`}>
                                 <Droplet size={16}/> B&W
                             </button>
-                            <button onClick={() => { setIsSelectionMode(true); setShowControls(false); }} className={`p-2 rounded flex flex-col items-center gap-1 text-[10px] bg-white/5 hover:bg-white/10 text-emerald-400`}>
+                            <button onClick={() => { setIsSelectionMode(true); setShowContextMenu(false); }} className={`p-2 rounded flex flex-col items-center gap-1 text-[10px] bg-white/5 hover:bg-white/10 text-emerald-400`}>
                                 <Scan size={16}/> Scan
                             </button>
                         </div>
 
                         {/* Sliders */}
-                        <div className="space-y-3 pt-2">
+                        <div className="space-y-3 pt-2 w-48">
                             <div>
                                 <div className="flex justify-between text-[10px] mb-1 font-mono">
                                     <span>Brightness</span>
@@ -566,7 +552,7 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                                     type="range" min="30" max="200" 
                                     value={videoBrightness} 
                                     onChange={(e) => setVideoBrightness(Number(e.target.value))}
-                                    className={`w-48 h-1 rounded-lg appearance-none cursor-pointer ${isWizard ? 'bg-emerald-900/50 accent-emerald-500' : 'bg-fuchsia-900/50 accent-fuchsia-500'}`}
+                                    className={`w-full h-1 rounded-lg appearance-none cursor-pointer ${isWizard ? 'bg-emerald-900/50 accent-emerald-500' : 'bg-fuchsia-900/50 accent-fuchsia-500'}`}
                                 />
                             </div>
                             
@@ -579,12 +565,12 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                                     type="range" min="50" max="200" 
                                     value={zoomLevel} 
                                     onChange={(e) => setZoomLevel(Number(e.target.value))}
-                                    className={`w-48 h-1 rounded-lg appearance-none cursor-pointer ${isWizard ? 'bg-emerald-900/50 accent-emerald-500' : 'bg-fuchsia-900/50 accent-fuchsia-500'}`}
+                                    className={`w-full h-1 rounded-lg appearance-none cursor-pointer ${isWizard ? 'bg-emerald-900/50 accent-emerald-500' : 'bg-fuchsia-900/50 accent-fuchsia-500'}`}
                                 />
                             </div>
 
                             {selectionRect && (
-                                <div className="animate-in fade-in slide-in-from-left-2">
+                                <div className="animate-in fade-in slide-in-from-left-2 pt-2 border-t border-white/10">
                                     <div className="flex justify-between text-[10px] mb-1 font-mono text-emerald-400">
                                         <span>Dark Box Brightness</span>
                                         <span>{regionBrightness}%</span>
@@ -593,7 +579,7 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                                         type="range" min="50" max="200" 
                                         value={regionBrightness} 
                                         onChange={(e) => setRegionBrightness(Number(e.target.value))}
-                                        className={`w-48 h-1 rounded-lg appearance-none cursor-pointer ${isWizard ? 'bg-emerald-900/50 accent-emerald-500' : 'bg-fuchsia-900/50 accent-fuchsia-500'}`}
+                                        className={`w-full h-1 rounded-lg appearance-none cursor-pointer ${isWizard ? 'bg-emerald-900/50 accent-emerald-500' : 'bg-fuchsia-900/50 accent-fuchsia-500'}`}
                                     />
                                 </div>
                             )}
