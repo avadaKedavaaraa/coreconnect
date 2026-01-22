@@ -883,38 +883,42 @@ export const SectorView: React.FC<SectorViewProps> = ({
                     <div className="flex-1 flex items-center justify-center p-2 sm:p-10 relative overflow-hidden">
                         <div className="w-full max-w-6xl aspect-video bg-black shadow-2xl rounded-xl border border-white/10 overflow-hidden relative group">
                             <div
-                                key={cinemaItem.id} /* 👈 Forces a fresh player for every video */
+                                key={cinemaItem.id} /* Forces a fresh player */
                                 className="w-full h-full"
                                 dangerouslySetInnerHTML={{
                                     __html: DOMPurify.sanitize(cinemaItem.content, {
-                                        /* 👇 ALLOW MORE TAGS so the player doesn't break */
-                                        ADD_TAGS: ['iframe', 'div', 'style', 'script', 'link'],
+                                        /* 1. ALLOW ALL TAGS from your embed code */
+                                        ADD_TAGS: ['iframe', 'div', 'style', 'span', 'img'],
 
-                                        /* 👇 ALLOW MORE ATTRIBUTES (Crucial for Microsoft Stream) */
+                                        /* 2. ALLOW ALL ATTRIBUTES from your embed code + common ones */
                                         ADD_ATTR: [
                                             'allow', 'allowfullscreen', 'frameborder', 'scrolling',
-                                            'style', 'width', 'height', 'src', 'id', 'class',
-                                            'name', 'sandbox', 'referrerpolicy', 'loading', 'title'
-                                        ]
+                                            'style', 'width', 'height', 'src', 'title',
+                                            'class', 'id', 'name', 'referrerpolicy', 'sandbox', 'loading'
+                                        ],
+
+                                        /* 3. FORCE KEEPING CSS (Critical for the "black screen" layout issue) */
+                                        FORBID_TAGS: [],
+                                        FORBID_ATTR: [],
+                                        WHOLE_DOCUMENT: false,
                                     })
                                 }}
                             />
                         </div>
-                    </div>
 
-                    {/* Warning Footer */}
-                    <div className="p-3 bg-yellow-900/10 border-t border-yellow-500/10 flex justify-center backdrop-blur-md">
-                        <p className="text-[10px] text-yellow-200/60 flex items-center gap-2 font-mono">
-                            <AlertTriangle size={12} />
-                            If the video shows a login screen, please ensure you are logged into your college account.
-                        </p>
+                        {/* Warning Footer */}
+                        <div className="p-3 bg-yellow-900/10 border-t border-yellow-500/10 flex justify-center backdrop-blur-md">
+                            <p className="text-[10px] text-yellow-200/60 flex items-center gap-2 font-mono">
+                                <AlertTriangle size={12} />
+                                If the video shows a login screen, please ensure you are logged into your college account.
+                            </p>
+                        </div>
                     </div>
-                </div>
             )}
 
-            <style dangerouslySetInnerHTML={{ __html: `@keyframes fade-in-up { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }` }} />
-        </div>
-    );
+                    <style dangerouslySetInnerHTML={{ __html: `@keyframes fade-in-up { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }` }} />
+                </div>
+            );
 };
 
-export default SectorView;
+            export default SectorView;
