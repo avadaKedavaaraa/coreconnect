@@ -905,20 +905,21 @@ export const SectorView: React.FC<SectorViewProps> = ({
                                 }}
                             />
                         </div>
-
-                        {/* Warning Footer */}
-                        <div className="p-3 bg-yellow-900/10 border-t border-yellow-500/10 flex justify-center backdrop-blur-md">
-                            <p className="text-[10px] text-yellow-200/60 flex items-center gap-2 font-mono">
-                                <AlertTriangle size={12} />
-                                If the video shows a login screen, please ensure you are logged into your college account.
-                            </p>
-                        </div>
                     </div>
+
+                    {/* Warning Footer */}
+                    <div className="p-3 bg-yellow-900/10 border-t border-yellow-500/10 flex justify-center backdrop-blur-md">
+                        <p className="text-[10px] text-yellow-200/60 flex items-center gap-2 font-mono">
+                            <AlertTriangle size={12} />
+                            If the video shows a login screen, please ensure you are logged into your college account.
+                        </p>
+                    </div>
+                </div>
             )}
 
-                    <style dangerouslySetInnerHTML={{ __html: `@keyframes fade-in-up { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }` }} />
-                </div>
-            );
+            <style dangerouslySetInnerHTML={{ __html: `@keyframes fade-in-up { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }` }} />
+        </div>
+    );
 };
 
-            export default SectorView;
+export default SectorView;
