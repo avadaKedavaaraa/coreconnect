@@ -68,9 +68,12 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
         const url = item.fileUrl;
         const isDrive = url.includes('drive.google.com');
         const isLocal = url.includes('localhost');
-        const isSharePoint = url.includes('sharepoint.com') || url.includes('point');
+        const isSharePoint = url.includes('sharepoint.com') || url.includes('point'); // Basic detection
         
-        if (isDrive || isSharePoint || (!isLocal && !item.fileUrl.endsWith('.pdf') && !item.type.includes('video'))) { 
+        // CRITICAL FIX: SharePoint/Stream must NOT use 'google' engine. It must be 'native' (iframe).
+        if (isSharePoint) {
+            setEngine('native');
+        } else if (isDrive || (!isLocal && !item.fileUrl.endsWith('.pdf') && !item.type.includes('video'))) { 
             setEngine('google'); 
         } else if (isLocal) {
             setEngine('native');
@@ -102,6 +105,7 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
   const safePdfUrl = isValidUrl(item.fileUrl) ? item.fileUrl! : "";
   const isVideoFile = item.type === 'video' || (safePdfUrl && safePdfUrl.match(/\.(mp4|webm|ogg|mov)$/i));
   const isGoogleDrive = safePdfUrl.includes('drive.google.com');
+  // 'isMediaView' is true if we have a direct file URL. If false, we likely have an embed in 'content'.
   const isMediaView = (item.type === 'file' || item.type === 'video' || item.type === 'link' || item.isLecture) && !!safePdfUrl;
 
   // --- VIDEO CONTROLS ---
@@ -298,7 +302,7 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                 </div>
 
                 <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto no-scrollbar">
-                    {/* View Controls Group - Always available now if desired, or conditionally */}
+                    {/* View Controls Group */}
                     <div className="flex items-center bg-black/20 rounded p-1">
                         <button onClick={() => setZoomLevel(z => Math.max(50, z - 10))} className="p-1.5 hover:bg-white/10 rounded text-white/70" title="Zoom Out"><ZoomOut size={16}/></button>
                         <span className="text-[10px] font-mono w-8 text-center hidden sm:block">{zoomLevel}%</span>
