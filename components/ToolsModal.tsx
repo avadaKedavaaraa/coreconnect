@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Lineage, type UserProfile, SECTORS, GlobalConfig, FONT_LIBRARY } from '../types';
-import { X, Clock, ClipboardList, User, Palette, Save, Type, PaintBucket, LayoutTemplate, Plus, Link as LinkIcon, Eye, Sun, Moon, Accessibility, Activity, RotateCw, Download, Search, CheckSquare, Square, Zap, Monitor, Layers, Video } from 'lucide-react';
+import { X, Clock, ClipboardList, User, Palette, Save, Type, PaintBucket, LayoutTemplate, Plus, Link as LinkIcon, Eye, Sun, Moon, Accessibility, Activity, RotateCw, Download, Search, CheckSquare, Square, Zap } from 'lucide-react';
 import Pomodoro from './Pomodoro';
 import Kanban from './Kanban';
 import StudentID from './StudentID';
@@ -213,9 +213,6 @@ const ToolsModal: React.FC<ToolsModalProps> = ({ lineage, onClose, profile, setP
   // Local State for Profile Editing
   const [editProfile, setEditProfile] = useState<UserProfile>(profile);
   const [hasChanges, setHasChanges] = useState(false);
-  const [videoMode, setVideoMode] = useState<'smart' | 'native'>(() => {
-      return (localStorage.getItem('core_video_mode') as 'smart' | 'native') || 'smart';
-  });
   
   // Check for changes
   useEffect(() => {
@@ -227,10 +224,9 @@ const ToolsModal: React.FC<ToolsModalProps> = ({ lineage, onClose, profile, setP
         editProfile.highContrast !== profile.highContrast ||
         editProfile.brightness !== profile.brightness ||
         editProfile.contrast !== profile.contrast ||
-        editProfile.skipIntro !== profile.skipIntro ||
-        videoMode !== (localStorage.getItem('core_video_mode') || 'smart');
+        editProfile.skipIntro !== profile.skipIntro; // <-- ADDED: Check skipIntro change
     setHasChanges(isDifferent);
-  }, [editProfile, profile, videoMode]);
+  }, [editProfile, profile]);
 
   const handleSaveProfile = () => {
     setProfile(prev => ({
@@ -242,18 +238,15 @@ const ToolsModal: React.FC<ToolsModalProps> = ({ lineage, onClose, profile, setP
         highContrast: editProfile.highContrast,
         brightness: editProfile.brightness,
         contrast: editProfile.contrast,
-        skipIntro: editProfile.skipIntro
+        skipIntro: editProfile.skipIntro // <-- ADDED: Save skipIntro
     }));
 
-    // Update localStorage immediately
+    // Update localStorage immediately so next reload works even if they don't navigate
     const saved = localStorage.getItem('core_connect_profile');
     if (saved) {
         const p = JSON.parse(saved);
         localStorage.setItem('core_connect_profile', JSON.stringify({ ...p, skipIntro: editProfile.skipIntro }));
     }
-    
-    // SAVE VIDEO MODE PREFERENCE
-    localStorage.setItem('core_video_mode', videoMode);
 
     setHasChanges(false);
     const btn = document.getElementById('save-btn');
@@ -398,7 +391,7 @@ const ToolsModal: React.FC<ToolsModalProps> = ({ lineage, onClose, profile, setP
                                </button>
                            </div>
 
-                           {/* --- STARTUP TOGGLE --- */}
+                           {/* --- STARTUP TOGGLE (NEW) --- */}
                            <div className="flex justify-between items-center pt-2 border-t border-white/10">
                                <div>
                                    <label className="text-sm font-bold text-white flex items-center gap-2">
@@ -414,41 +407,9 @@ const ToolsModal: React.FC<ToolsModalProps> = ({ lineage, onClose, profile, setP
                                    <div className={`w-4 h-4 rounded-full bg-white transition-transform ${editProfile.skipIntro ? 'translate-x-6' : 'translate-x-0'}`}></div>
                                </button>
                            </div>
+                           {/* --- END STARTUP TOGGLE --- */}
 
-                           {/* --- DEFAULT PLAYER MODE (NEW) --- */}
-                           <div className="flex flex-col gap-2 pt-2 border-t border-white/10">
-                               <label className="text-sm font-bold text-white flex items-center gap-2">
-                                   <Video size={14} /> Default Video Player (Resources)
-                               </label>
-                               <div className="flex bg-black/40 rounded-lg p-1">
-                                   <button 
-                                       onClick={() => setVideoMode('smart')}
-                                       className={`flex-1 py-2 text-xs rounded transition-all flex items-center justify-center gap-2
-                                           ${videoMode === 'smart' 
-                                               ? (isWizard ? 'bg-emerald-600 text-white' : 'bg-fuchsia-600 text-white') 
-                                               : 'text-white/50 hover:text-white'}
-                                       `}
-                                   >
-                                       <Layers size={14}/> Smart Player
-                                   </button>
-                                   <button 
-                                       onClick={() => setVideoMode('native')}
-                                       className={`flex-1 py-2 text-xs rounded transition-all flex items-center justify-center gap-2
-                                           ${videoMode === 'native' 
-                                               ? (isWizard ? 'bg-emerald-600 text-white' : 'bg-fuchsia-600 text-white') 
-                                               : 'text-white/50 hover:text-white'}
-                                       `}
-                                   >
-                                       <Monitor size={14}/> Normal Player
-                                   </button>
-                               </div>
-                               <p className="text-xs opacity-60 text-white/70">
-                                   "Smart" uses app overlays. "Normal" uses native controls (Default on Mobile).
-                               </p>
-                           </div>
-                           {/* --- END PLAYER MODE --- */}
-
-                           <div className="pt-2 border-t border-white/10">
+                           <div>
                                <div className="flex justify-between text-xs mb-1 opacity-80 text-white">
                                    <span>Global Brightness</span>
                                    <span>{editProfile.brightness || 100}%</span>
