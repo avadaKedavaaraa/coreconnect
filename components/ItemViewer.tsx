@@ -42,7 +42,7 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
       // 1. Check Mobile
       const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
       
-      // 2. If Resource + Mobile -> Force Native (Normal) Default to match Microsoft UI
+      // 2. If Resource + Mobile -> Force Native (Normal) Default
       if (isResourcesSector && isMobile) return 'native';
       
       // 3. Otherwise load user preference
@@ -156,7 +156,7 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
 
   // --- VIDEO CONTROLS ---
   const togglePlay = () => {
-    if (isNativeMode) return; // Native/Microsoft controls handle this
+    if (isNativeMode) return; // Native controls handle this
     if (videoRef.current) {
         if (videoRef.current.paused) {
             videoRef.current.play();
@@ -288,7 +288,7 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
         ${isFullScreen || isNativeMode ? 'bg-black' : 'bg-black/90 backdrop-blur-xl'}
     `}>
       <div 
-        className={`flex flex-col relative transition-all duration-300
+        className={`flex flex-col relative transition-all duration-300 group
           ${isWizard ? 'border-emerald-600 bg-[#0a0f0a]' : 'border-fuchsia-600 bg-[#0f0a15]'}
           ${isFullScreen || isNativeMode 
             ? 'w-full h-full rounded-none border-0' 
@@ -398,7 +398,7 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
 
         {/* --- NATIVE MODE FLOATING TRIGGERS (Since Navbar is gone) --- */}
         {isNativeMode && (
-            <div className="absolute top-0 left-0 right-0 z-50 p-4 flex justify-between pointer-events-none group">
+            <div className="absolute top-0 left-0 right-0 z-50 p-4 flex justify-between pointer-events-none">
                  {/* Close Button */}
                  <button 
                     onClick={onClose}
@@ -425,7 +425,7 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
             {/* GLOBAL CONTENT CONTAINER */}
             <div 
                 ref={containerRef}
-                className="flex-1 bg-zinc-900 relative w-full h-full overflow-hidden flex flex-col group"
+                className="flex-1 bg-zinc-900 relative w-full h-full overflow-hidden flex flex-col"
                 onContextMenu={handleContextMenu}
                 onMouseDown={handleMouseDown}
                 onMouseMove={handleMouseMove}
@@ -606,7 +606,7 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
             </div>
 
             {/* --- RIGHT: NOTEBOOK SIDEBAR --- */}
-            {showNotes && (
+            {showNotes && !isNativeMode && (
                 <div className={`w-80 border-l flex flex-col shrink-0 transition-all animate-[fade-in-left_0.2s]
                     ${isWizard ? 'bg-[#050a05] border-emerald-900' : 'bg-[#09050f] border-fuchsia-900'}
                 `}>

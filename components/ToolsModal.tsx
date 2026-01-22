@@ -213,8 +213,6 @@ const ToolsModal: React.FC<ToolsModalProps> = ({ lineage, onClose, profile, setP
   // Local State for Profile Editing
   const [editProfile, setEditProfile] = useState<UserProfile>(profile);
   const [hasChanges, setHasChanges] = useState(false);
-  
-  // --- VIDEO MODE STATE ---
   const [videoMode, setVideoMode] = useState<'smart' | 'native'>(() => {
       return (localStorage.getItem('core_video_mode') as 'smart' | 'native') || 'smart';
   });
@@ -244,7 +242,7 @@ const ToolsModal: React.FC<ToolsModalProps> = ({ lineage, onClose, profile, setP
         highContrast: editProfile.highContrast,
         brightness: editProfile.brightness,
         contrast: editProfile.contrast,
-        skipIntro: editProfile.skipIntro 
+        skipIntro: editProfile.skipIntro
     }));
 
     // Update localStorage immediately
