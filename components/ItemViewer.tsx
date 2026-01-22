@@ -22,8 +22,8 @@ type VisualFilter = 'none' | 'invert' | 'sepia' | 'grayscale' | 'contrast';
 const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
   const isWizard = lineage === Lineage.WIZARD;
   
+
   // --- SECTOR CHECK ---
-  // Enable Smart Tools for Resources AND Lectures (SharePoint/Tree items)
   const enableSmartTools = item.sector === 'resources' || item.sector === 'lectures' || item.type === 'link_tree';
 
   // --- STATE ---
@@ -47,7 +47,7 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
   const [videoBrightness, setVideoBrightness] = useState(100);
   
   // Smart Interaction States
-  const [isSmartLayerActive, setIsSmartLayerActive] = useState(false); // THE GLASS LAYER SWITCH
+  const [isSmartLayerActive, setIsSmartLayerActive] = useState(false); 
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [dragStart, setDragStart] = useState<{x: number, y: number} | null>(null);
   const [selectionRect, setSelectionRect] = useState<{x: number, y: number, w: number, h: number} | null>(null);
@@ -55,7 +55,7 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
 
   // Control Dock State
   const [showControls, setShowControls] = useState(false);
-  const [menuPos, setMenuPos] = useState({ x: window.innerWidth / 2 - 150, y: window.innerHeight / 2 - 200 }); // Default center
+  const [menuPos, setMenuPos] = useState({ x: window.innerWidth / 2 - 150, y: window.innerHeight / 2 - 200 });
 
   // Notebook State
   const [showNotes, setShowNotes] = useState(false);
@@ -107,7 +107,6 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
   useEffect(() => {
       const handleClickOutside = (e: MouseEvent) => {
           if (showControls && controlsRef.current && !controlsRef.current.contains(e.target as Node)) {
-              // Only close if we aren't clicking the toggle buttons
               const target = e.target as HTMLElement;
               if (!target.closest('.control-trigger')) {
                   setShowControls(false);
@@ -129,11 +128,13 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
   const safePdfUrl = isValidUrl(item.fileUrl) ? item.fileUrl! : "";
   const isVideoFile = item.type === 'video' || (safePdfUrl && safePdfUrl.match(/\.(mp4|webm|ogg|mov)$/i));
   const isGoogleDrive = safePdfUrl.includes('drive.google.com');
-  // NOTE: 'link_tree' is purposely excluded from MediaView so it uses the Text/Embed view
   const isMediaView = (item.type === 'file' || item.type === 'video' || item.type === 'link' || item.isLecture) && !!safePdfUrl;
 
-  // --- VIDEO CONTROLS ---
+  // --- DETECT EMBEDS (iframe/video tags) to force Full Screen layout ---
+  const hasEmbed = item.content && (item.content.includes('<iframe') || item.content.includes('<video') || item.content.includes('<object'));
+  const isImmersiveView = isMediaView || hasEmbed || item.type === 'link_tree';
 
+  // --- VIDEO CONTROLS ---
   const togglePlay = () => {
     if (videoRef.current) {
         if (videoRef.current.paused) {
@@ -146,12 +147,12 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
     }
   };
 
-  // Keyboard Shortcuts (Spacebar)
+  // Keyboard Shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
         if (e.key === 'Escape') {
             if (showControls) setShowControls(false);
-            // onClose(); // Removed close on escape
+            else onClose();
         }
         if (e.code === 'Space' && isVideoFile && !showNotes) {
             e.preventDefault(); 
@@ -166,19 +167,14 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
       if (videoRef.current) setIsPlaying(!videoRef.current.paused);
   };
 
-  // --- CONTEXT MENU HANDLER (Requires Smart Layer) ---
+  // --- CONTEXT MENU HANDLER ---
   const handleContextMenu = (e: React.MouseEvent) => {
       if (!enableSmartTools) return;
-      
       e.preventDefault(); 
-      
       let x = e.clientX;
       let y = e.clientY;
-      
-      // Keep menu in bounds
       if (x + 250 > window.innerWidth) x = window.innerWidth - 260;
       if (y + 400 > window.innerHeight) y = window.innerHeight - 410;
-
       setMenuPos({ x, y });
       setShowControls(true);
   };
@@ -191,26 +187,19 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
     if (showControls && controlsRef.current?.contains(e.target as Node)) return; 
     
     e.preventDefault();
-    
     const rect = containerRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    
-    setDragStart({ x, y });
-    setSelectionRect({ x, y, w: 0, h: 0 });
+    setDragStart({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+    setSelectionRect({ x: e.clientX - rect.left, y: e.clientY - rect.top, w: 0, h: 0 });
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
     const currentY = e.clientY - rect.top;
-
     if (showRuler && rulerRef.current) rulerRef.current.style.top = `${currentY}px`;
 
     if (!dragStart) return;
-    
     const currentX = e.clientX - rect.left;
-    
     setSelectionRect({
         x: Math.min(dragStart.x, currentX),
         y: Math.min(dragStart.y, currentY),
@@ -229,7 +218,6 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
     }
   };
 
-  // --- RESET ---
   const handleResetFilters = () => {
       setVideoBrightness(100);
       setFilter('none');
@@ -238,7 +226,6 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
       setRotation(0);
   };
 
-  // --- STYLES ---
   const getFilterStyle = () => {
       let f = '';
       switch(filter) {
@@ -247,31 +234,16 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
           case 'grayscale': f += 'grayscale(1) '; break;
           case 'contrast': f += 'contrast(1.5) saturate(1.5) '; break;
       }
-      if (videoBrightness !== 100) {
-          f += `brightness(${videoBrightness}%) `;
-      }
+      if (videoBrightness !== 100) f += `brightness(${videoBrightness}%) `;
       return f;
   };
 
   const customStyle = item.style || {};
   const accentColor = isWizard ? '#10b981' : '#d946ef';
-  const titleFont = customStyle.fontFamily === 'wizard' ? '"EB Garamond", serif' : customStyle.fontFamily === 'muggle' ? '"JetBrains Mono", monospace' : undefined;
-
-  const titleStyle: React.CSSProperties = customStyle.isGradient ? {
-      backgroundImage: `linear-gradient(to right, ${customStyle.titleColor}, ${customStyle.titleColorEnd || customStyle.titleColor})`,
-      WebkitBackgroundClip: 'text',
-      WebkitTextFillColor: 'transparent',
-      backgroundClip: 'text',
-      color: 'transparent',
-      fontFamily: titleFont
-  } : {
-      color: customStyle.titleColor || (isWizard ? '#d1fae5' : '#f5d0fe'),
-      fontFamily: titleFont
-  };
 
   const cleanContent = DOMPurify.sanitize(item.content || '', { 
-      ADD_TAGS: ['style', 'iframe', 'img', 'b', 'i', 'em', 'strong', 'a', 'p', 'br', 'ul', 'li', 'ol', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'code', 'pre', 'div', 'span', 'table', 'thead', 'tbody', 'tr', 'td', 'th', 'hr', 'button', 'input', 'label', 'form', 'audio', 'video', 'source', 'track'],
-      ADD_ATTR: ['target', 'href', 'src', 'frameborder', 'allow', 'allowfullscreen', 'style', 'class', 'id', 'width', 'height', 'align', 'controls', 'autoplay', 'loop', 'muted', 'poster', 'type']
+      ADD_TAGS: ['iframe', 'video', 'source', 'style', 'div', 'span', 'img', 'p', 'br', 'b', 'i', 'strong', 'a'],
+      ADD_ATTR: ['src', 'frameborder', 'allow', 'allowfullscreen', 'style', 'class', 'width', 'height', 'controls', 'autoplay', 'loop', 'muted', 'type', 'target', 'href']
   });
 
   return (
