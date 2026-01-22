@@ -233,7 +233,6 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
   };
 
   const customStyle = item.style || {};
-  // --- DEFINING ACCENT COLOR HERE TO FIX ERROR ---
   const accentColor = isWizard ? '#10b981' : '#d946ef';
   
   const titleFont = customStyle.fontFamily === 'wizard' ? '"EB Garamond", serif' : customStyle.fontFamily === 'muggle' ? '"JetBrains Mono", monospace' : undefined;
@@ -718,9 +717,6 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
             </div>
         </div>
     )}
-
-  </div>
-  
   {/* Global Styles for Animations */}
   <style dangerouslySetInnerHTML={{ __html: `
     @keyframes fade-in-left { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
