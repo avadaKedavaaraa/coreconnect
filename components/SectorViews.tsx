@@ -193,14 +193,11 @@ export const SectorView: React.FC<SectorViewProps> = ({
     }, [cinemaMode]);
 
     // --- HANDLER ---
+    // --- HANDLER ---
     const handlePlayItem = (item: CarouselItem) => {
-        // FIX: Use local Cinema Player for Link Tree items (SharePoint Embeds)
-        // This ensures raw iframes are rendered correctly with proper permissions.
-        setCinemaItem(item);
-        setCinemaMode(true);
-
-        // Optional: Still trigger the 'view' tracker in the background
-        // onViewItem(item); 
+        // REVERT: Send back to main ItemViewer so we get Smart Controls (Dark Mode, etc.)
+        // We will fix ItemViewer to handle the video correctly.
+        onViewItem(item);
     };
 
     // State
@@ -892,13 +889,14 @@ export const SectorView: React.FC<SectorViewProps> = ({
                                 className="flex-1 w-full relative [&_iframe]:w-full [&_iframe]:h-full [&_iframe]:border-none"
                                 dangerouslySetInnerHTML={{
                                     __html: DOMPurify.sanitize(cinemaItem.content, {
-                                        // 👇 UPDATE THIS LIST to allow video tags and controls
-                                        ADD_TAGS: ['iframe', 'div', 'style', 'span', 'img', 'video', 'source', 'p', 'a', 'b', 'strong'],
+                                        // 👇 FIX: Allow 'video', 'source', and formatting tags so they aren't deleted!
+                                        ADD_TAGS: ['iframe', 'div', 'style', 'span', 'img', 'video', 'source', 'p', 'a', 'b', 'strong', 'center'],
                                         ADD_ATTR: [
                                             'allow', 'allowfullscreen', 'frameborder', 'scrolling',
                                             'style', 'width', 'height', 'src', 'title',
                                             'class', 'id', 'name', 'referrerpolicy', 'loading',
-                                            'controls', 'autoplay', 'loop', 'muted', 'poster', 'type' // 👈 Essential for standard players!
+                                            // 👇 FIX: Allow native video controls
+                                            'controls', 'autoplay', 'loop', 'muted', 'poster', 'type'
                                         ]
                                     })
                                 }}
