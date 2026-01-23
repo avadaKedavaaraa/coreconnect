@@ -882,8 +882,9 @@ export const SectorView: React.FC<SectorViewProps> = ({
                     <div className="flex-1 flex items-center justify-center p-2 sm:p-10 relative overflow-hidden">
                         <div className="w-full max-w-6xl aspect-video bg-black shadow-2xl rounded-xl border border-white/10 overflow-hidden relative group">
                             <div
-                                key={cinemaItem.id} /* Forces a fresh player */
-                                className="w-full h-full"
+                                key={cinemaItem.id}
+                                // 👇 FIX: This Tailwind magic forces the iframe inside to be 100% width/height
+                                className="w-full h-full [&_iframe]:w-full [&_iframe]:h-full"
                                 dangerouslySetInnerHTML={{
                                     __html: DOMPurify.sanitize(cinemaItem.content, {
                                         /* 1. ALLOW ALL TAGS from your embed code */
@@ -893,7 +894,7 @@ export const SectorView: React.FC<SectorViewProps> = ({
                                         ADD_ATTR: [
                                             'allow', 'allowfullscreen', 'frameborder', 'scrolling',
                                             'style', 'width', 'height', 'src', 'title',
-                                            'class', 'id', 'name', 'referrerpolicy', 'sandbox', 'loading'
+                                            'class', 'id', 'name', 'referrerpolicy', 'loading' //'sandbox'//
                                         ],
 
                                         /* 3. FORCE KEEPING CSS (Critical for the "black screen" layout issue) */
