@@ -194,24 +194,26 @@ export const SectorView: React.FC<SectorViewProps> = ({
 
     // --- HANDLER ---
     const handlePlayItem = (item: CarouselItem) => {
-        // 1. Check if Mobile (Phone View)
+        // 1. Detect Device
         const isMobile = window.innerWidth < 768;
-        const isResource = item.sector === 'resources';
 
-        // 2. Get User Preference (Default to 'smart')
-        const savedMode = localStorage.getItem('core_video_mode') || 'smart';
+        // 2. Get User Preference based on Device
+        // Desktop defaults to 'smart', Mobile defaults to 'normal'
+        let modeToUse = 'smart';
+        
+        if (isMobile) {
+            modeToUse = localStorage.getItem('core_video_mode_mobile') || 'normal';
+        } else {
+            modeToUse = localStorage.getItem('core_video_mode_desktop') || 'smart';
+        }
 
-        // 3. Logic: 
-        // If it's a Resource on Mobile -> FORCE Normal Player (Center Overlay)
-        // Otherwise -> Use User Preference (Smart or Normal)
-        const useNormalPlayer = (isMobile && isResource) || savedMode === 'normal';
-
-        if (useNormalPlayer) {
-            // MODE A: NORMAL PLAYER (Local Cinema Mode - Centered Overlay)
+        // 3. Execute
+        if (modeToUse === 'normal') {
+            // MODE A: NORMAL (Local Cinema - Centered)
             setCinemaItem(item);
             setCinemaMode(true);
         } else {
-            // MODE B: SMART PLAYER (ItemViewer - With Sidebars & Tools)
+            // MODE B: SMART (ItemViewer - Advanced Dock)
             onViewItem(item);
         }
     };
@@ -616,13 +618,15 @@ export const SectorView: React.FC<SectorViewProps> = ({
                         <h2 className={`text-2xl font-bold ${isWizard ? 'font-wizardTitle text-emerald-100' : 'font-muggle text-fuchsia-100'}`}>
                             {isWizard ? currentSector.wizardName : currentSector.muggleName}
                         </h2>
+
                         {/* ✨ NEW: BACK TO FOLDERS BUTTON ✨ */}
+                        {/* Only shows if: Not Lecture, Not Announcement, AND a Subject is currently selected */}
                         {!isLectures && sectorId !== 'announcements' && subjectFilter && (
                             <button 
                                 onClick={() => { 
                                     setSubjectFilter(''); 
                                     setViewMode('folders'); 
-                                    setSearch(''); // Safety: Clear search to ensure folders appear
+                                    setSearch(''); // Clear search so folders reappear
                                 }}
                                 className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold border transition-all animate-in fade-in slide-in-from-left-4
                                     ${isWizard ? 'bg-emerald-900/30 border-emerald-500/30 text-emerald-300 hover:bg-emerald-900/50' : 'bg-fuchsia-900/30 border-fuchsia-500/30 text-fuchsia-300 hover:bg-fuchsia-900/50'}
@@ -846,17 +850,28 @@ export const SectorView: React.FC<SectorViewProps> = ({
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center gap-2 mb-1">{item.subject && <span className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded border opacity-60 ${isWizard ? 'border-emerald-800 text-emerald-300' : 'border-fuchsia-800 text-fuchsia-300'}`}>{item.subject}</span>}<div className={`flex items-center gap-1 text-[10px] opacity-50 ${isWizard ? 'font-wizard' : 'font-muggle'}`}><Calendar size={10} /><span>{item.date}</span></div></div>
 
-                                                {/* FIX: Applied text-white for Title & text-zinc-300 for Content in non-announcement sectors to prevent UI conflict */}
+                                                {/* ✨ FIX: Removed 'sectorId !== announcements' check so text is ALWAYS visible (white/grey) */}
+                                                {/* 1. TITLE: Defaults to 'text-white', but 'style.color' overrides it if you picked one */}
                                                 <h4
-                                                    className={`font-bold leading-tight truncate ${viewMode === 'list' ? 'text-lg' : 'text-lg mb-2'} ${sectorId !== 'announcements' ? 'text-white' : ''}`}
-                                                    style={item.style?.isGradient ? { backgroundImage: `linear-gradient(to right, ${item.style.titleColor}, ${item.style.titleColorEnd || item.style.titleColor})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', color: 'transparent' } : { color: item.style?.titleColor }}
+                                                    className={`font-bold leading-tight truncate text-white ${viewMode === 'list' ? 'text-lg' : 'text-lg mb-2'}`}
+                                                    style={item.style?.isGradient ? { 
+                                                        backgroundImage: `linear-gradient(to right, ${item.style.titleColor}, ${item.style.titleColorEnd || item.style.titleColor})`, 
+                                                        WebkitBackgroundClip: 'text', 
+                                                        WebkitTextFillColor: 'transparent', 
+                                                        backgroundClip: 'text', 
+                                                        color: 'transparent' 
+                                                    } : { 
+                                                        color: item.style?.titleColor // 👈 This OVERRIDES text-white!
+                                                    }}
                                                 >
                                                     {item.title}
                                                 </h4>
 
+                                                {/* 2. CONTENT: Defaults to 'text-zinc-300', but 'style.contentColor' overrides it */}
                                                 {!(item.fileUrl && (item.fileUrl.startsWith('http') || item.fileUrl.startsWith('https'))) &&
                                                     <div
-                                                        className={`text-xs opacity-70 line-clamp-3 mt-1 ${isWizard ? 'font-wizard' : 'font-muggle'} ${sectorId !== 'announcements' ? 'text-zinc-300' : ''}`}
+                                                        className={`text-xs opacity-70 line-clamp-3 mt-1 text-zinc-300 ${isWizard ? 'font-wizard' : 'font-muggle'}`}
+                                                        style={{ color: item.style?.contentColor }} // 👈 Added this to ensure custom content colors work too!
                                                         dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(item.content, { ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'u', 'span'], ALLOWED_ATTR: ['style', 'class'] }) }}
                                                     />
                                                 }

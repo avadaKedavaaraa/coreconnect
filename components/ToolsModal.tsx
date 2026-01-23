@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Lineage, type UserProfile, SECTORS, GlobalConfig, FONT_LIBRARY } from '../types';
-import { X, Clock, ClipboardList, User, Palette, Save, Type, PaintBucket, LayoutTemplate, Plus, Link as LinkIcon, Eye, Sun, Moon, Accessibility, Activity, RotateCw, Download, Search, CheckSquare, Square, Zap, Layers, MonitorPlay } from 'lucide-react';
+import { X, Clock, ClipboardList, User, Palette, Save, Type, PaintBucket, LayoutTemplate, Plus, Link as LinkIcon, Eye, Sun, Moon, Accessibility, Activity, RotateCw, Download, Search, CheckSquare, Square, Zap, Layers, MonitorPlay, Monitor, Smartphone } from 'lucide-react';
 import Pomodoro from './Pomodoro';
 import Kanban from './Kanban';
 import StudentID from './StudentID';
@@ -512,19 +512,78 @@ const ToolsModal: React.FC<ToolsModalProps> = ({ lineage, onClose, profile, setP
                                             </label>
                                         </div>
                                     </div>
+                                    {/* --- NEW SECTION: VIDEO PLAYER PREFERENCES (SPLIT) --- */}
+                                    <div className="space-y-4 pt-4 border-t border-white/10">
+
+                                        {/* 1. DESKTOP PREFERENCE */}
+                                        <div>
+                                            <h4 className="text-[10px] font-bold opacity-50 uppercase tracking-widest text-white mb-2 flex items-center gap-2">
+                                                <Monitor size={12} /> Desktop / Laptop
+                                            </h4>
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <button
+                                                    onClick={() => { localStorage.setItem('core_video_mode_desktop', 'smart'); alert("Desktop: Smart Player set!"); }}
+                                                    className="p-2 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 flex flex-col items-center gap-1 transition-all active:scale-95 text-white"
+                                                >
+                                                    <div className={`p-1.5 rounded-full ${isWizard ? 'bg-emerald-500/20 text-emerald-300' : 'bg-fuchsia-500/20 text-fuchsia-300'}`}>
+                                                        <Layers size={16} />
+                                                    </div>
+                                                    <span className="text-[10px] font-bold">Smart Player</span>
+                                                </button>
+
+                                                <button
+                                                    onClick={() => { localStorage.setItem('core_video_mode_desktop', 'normal'); alert("Desktop: Normal Player set!"); }}
+                                                    className="p-2 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 flex flex-col items-center gap-1 transition-all active:scale-95 text-white"
+                                                >
+                                                    <div className="p-1.5 rounded-full bg-white/10 text-white">
+                                                        <MonitorPlay size={16} />
+                                                    </div>
+                                                    <span className="text-[10px] font-bold">Normal Player</span>
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {/* 2. MOBILE PREFERENCE */}
+                                        <div>
+                                            <h4 className="text-[10px] font-bold opacity-50 uppercase tracking-widest text-white mb-2 flex items-center gap-2">
+                                                <Smartphone size={12} /> Mobile / Phone
+                                            </h4>
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <button
+                                                    onClick={() => { localStorage.setItem('core_video_mode_mobile', 'smart'); alert("Mobile: Smart Player set!"); }}
+                                                    className="p-2 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 flex flex-col items-center gap-1 transition-all active:scale-95 text-white"
+                                                >
+                                                    <div className={`p-1.5 rounded-full ${isWizard ? 'bg-emerald-500/20 text-emerald-300' : 'bg-fuchsia-500/20 text-fuchsia-300'}`}>
+                                                        <Layers size={16} />
+                                                    </div>
+                                                    <span className="text-[10px] font-bold">Smart Player</span>
+                                                </button>
+
+                                                <button
+                                                    onClick={() => { localStorage.setItem('core_video_mode_mobile', 'normal'); alert("Mobile: Normal Player set!"); }}
+                                                    className="p-2 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 flex flex-col items-center gap-1 transition-all active:scale-95 text-white"
+                                                >
+                                                    <div className="p-1.5 rounded-full bg-white/10 text-white">
+                                                        <MonitorPlay size={16} />
+                                                    </div>
+                                                    <span className="text-[10px] font-bold">Normal Player</span>
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                    </div>
                                     {/* --- NEW SECTION: VIDEO PLAYER PREFERENCE --- */}
                                     <div className="space-y-3 pt-4 border-t border-white/10">
-                                        <h4 className="text-xs font-bold opacity-50 uppercase tracking-widest">
+                                        <h4 className="text-xs font-bold opacity-50 uppercase tracking-widest text-white">
                                             Video Player Experience
                                         </h4>
                                         <div className="grid grid-cols-2 gap-3">
                                             <button
                                                 onClick={() => {
                                                     localStorage.setItem('core_video_mode', 'smart');
-                                                    // Force a small reload or state update if needed, but usually not required for next click
                                                     alert("Smart Player Activated: You will now see the advanced control dock!");
                                                 }}
-                                                className="p-3 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 flex flex-col items-center gap-2 transition-all active:scale-95"
+                                                className="p-3 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 flex flex-col items-center gap-2 transition-all active:scale-95 text-white"
                                             >
                                                 <div className={`p-2 rounded-full ${isWizard ? 'bg-emerald-500/20 text-emerald-300' : 'bg-fuchsia-500/20 text-fuchsia-300'}`}>
                                                     <Layers size={20} />
@@ -538,7 +597,7 @@ const ToolsModal: React.FC<ToolsModalProps> = ({ lineage, onClose, profile, setP
                                                     localStorage.setItem('core_video_mode', 'normal');
                                                     alert("Classic Player Activated: Videos will open in the standard popup.");
                                                 }}
-                                                className="p-3 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 flex flex-col items-center gap-2 transition-all active:scale-95"
+                                                className="p-3 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 flex flex-col items-center gap-2 transition-all active:scale-95 text-white"
                                             >
                                                 <div className="p-2 rounded-full bg-white/10 text-white">
                                                     <MonitorPlay size={20} />
@@ -548,41 +607,6 @@ const ToolsModal: React.FC<ToolsModalProps> = ({ lineage, onClose, profile, setP
                                             </button>
                                         </div>
                                     </div>
-                                    {/* --- NEW SECTION: VIDEO PLAYER PREFERENCE --- */}
-                       <div className="space-y-3 pt-4 border-t border-white/10">
-                           <h4 className="text-xs font-bold opacity-50 uppercase tracking-widest text-white">
-                               Video Player Experience
-                           </h4>
-                           <div className="grid grid-cols-2 gap-3">
-                               <button
-                                   onClick={() => {
-                                       localStorage.setItem('core_video_mode', 'smart');
-                                       alert("Smart Player Activated: You will now see the advanced control dock!");
-                                   }}
-                                   className="p-3 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 flex flex-col items-center gap-2 transition-all active:scale-95 text-white"
-                               >
-                                   <div className={`p-2 rounded-full ${isWizard ? 'bg-emerald-500/20 text-emerald-300' : 'bg-fuchsia-500/20 text-fuchsia-300'}`}>
-                                       <Layers size={20} />
-                                   </div>
-                                   <span className="text-xs font-bold">Smart Player</span>
-                                   <span className="text-[10px] opacity-50 text-center">Interactive Dock & Controls</span>
-                               </button>
-
-                               <button
-                                   onClick={() => {
-                                       localStorage.setItem('core_video_mode', 'normal');
-                                       alert("Classic Player Activated: Videos will open in the standard popup.");
-                                   }}
-                                   className="p-3 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 flex flex-col items-center gap-2 transition-all active:scale-95 text-white"
-                               >
-                                   <div className="p-2 rounded-full bg-white/10 text-white">
-                                       <MonitorPlay size={20} />
-                                   </div>
-                                   <span className="text-xs font-bold">Normal Player</span>
-                                   <span className="text-[10px] opacity-50 text-center">Faster, Simple Popup</span>
-                               </button>
-                           </div>
-                       </div>
 
                                     <div className="pt-4 sticky bottom-0 bg-gradient-to-t from-black via-black to-transparent pb-2 z-10">
                                         <button
