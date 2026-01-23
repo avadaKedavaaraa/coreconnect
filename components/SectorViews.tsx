@@ -193,11 +193,27 @@ export const SectorView: React.FC<SectorViewProps> = ({
     }, [cinemaMode]);
 
     // --- HANDLER ---
-    // --- HANDLER ---
     const handlePlayItem = (item: CarouselItem) => {
-        // REVERT: Send back to main ItemViewer so we get Smart Controls (Dark Mode, etc.)
-        // We will fix ItemViewer to handle the video correctly.
-        onViewItem(item);
+        // 1. Check if Mobile (Phone View)
+        const isMobile = window.innerWidth < 768;
+        const isResource = item.sector === 'resources';
+
+        // 2. Get User Preference (Default to 'smart')
+        const savedMode = localStorage.getItem('core_video_mode') || 'smart';
+
+        // 3. Logic: 
+        // If it's a Resource on Mobile -> FORCE Normal Player (Center Overlay)
+        // Otherwise -> Use User Preference (Smart or Normal)
+        const useNormalPlayer = (isMobile && isResource) || savedMode === 'normal';
+
+        if (useNormalPlayer) {
+            // MODE A: NORMAL PLAYER (Local Cinema Mode - Centered Overlay)
+            setCinemaItem(item);
+            setCinemaMode(true);
+        } else {
+            // MODE B: SMART PLAYER (ItemViewer - With Sidebars & Tools)
+            onViewItem(item);
+        }
     };
 
     // State
@@ -600,6 +616,21 @@ export const SectorView: React.FC<SectorViewProps> = ({
                         <h2 className={`text-2xl font-bold ${isWizard ? 'font-wizardTitle text-emerald-100' : 'font-muggle text-fuchsia-100'}`}>
                             {isWizard ? currentSector.wizardName : currentSector.muggleName}
                         </h2>
+                        {/* ✨ NEW: BACK TO FOLDERS BUTTON ✨ */}
+                        {!isLectures && sectorId !== 'announcements' && subjectFilter && (
+                            <button 
+                                onClick={() => { 
+                                    setSubjectFilter(''); 
+                                    setViewMode('folders'); 
+                                    setSearch(''); // Safety: Clear search to ensure folders appear
+                                }}
+                                className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold border transition-all animate-in fade-in slide-in-from-left-4
+                                    ${isWizard ? 'bg-emerald-900/30 border-emerald-500/30 text-emerald-300 hover:bg-emerald-900/50' : 'bg-fuchsia-900/30 border-fuchsia-500/30 text-fuchsia-300 hover:bg-fuchsia-900/50'}
+                                `}
+                            >
+                                <ArrowLeft size={14} /> <span className="hidden sm:inline">BACK TO FOLDERS</span><span className="sm:hidden">FOLDERS</span>
+                            </button>
+                        )}
                     </div>
 
                     {!isLectures && (

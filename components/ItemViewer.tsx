@@ -350,6 +350,19 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                             </button>
                          </div>
                     )}
+                    {/* ✨ NEW: OPEN LINK BUTTON (Only if link exists) ✨ */}
+                    {item.fileUrl && (
+                        <button
+                            onClick={() => window.open(item.fileUrl, '_blank')}
+                            className="p-2 rounded hover:bg-white/10 text-white/70 hover:text-white transition-colors flex items-center gap-2"
+                            title="Open Source in New Tab"
+                        >
+                            <ExternalLink size={18} />
+                            <span className="text-xs font-bold hidden md:block">Open</span>
+                        </button>
+                    )}
+
+                    <div className="w-px h-6 bg-white/10 mx-1 hidden sm:block"></div>
 
                     {enableSmartTools && (
                         <button 
@@ -502,7 +515,7 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                     <div 
                         className={`flex-1 relative 
                             ${isLinkTree 
-                                ? 'p-0 overflow-hidden flex flex-col' 
+                                ? 'p-0 overflow-hidden flex flex-col items-center justify-center' // 👈 Added centering here!
                                 : `overflow-y-auto p-6 md:p-10 space-y-8 ${isWizard ? 'scrollbar-wizard' : 'scrollbar-muggle'}`
                             }
                         `}
@@ -513,8 +526,8 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                             <h2 className="text-2xl md:text-3xl font-bold leading-tight break-words mb-6" style={titleStyle}>{item.title}</h2>
                         )}
                         <div 
-                            // FIX: Added [&_iframe]:w-full... to force video to fill the Smart Player area
-                            className={isLinkTree ? "w-full h-full [&_iframe]:w-full [&_iframe]:h-full [&_iframe]:border-none" : `prose prose-invert max-w-none safe-font text-lg leading-relaxed html-content ${isWizard ? 'prose-emerald' : 'prose-fuchsia'}`}
+                            // ✨ FIX: Added [&_iframe] styles to force video to fill container
+                        className={isLinkTree ? "w-full h-full flex items-center justify-center [&_iframe]:w-full [&_iframe]:h-full [&_iframe]:border-none" : `prose prose-invert max-w-none safe-font text-lg leading-relaxed html-content ${isWizard ? 'prose-emerald' : 'prose-fuchsia'}`}
                             style={{ color: customStyle.contentColor || '#e4e4e7' }}
                         >
                             {cleanContent ? <div className={isLinkTree ? 'w-full h-full' : ''} dangerouslySetInnerHTML={{__html: cleanContent}}></div> : <p className="italic opacity-50 text-center py-10">No additional text content provided.</p>}
