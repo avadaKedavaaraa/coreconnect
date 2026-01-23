@@ -880,7 +880,7 @@ export const SectorView: React.FC<SectorViewProps> = ({
 
                     {/* Video Area */}
                     <div className="flex-1 flex items-center justify-center p-2 sm:p-10 relative overflow-hidden">
-                        <div className="w-full max-w-6xl aspect-video bg-black shadow-2xl rounded-xl border border-white/10 overflow-hidden relative group">
+                        <div className="w-full max-w-6xl aspect-video bg-black shadow-2xl rounded-xl border border-white/10 relative group">
                             <div
                                 key={cinemaItem.id}
                                 // 👇 FIX: This Tailwind magic forces the iframe inside to be 100% width/height
