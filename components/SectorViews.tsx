@@ -194,9 +194,13 @@ export const SectorView: React.FC<SectorViewProps> = ({
 
     // --- HANDLER ---
     const handlePlayItem = (item: CarouselItem) => {
-        // Redirect ALL playback to the main ItemViewer.
-        // This ensures the Smart Controls (Dark Mode, etc.) you just added are used.
-        onViewItem(item);
+        // FIX: Use local Cinema Player for Link Tree items (SharePoint Embeds)
+        // This ensures raw iframes are rendered correctly with proper permissions.
+        setCinemaItem(item);
+        setCinemaMode(true);
+
+        // Optional: Still trigger the 'view' tracker in the background
+        // onViewItem(item); 
     };
 
     // State
