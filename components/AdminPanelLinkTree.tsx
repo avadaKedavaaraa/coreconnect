@@ -460,14 +460,21 @@ export const AdminPanelLinkTree: React.FC<AdminPanelLinkTreeProps> = ({
             </button>
             
             {/* Content Container */}
-            <div className="w-full max-w-5xl aspect-video bg-black shadow-2xl rounded-xl border border-white/10 overflow-hidden relative group">
+            {/* FIX: Removed aspect-video/overflow-hidden. Added h-[85vh] and iframe sizing. */}
+            <div className="w-full max-w-7xl h-[85vh] bg-black shadow-2xl rounded-xl border border-white/10 relative group flex flex-col">
               {existingTreeItems[activePreviewIndex] ? (
                   <div 
-                    className="w-full h-full"
+                    className="flex-1 w-full relative [&_iframe]:w-full [&_iframe]:h-full [&_iframe]:border-none"
                     dangerouslySetInnerHTML={{ 
                       __html: DOMPurify.sanitize(existingTreeItems[activePreviewIndex].content, { 
-                        ADD_TAGS: ['iframe', 'div', 'style'], 
-                        ADD_ATTR: ['allow', 'allowfullscreen', 'frameborder', 'scrolling', 'style', 'width', 'height', 'src'] 
+                        // FIX: Expanded allowed tags to match ItemViewer (restores missing players)
+                        ADD_TAGS: ['iframe', 'div', 'style', 'span', 'img', 'video', 'p', 'a', 'b', 'i', 'strong', 'center'],
+                        ADD_ATTR: [
+                            'allow', 'allowfullscreen', 'frameborder', 'scrolling', 
+                            'style', 'width', 'height', 'src', 'title', 
+                            'class', 'id', 'name', 'referrerpolicy', 'loading',
+                            'controls', 'autoplay', 'loop', 'muted', 'poster', 'href', 'target' // Added video/link attributes
+                        ]
                       }) 
                     }} 
                   />

@@ -892,13 +892,13 @@ export const SectorView: React.FC<SectorViewProps> = ({
                                 className="flex-1 w-full relative [&_iframe]:w-full [&_iframe]:h-full [&_iframe]:border-none"
                                 dangerouslySetInnerHTML={{
                                     __html: DOMPurify.sanitize(cinemaItem.content, {
-                                        // This config is perfect, keep it as is!
-                                        ADD_TAGS: ['iframe', 'div', 'style', 'span', 'img'],
+                                        // 👇 UPDATE THIS LIST to allow video tags and controls
+                                        ADD_TAGS: ['iframe', 'div', 'style', 'span', 'img', 'video', 'source', 'p', 'a', 'b', 'strong'],
                                         ADD_ATTR: [
                                             'allow', 'allowfullscreen', 'frameborder', 'scrolling',
                                             'style', 'width', 'height', 'src', 'title',
-                                            'class', 'id', 'name', 'referrerpolicy', 'loading'
-                                            // Removed 'sandbox' to be safe, as discussed!
+                                            'class', 'id', 'name', 'referrerpolicy', 'loading',
+                                            'controls', 'autoplay', 'loop', 'muted', 'poster', 'type' // 👈 Essential for standard players!
                                         ]
                                     })
                                 }}
