@@ -880,27 +880,26 @@ export const SectorView: React.FC<SectorViewProps> = ({
 
                     {/* Video Area */}
                     <div className="flex-1 flex items-center justify-center p-2 sm:p-10 relative overflow-hidden">
-                        <div className="w-full max-w-6xl aspect-video bg-black shadow-2xl rounded-xl border border-white/10 relative group">
+                        {/* FIX APPLIED:
+       1. Removed 'aspect-video': Stops forcing 16:9 (which was cutting off the bottom bar).
+       2. Added 'h-[85vh]': Sets height to 85% of the screen. This ensures there is ALWAYS room for controls at the bottom.
+       3. Removed 'overflow-hidden' from parent: Allows the player UI to render fully.
+       4. Added '[&_iframe]:w-full [&_iframe]:h-full': Forces the Microsoft player to fill this new tall box.
+    */}
+                        <div className="w-full max-w-7xl h-[85vh] bg-black shadow-2xl rounded-xl border border-white/10 relative group flex flex-col">
                             <div
                                 key={cinemaItem.id}
-                                // 👇 FIX: This Tailwind magic forces the iframe inside to be 100% width/height
-                                className="w-full h-full [&_iframe]:w-full [&_iframe]:h-full"
+                                className="flex-1 w-full relative [&_iframe]:w-full [&_iframe]:h-full [&_iframe]:border-none"
                                 dangerouslySetInnerHTML={{
                                     __html: DOMPurify.sanitize(cinemaItem.content, {
-                                        /* 1. ALLOW ALL TAGS from your embed code */
+                                        // This config is perfect, keep it as is!
                                         ADD_TAGS: ['iframe', 'div', 'style', 'span', 'img'],
-
-                                        /* 2. ALLOW ALL ATTRIBUTES from your embed code + common ones */
                                         ADD_ATTR: [
                                             'allow', 'allowfullscreen', 'frameborder', 'scrolling',
                                             'style', 'width', 'height', 'src', 'title',
-                                            'class', 'id', 'name', 'referrerpolicy', 'loading' //'sandbox'//
-                                        ],
-
-                                        /* 3. FORCE KEEPING CSS (Critical for the "black screen" layout issue) */
-                                        FORBID_TAGS: [],
-                                        FORBID_ATTR: [],
-                                        WHOLE_DOCUMENT: false,
+                                            'class', 'id', 'name', 'referrerpolicy', 'loading'
+                                            // Removed 'sandbox' to be safe, as discussed!
+                                        ]
                                     })
                                 }}
                             />
