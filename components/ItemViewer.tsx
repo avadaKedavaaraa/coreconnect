@@ -569,6 +569,7 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                         `}
                         style={{ left: menuPos.x, top: menuPos.y, minWidth: '320px' }}
                         onMouseDown={(e) => e.stopPropagation()} 
+                        onMouseUp={(e) => e.stopPropagation()} 
                     >
                         <div className="flex items-center justify-between text-xs font-bold uppercase tracking-widest opacity-70 mb-1 border-b border-white/10 pb-2">
                             <span className="flex items-center gap-2"><SlidersHorizontal size={14}/> Smart Controls</span>
