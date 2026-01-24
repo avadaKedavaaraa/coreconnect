@@ -214,28 +214,69 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
     setSelectionRect({ x, y, w: 0, h: 0 });
   };
 
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!containerRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
-    const currentY = e.clientY - rect.top;
-    if (showRuler && rulerRef.current) rulerRef.current.style.top = `${currentY}px`;
-    if (!dragStart) return;
-    const currentX = e.clientX - rect.left;
-    setSelectionRect({
-        x: Math.min(dragStart.x, currentX),
-        y: Math.min(dragStart.y, currentY),
-        w: Math.abs(currentX - dragStart.x),
-        h: Math.abs(currentY - dragStart.y)
-    });
-  };
+  // --- FIX: GLOBAL DRAG HANDLER (Solves Lag & Outside Click) ---
+  useEffect(() => {
+    if (!dragStart) return; // Only run when dragging starts
 
-  const handleMouseUp = () => {
-    setDragStart(null);
-    if (selectionRect && (selectionRect.w < 10 || selectionRect.h < 10)) {
-        setSelectionRect(null); 
-    } else if (selectionRect) {
-        setTimeout(() => setShowControls(true), 100);
-        setIsSelectionMode(false); 
+    const handleWindowMove = (e: MouseEvent) => {
+        if (!containerRef.current) return;
+        
+        // Calculate relative coordinates
+        const rect = containerRef.current.getBoundingClientRect();
+        const currentX = e.clientX - rect.left;
+        const currentY = e.clientY - rect.top;
+
+        // Update Selection Box
+        setSelectionRect({
+            x: Math.min(dragStart.x, currentX),
+            y: Math.min(dragStart.y, currentY),
+            w: Math.abs(currentX - dragStart.x),
+            h: Math.abs(currentY - dragStart.y)
+        });
+    };
+
+    const handleWindowUp = (e: MouseEvent) => {
+        if (!containerRef.current) {
+            setDragStart(null);
+            return;
+        }
+
+        // Calculate final dimensions one last time to decide if we keep it
+        const rect = containerRef.current.getBoundingClientRect();
+        const currentX = e.clientX - rect.left;
+        const currentY = e.clientY - rect.top;
+        const w = Math.abs(currentX - dragStart.x);
+        const h = Math.abs(currentY - dragStart.y);
+
+        // Logic: If box is too small (<10px), discard it. Otherwise, keep it.
+        if (w < 10 || h < 10) {
+            setSelectionRect(null);
+        } else {
+            // Valid selection made
+            setTimeout(() => setShowControls(true), 100);
+            setIsSelectionMode(false);
+        }
+        
+        // Stop dragging
+        setDragStart(null);
+    };
+
+    // Attach listeners to WINDOW (handles outside clicks)
+    window.addEventListener('mousemove', handleWindowMove);
+    window.addEventListener('mouseup', handleWindowUp);
+
+    // Cleanup listeners when drag ends
+    return () => {
+        window.removeEventListener('mousemove', handleWindowMove);
+        window.removeEventListener('mouseup', handleWindowUp);
+    };
+  }, [dragStart]);
+
+  // --- RULER HANDLER (Separate to keep ruler smooth without dragging) ---
+  const handleRulerMove = (e: React.MouseEvent) => {
+    if (showRuler && rulerRef.current && containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        rulerRef.current.style.top = `${e.clientY - rect.top}px`;
     }
   };
 
@@ -443,8 +484,8 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                 className="flex-1 bg-zinc-900 relative w-full h-full overflow-hidden flex flex-col"
                 onContextMenu={handleContextMenu}
                 onMouseDown={handleMouseDown}
-                onMouseMove={handleMouseMove}
-                onMouseUp={handleMouseUp}
+                onMouseMove={handleRulerMove}
+                // REMOVED onMouseUp (Handled globally by useEffect)
             >
                 {/* 1. MEDIA MODE (Video/PDF) */}
                 {isMediaView ? (
@@ -569,7 +610,7 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                         `}
                         style={{ left: menuPos.x, top: menuPos.y, minWidth: '320px' }}
                         onMouseDown={(e) => e.stopPropagation()} 
-                        onMouseUp={(e) => e.stopPropagation()} 
+                        onMouseUp={(e) => e.stopPropagation()} // <--- FIX: Prevents "Close" button from re-triggering open
                     >
                         <div className="flex items-center justify-between text-xs font-bold uppercase tracking-widest opacity-70 mb-1 border-b border-white/10 pb-2">
                             <span className="flex items-center gap-2"><SlidersHorizontal size={14}/> Smart Controls</span>
