@@ -3,7 +3,7 @@ import { CarouselItem } from '../types';
 import { 
   Network, Trash2, Edit3, PlayCircle, Maximize2, X, RefreshCw, 
   Layers, MonitorPlay, Image as ImageIcon, AlertTriangle, ExternalLink,
-  ChevronLeft, ChevronRight 
+  ChevronLeft, ChevronRight, FolderOpen 
 } from 'lucide-react';
 import DOMPurify from 'dompurify';
 
@@ -40,6 +40,17 @@ export const AdminPanelLinkTree: React.FC<AdminPanelLinkTreeProps> = ({
   // --- DERIVED DATA ---
   const uniqueSubjects = Array.from(new Set(items.map(i => i.subject || 'General'))).sort();
   const existingTreeItems = items.filter(i => i.type === 'link_tree');
+
+  // GROUPING LOGIC: Subject -> Batch -> Items
+  const groupedItems = existingTreeItems.reduce((acc, item) => {
+    const subj = item.subject || 'Uncategorized';
+    if (!acc[subj]) acc[subj] = { AICS: [], CSDA: [] };
+    
+    // Normalize batch
+    const batchKey = (item.batch === 'CSDA') ? 'CSDA' : 'AICS';
+    acc[subj][batchKey].push(item);
+    return acc;
+  }, {} as Record<string, { AICS: CarouselItem[], CSDA: CarouselItem[] }>);
 
   // --- HANDLERS ---
 
@@ -113,10 +124,8 @@ export const AdminPanelLinkTree: React.FC<AdminPanelLinkTreeProps> = ({
       if (!cinemaMode) return;
       
       if (e.key === 'ArrowRight') {
-         // Go Next (Wrap around)
          setActivePreviewIndex((prev) => (prev + 1) % existingTreeItems.length);
       } else if (e.key === 'ArrowLeft') {
-         // Go Prev (Wrap around)
          setActivePreviewIndex((prev) => (prev - 1 + existingTreeItems.length) % existingTreeItems.length);
       } else if (e.key === 'Escape') {
          setCinemaMode(false);
@@ -127,15 +136,79 @@ export const AdminPanelLinkTree: React.FC<AdminPanelLinkTreeProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [cinemaMode, existingTreeItems.length]);
 
-  // When opening Cinema Mode via the form button, determine the starting index based on what we are editing
   const openCinema = () => {
-      // If editing, try to find that item in the list to start there
       if (isEditing && form.id) {
           const idx = existingTreeItems.findIndex(i => i.id === form.id);
           if (idx !== -1) setActivePreviewIndex(idx);
       }
       setCinemaMode(true);
   };
+
+  // Helper to render a single item card
+  const renderItemCard = (item: CarouselItem) => (
+    <div 
+      key={item.id} 
+      className={`
+        relative flex items-stretch rounded-lg border overflow-hidden transition-all group cursor-pointer
+        ${isEditing && form.id === item.id 
+          ? 'border-yellow-500/50 bg-yellow-900/10' 
+          : 'border-white/5 bg-black/20 hover:border-white/20 hover:bg-white/5'
+        }
+      `}
+      onClick={() => handleEditClick(item)}
+    >
+      {/* Batch Color Strip */}
+      <div className={`w-1 shrink-0 ${item.batch === 'CSDA' ? 'bg-fuchsia-500' : 'bg-blue-500'}`}></div>
+      
+      {/* Thumbnail */}
+      <div className="w-12 bg-black/40 relative overflow-hidden shrink-0 hidden sm:block">
+        {item.image ? (
+          <img src={item.image} className="w-full h-full object-cover opacity-70 group-hover:opacity-100 transition-opacity" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <Network size={16} className="opacity-20" />
+          </div>
+        )}
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 p-2 min-w-0 flex flex-col justify-center">
+        <h4 className="font-bold text-xs text-white truncate pr-16">{item.title}</h4>
+        <div className="flex items-center gap-2 mt-1">
+            {/* Visual Indicator for Recording */}
+            {item.content && item.content !== 'Link Tree Item' && (
+                <div className="flex items-center gap-1 text-[10px] text-pink-400">
+                    <PlayCircle size={10} className="fill-pink-400/20" /> Recording
+                </div>
+            )}
+            {/* Visual Indicator for Direct Link */}
+            {item.fileUrl && (
+                <div className="flex items-center gap-1 text-[10px] text-green-400">
+                    <ExternalLink size={10} /> Direct Link
+                </div>
+            )}
+        </div>
+      </div>
+
+      {/* Actions (Absolute) */}
+      <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity bg-black/60 rounded-lg p-1 backdrop-blur-sm">
+        <button 
+            onClick={(e) => { e.stopPropagation(); handleEditClick(item); }} 
+            className="p-1.5 hover:bg-blue-600 hover:text-white text-blue-400 rounded-md transition-colors" 
+            title="Edit"
+        >
+          <Edit3 size={12}/>
+        </button>
+        <button 
+            onClick={(e) => { e.stopPropagation(); if(confirm('Delete?')) onDeleteItem(item.id); }} 
+            className="p-1.5 hover:bg-red-600 hover:text-white text-red-400 rounded-md transition-colors" 
+            title="Delete"
+        >
+          <Trash2 size={12}/>
+        </button>
+      </div>
+    </div>
+  );
 
   // --- RENDER ---
   return (
@@ -179,7 +252,7 @@ export const AdminPanelLinkTree: React.FC<AdminPanelLinkTreeProps> = ({
                 {(['AICS', 'CSDA'] as const).map((b) => (
                   <button
                     key={b}
-                    onClick={() => setForm({ ...form, batch: b })}
+                    onClick={() => setForm(prev => ({ ...prev, batch: b }))}
                     className={`flex-1 py-2 rounded text-xs font-bold transition-all ${
                       form.batch === b 
                       ? (b === 'AICS' ? 'bg-blue-600 text-white' : 'bg-fuchsia-600 text-white') 
@@ -202,10 +275,10 @@ export const AdminPanelLinkTree: React.FC<AdminPanelLinkTreeProps> = ({
                         onChange={(e) => {
                             if (e.target.value === '__NEW__') {
                             setIsCustomSubject(true);
-                            setForm({ ...form, subject: '' });
+                            setForm(prev => ({ ...prev, subject: '' }));
                             } else {
                             setIsCustomSubject(false);
-                            setForm({ ...form, subject: e.target.value });
+                            setForm(prev => ({ ...prev, subject: e.target.value }));
                             }
                         }}
                         className="w-full p-3 bg-black/40 border border-white/10 rounded-lg text-sm text-white outline-none"
@@ -218,7 +291,7 @@ export const AdminPanelLinkTree: React.FC<AdminPanelLinkTreeProps> = ({
                     {isCustomSubject && (
                         <input
                         value={form.subject}
-                        onChange={e => setForm({ ...form, subject: e.target.value })}
+                        onChange={e => setForm(prev => ({ ...prev, subject: e.target.value }))}
                         className="w-full mt-2 p-3 bg-blue-900/20 border border-blue-500/50 rounded-lg text-sm text-white outline-none animate-[fade-in_0.2s]"
                         placeholder="Enter New Subject Name..."
                         autoFocus
@@ -231,7 +304,7 @@ export const AdminPanelLinkTree: React.FC<AdminPanelLinkTreeProps> = ({
                     <label className="text-xs font-bold opacity-50 block mb-1 uppercase">Title</label>
                     <input
                         value={form.title}
-                        onChange={e => setForm({ ...form, title: e.target.value })}
+                        onChange={e => setForm(prev => ({ ...prev, title: e.target.value }))}
                         className="w-full p-3 bg-black/40 border border-white/10 rounded-lg text-sm text-white outline-none focus:border-white/30 transition-colors"
                         placeholder="Lecture 1: Introduction..."
                     />
@@ -244,7 +317,7 @@ export const AdminPanelLinkTree: React.FC<AdminPanelLinkTreeProps> = ({
                         <ImageIcon className="absolute left-3 top-3 text-white/30" size={16} />
                         <input
                         value={form.image}
-                        onChange={e => setForm({ ...form, image: e.target.value })}
+                        onChange={e => setForm(prev => ({ ...prev, image: e.target.value }))}
                         className="w-full pl-10 p-3 bg-black/40 border border-white/10 rounded-lg text-sm text-white outline-none focus:border-white/30 transition-colors"
                         placeholder="https://..."
                         />
@@ -263,7 +336,7 @@ export const AdminPanelLinkTree: React.FC<AdminPanelLinkTreeProps> = ({
               <label className="text-xs font-bold opacity-50 block mb-1 uppercase">Direct Link URL (Optional)</label>
               <input
                 value={form.url}
-                onChange={e => setForm({ ...form, url: e.target.value })}
+                onChange={e => setForm(prev => ({ ...prev, url: e.target.value }))}
                 className="w-full p-3 bg-black/40 border border-white/10 rounded-lg text-sm text-white outline-none font-mono text-xs focus:border-white/30 transition-colors"
                 placeholder="https://sharepoint..."
               />
@@ -277,7 +350,11 @@ export const AdminPanelLinkTree: React.FC<AdminPanelLinkTreeProps> = ({
               </label>
               <textarea
                 value={form.embedCode}
-                onChange={e => { setForm({ ...form, embedCode: e.target.value }); setShowPreview(false); }}
+                onChange={e => { 
+                    const val = e.target.value; 
+                    setForm(prev => ({ ...prev, embedCode: val })); 
+                    setShowPreview(false); 
+                }}
                 className="w-full h-24 p-3 bg-black/40 border border-white/10 rounded-lg text-xs font-mono text-zinc-300 outline-none resize-none focus:border-white/30 transition-colors"
                 placeholder='<div style="..."><iframe src="..."></iframe></div>'
               />
@@ -295,74 +372,53 @@ export const AdminPanelLinkTree: React.FC<AdminPanelLinkTreeProps> = ({
             </button>
           </div>
 
-          {/* LIST OF EXISTING ITEMS */}
+          {/* LIST OF EXISTING ITEMS - GROUPED */}
           <div className="space-y-2">
             <h4 className="font-bold text-sm opacity-60 uppercase flex items-center gap-2 border-b border-white/10 pb-2">
               <Layers size={14}/> Database Entries ({existingTreeItems.length})
             </h4>
             
-            <div className="max-h-[400px] overflow-y-auto space-y-3 pr-2 custom-scrollbar p-1">
+            <div className="max-h-[600px] overflow-y-auto space-y-4 pr-2 custom-scrollbar p-1">
               {existingTreeItems.length === 0 ? (
                   <div className="text-center opacity-30 py-8 text-xs">No entries found.</div>
               ) : (
-                  existingTreeItems.map(item => (
-                    <div 
-                      key={item.id} 
-                      className={`
-                        relative flex items-stretch rounded-xl border overflow-hidden transition-all group cursor-pointer
-                        ${isEditing && form.id === item.id 
-                          ? 'border-yellow-500/50 bg-yellow-900/10' 
-                          : 'border-white/10 bg-white/5 hover:border-white/20 hover:bg-white/10'
-                        }
-                      `}
-                      onClick={() => handleEditClick(item)}
-                    >
-                      {/* Batch Color Strip */}
-                      <div className={`w-1 shrink-0 ${item.batch === 'CSDA' ? 'bg-fuchsia-500' : 'bg-blue-500'}`}></div>
-                      
-                      {/* Thumbnail */}
-                      <div className="w-16 sm:w-20 bg-black/40 relative overflow-hidden shrink-0 hidden sm:block">
-                        {item.image ? (
-                          <img src={item.image} className="w-full h-full object-cover opacity-70 group-hover:opacity-100 transition-opacity" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <Network size={20} className="opacity-20" />
-                          </div>
-                        )}
+                  Object.entries(groupedItems).sort((a,b) => a[0].localeCompare(b[0])).map(([subject, batches]) => (
+                    <div key={subject} className="bg-white/5 border border-white/10 rounded-xl overflow-hidden">
+                      {/* Subject Header */}
+                      <div className="bg-white/5 p-3 flex items-center gap-2 border-b border-white/5">
+                        <FolderOpen size={16} className="text-yellow-500 opacity-80" />
+                        <span className="font-bold text-sm text-yellow-100">{subject}</span>
                       </div>
 
-                      {/* Content */}
-                      <div className="flex-1 p-3 min-w-0 flex flex-col justify-center">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${item.batch === 'CSDA' ? 'bg-fuchsia-900/50 text-fuchsia-200' : 'bg-blue-900/50 text-blue-200'}`}>
-                            {item.batch || 'AICS'}
-                          </span>
-                          <span className="text-[10px] opacity-50 uppercase tracking-wider truncate">{item.subject}</span>
-                        </div>
-                        <h4 className="font-bold text-sm text-white truncate pr-16">{item.title}</h4>
-                        {item.fileUrl && (
-                            <div className="flex items-center gap-1 text-[10px] text-green-400 mt-1">
-                                <ExternalLink size={10} /> Direct Link
-                            </div>
-                        )}
-                      </div>
+                      <div className="p-2 space-y-3">
+                         {/* AICS Group */}
+                         {batches.AICS.length > 0 && (
+                           <div className="space-y-2">
+                              <h5 className="text-[10px] font-bold text-blue-300 uppercase tracking-wider pl-2 border-l-2 border-blue-500/30">
+                                AICS Batch ({batches.AICS.length})
+                              </h5>
+                              <div className="space-y-2 pl-2">
+                                {batches.AICS.map(item => renderItemCard(item))}
+                              </div>
+                           </div>
+                         )}
 
-                      {/* Actions (Absolute) */}
-                      <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity bg-black/60 rounded-lg p-1 backdrop-blur-sm">
-                        <button 
-                            onClick={(e) => { e.stopPropagation(); handleEditClick(item); }} 
-                            className="p-2 hover:bg-blue-600 hover:text-white text-blue-400 rounded-md transition-colors" 
-                            title="Edit"
-                        >
-                          <Edit3 size={14}/>
-                        </button>
-                        <button 
-                            onClick={(e) => { e.stopPropagation(); if(confirm('Delete?')) onDeleteItem(item.id); }} 
-                            className="p-2 hover:bg-red-600 hover:text-white text-red-400 rounded-md transition-colors" 
-                            title="Delete"
-                        >
-                          <Trash2 size={14}/>
-                        </button>
+                         {/* Separator if both exist */}
+                         {batches.AICS.length > 0 && batches.CSDA.length > 0 && (
+                            <div className="h-px bg-white/5 w-full"></div>
+                         )}
+
+                         {/* CSDA Group */}
+                         {batches.CSDA.length > 0 && (
+                           <div className="space-y-2">
+                              <h5 className="text-[10px] font-bold text-fuchsia-300 uppercase tracking-wider pl-2 border-l-2 border-fuchsia-500/30">
+                                CSDA Batch ({batches.CSDA.length})
+                              </h5>
+                              <div className="space-y-2 pl-2">
+                                {batches.CSDA.map(item => renderItemCard(item))}
+                              </div>
+                           </div>
+                         )}
                       </div>
                     </div>
                   ))
@@ -460,14 +516,12 @@ export const AdminPanelLinkTree: React.FC<AdminPanelLinkTreeProps> = ({
             </button>
             
             {/* Content Container */}
-            {/* FIX: Applied 85vh height + Full Permissions to match the User View */}
             <div className="w-full max-w-7xl h-[85vh] bg-black shadow-2xl rounded-xl border border-white/10 relative group flex flex-col">
               {existingTreeItems[activePreviewIndex] ? (
                   <div 
                     className="flex-1 w-full relative [&_iframe]:w-full [&_iframe]:h-full [&_iframe]:border-none"
                     dangerouslySetInnerHTML={{ 
                       __html: DOMPurify.sanitize(existingTreeItems[activePreviewIndex].content, { 
-                        // FIX: Allow all video and formatting tags
                         ADD_TAGS: ['iframe', 'div', 'style', 'span', 'img', 'video', 'source', 'p', 'a', 'b', 'strong', 'center'],
                         ADD_ATTR: [
                             'allow', 'allowfullscreen', 'frameborder', 'scrolling', 

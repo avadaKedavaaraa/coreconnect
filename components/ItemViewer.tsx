@@ -6,7 +6,7 @@ import {
   Monitor, Smartphone, PenTool, Save, Trash2, AlignJustify, Loader2, Share2, 
   CornerDownRight, Calendar, User, ArrowRight, AlertTriangle, 
   Play, Pause, Scan, Sliders, Eraser, Video, RefreshCw, Droplet, Lock, Unlock, SlidersHorizontal,
-  Settings, Type
+  Settings, Type, Camera
 } from 'lucide-react';
 import DOMPurify from 'dompurify';
 import { trackActivity } from '../services/tracking';
