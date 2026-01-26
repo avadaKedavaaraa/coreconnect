@@ -44,8 +44,19 @@ const OfficeViewer: React.FC<OfficeViewerProps> = ({ item, lineage, onClose }) =
 
   // --- URL HANDLER (Microsoft Engine) ---
   const getMicrosoftUrl = (url: string) => {
+    let directUrl = url;
+
+    // CRITICAL FIX: Convert Google Drive "View" links to "Download" links
+    // The Microsoft Engine requires a direct file stream to render the document.
+    if (url.includes('drive.google.com') && url.includes('/file/d/')) {
+        const match = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+        if (match && match[1]) {
+            directUrl = `https://drive.google.com/uc?export=download&id=${match[1]}`;
+        }
+    }
+
     // Encodes the URL to pass it safely to Microsoft's viewer
-    return `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}`;
+    return `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(directUrl)}`;
   };
 
   const safeUrl = item.fileUrl || "";

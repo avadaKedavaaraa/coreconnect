@@ -150,13 +150,12 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
     // 1. Detect PDF (Keep using existing logic)
     const isPdf = safePdfUrl.toLowerCase().endsWith('.pdf');
 
-    // 2. Detect Office Files (Send these to the new Microsoft Viewer)
-    // Note: We EXCLUDE .pdf from this check so it doesn't get hijacked
-    const isOfficeFile = /\.(ppt|pptx|doc|docx|xls|xlsx|csv)$/i.test(safePdfUrl);
+    // --- NEW: DETECT OFFICE FILES ---
+    // Checks for PPT, DOC, XLS extensions OR if it's a file type that isn't PDF/Video/Image
+    const isOfficeFile = /\.(ppt|pptx|doc|docx|xls|xlsx|csv)$/i.test(safePdfUrl) ||
+        (item.type === 'file' && !isPdf && !isVideoFile && !item.type.includes('image'));
 
-    // 3. Early Return for Office Viewer
     if (isOfficeFile) {
-        // Make sure you imported OfficeViewer at the top!
         return <OfficeViewer item={item} lineage={lineage} onClose={onClose} />;
     }
 
