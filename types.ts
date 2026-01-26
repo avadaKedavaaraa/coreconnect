@@ -12,6 +12,7 @@ export interface Sector {
   wizardIcon: string; 
   muggleIcon: string;
   description: string;
+  uiTemplate?: string;
   sortOrder?: 'newest' | 'oldest' | 'alphabetical' | 'manual';
 }
 
@@ -253,7 +254,8 @@ export const SECTORS: Sector[] = [
     wizardIcon: 'Scroll',
     muggleIcon: 'Megaphone',
     description: 'Main news feed and critical updates.',
-    sortOrder: 'newest'
+    sortOrder: 'newest',
+    uiTemplate: 'announcements'
   },
   {
     id: 'lectures',
@@ -262,7 +264,8 @@ export const SECTORS: Sector[] = [
     wizardIcon: 'Feather',
     muggleIcon: 'BellRing',
     description: 'Incoming knowledge streams and recordings.',
-    sortOrder: 'newest'
+    sortOrder: 'newest',
+    uiTemplate: 'lectures'
   },
   {
     id: 'books',
@@ -271,7 +274,8 @@ export const SECTORS: Sector[] = [
     wizardIcon: 'Lock',
     muggleIcon: 'Book',
     description: 'High-level knowledge materials.',
-    sortOrder: 'alphabetical'
+    sortOrder: 'alphabetical',
+    uiTemplate: 'books'
   },
   {
     id: 'notes',
@@ -280,7 +284,8 @@ export const SECTORS: Sector[] = [
     wizardIcon: 'Waves',
     muggleIcon: 'FileText',
     description: 'Archived thoughts and preliminary data.',
-    sortOrder: 'newest'
+    sortOrder: 'newest',
+    uiTemplate: 'announcements'
   },
   {
     id: 'resources',
@@ -289,7 +294,8 @@ export const SECTORS: Sector[] = [
     wizardIcon: 'DoorOpen',
     muggleIcon: 'Library',
     description: 'Tools appearing exactly when you need them.',
-    sortOrder: 'newest'
+    sortOrder: 'newest',
+    uiTemplate: 'resources'
   },
   {
     id: 'tasks',
@@ -298,7 +304,8 @@ export const SECTORS: Sector[] = [
     wizardIcon: 'ScrollText',
     muggleIcon: 'ClipboardList',
     description: 'Assessments and practical evaluations.',
-    sortOrder: 'newest'
+    sortOrder: 'newest',
+    uiTemplate: 'tasks'
   },
   {
     id: 'system_info',
@@ -307,6 +314,7 @@ export const SECTORS: Sector[] = [
     wizardIcon: 'CircleHelp',
     muggleIcon: 'Settings2',
     description: 'Operational status and documentation.',
-    sortOrder: 'newest'
+    sortOrder: 'newest',
+    uiTemplate: 'announcements'
   }
 ];

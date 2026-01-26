@@ -162,19 +162,34 @@ export const SectorView: React.FC<SectorViewProps> = ({
     schedules = [], config, sectors = [], quickInputOnly
 }) => {
     const isWizard = lineage === Lineage.WIZARD;
+    // --- UPDATED LOGIC FOR UI TEMPLATES ---
     const currentSector = sectors.find(s => s.id === sectorId) || SECTORS[0];
-    const isLectures = sectorId === 'lectures';
-    const isResources = sectorId === 'resources'; // Helper for Link Tree
+    const template = currentSector.uiTemplate || sectorId; // Fallback to ID for legacy
 
-    // --- TRACKING ---
+    const isLectures = template === 'lectures';
+    const isResources = template === 'resources' || template === 'link_tree'; // Supports both names
+    const isBooks = template === 'books';
+    const isTasks = template === 'tasks';
+
+    // (Use these flags to determine viewMode)
+
     useEffect(() => {
-        try {
-            const profile = JSON.parse(localStorage.getItem('core_connect_profile') || '{}');
-            if (profile.id && !quickInputOnly) {
-                trackActivity(profile.id, 'ENTER_SECTOR', sectorId, sectorId, 0, profile.displayName);
-            }
-        } catch (e) { }
-    }, [sectorId, quickInputOnly]);
+        setSearch(''); setDateFilter(''); setSubjectFilter(''); setShowPinnedOnly(false);
+
+        if (isLectures) {
+            const isMobile = window.innerWidth < 768;
+            setViewMode(isMobile ? 'grid' : 'columns');
+            setDateFilter(getISTDateStr());
+        } else if (isBooks) {
+            setViewMode('folders'); // Books default to folder view
+        } else if (isTasks) {
+            setViewMode('list'); // Tasks default to list
+        } else {
+            // Standard Announcements
+            setViewMode('folders');
+            setDateFilter('');
+        }
+    }, [sectorId, isLectures, isBooks, isTasks]);
 
     // --- CINEMA STATE ---
     const [cinemaMode, setCinemaMode] = useState(false);
@@ -200,7 +215,7 @@ export const SectorView: React.FC<SectorViewProps> = ({
         // 2. Get User Preference based on Device
         // Desktop defaults to 'smart', Mobile defaults to 'normal'
         let modeToUse = 'smart';
-        
+
         if (isMobile) {
             modeToUse = localStorage.getItem('core_video_mode_mobile') || 'normal';
         } else {
@@ -622,10 +637,10 @@ export const SectorView: React.FC<SectorViewProps> = ({
                         {/* ✨ NEW: BACK TO FOLDERS BUTTON ✨ */}
                         {/* Only shows if: Not Lecture, Not Announcement, AND a Subject is currently selected */}
                         {!isLectures && sectorId !== 'announcements' && subjectFilter && (
-                            <button 
-                                onClick={() => { 
-                                    setSubjectFilter(''); 
-                                    setViewMode('folders'); 
+                            <button
+                                onClick={() => {
+                                    setSubjectFilter('');
+                                    setViewMode('folders');
                                     setSearch(''); // Clear search so folders reappear
                                 }}
                                 className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold border transition-all animate-in fade-in slide-in-from-left-4
@@ -854,13 +869,13 @@ export const SectorView: React.FC<SectorViewProps> = ({
                                                 {/* 1. TITLE: Defaults to 'text-white', but 'style.color' overrides it if you picked one */}
                                                 <h4
                                                     className={`font-bold leading-tight truncate text-white ${viewMode === 'list' ? 'text-lg' : 'text-lg mb-2'}`}
-                                                    style={item.style?.isGradient ? { 
-                                                        backgroundImage: `linear-gradient(to right, ${item.style.titleColor}, ${item.style.titleColorEnd || item.style.titleColor})`, 
-                                                        WebkitBackgroundClip: 'text', 
-                                                        WebkitTextFillColor: 'transparent', 
-                                                        backgroundClip: 'text', 
-                                                        color: 'transparent' 
-                                                    } : { 
+                                                    style={item.style?.isGradient ? {
+                                                        backgroundImage: `linear-gradient(to right, ${item.style.titleColor}, ${item.style.titleColorEnd || item.style.titleColor})`,
+                                                        WebkitBackgroundClip: 'text',
+                                                        WebkitTextFillColor: 'transparent',
+                                                        backgroundClip: 'text',
+                                                        color: 'transparent'
+                                                    } : {
                                                         color: item.style?.titleColor // 👈 This OVERRIDES text-white!
                                                     }}
                                                 >

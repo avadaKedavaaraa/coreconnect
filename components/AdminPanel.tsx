@@ -6,12 +6,13 @@ import {
     BrainCircuit, ScanFace, Users, Activity, Settings, LayoutTemplate, Search,
     Filter, Replace, Edit3, Trash2, Plus, ImageIcon, Save,
     FolderInput, AlertCircle, Wand2, RefreshCw, Pin, Share2, Link as LinkIcon, ImagePlus,
-    AlertTriangle, FileText, Sparkles, Network, MessageSquare, ArrowDownUp, BellRing, Paperclip, Zap, Palmtree, Smartphone, Monitor, FileUp, Clock, Calendar
+    AlertTriangle, FileText, Sparkles, Network, MessageSquare, ArrowDownUp, BellRing, Paperclip, Zap, Palmtree, Smartphone, Monitor, FileUp, PlusCircle, Clock, Calendar,
 } from 'lucide-react';
 import DOMPurify from 'dompurify';
 
 // --- NEW IMPORT ---
 import { AdminPanelLinkTree } from './AdminPanelLinkTree';
+import { NewSector } from './NewSector';  // <--- ADD THIS LINE HERE!
 
 interface AdminPanelProps {
     lineage: Lineage | null;
@@ -65,6 +66,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 }) => {
     const isWizard = lineage === Lineage.WIZARD;
     const [activeTab, setActiveTab] = useState<'creator' | 'ai-lab' | 'database' | 'visitors' | 'structure' | 'users' | 'logs' | 'config' | 'backup' | 'scheduler' | 'link-tree'>(initialTab || 'database');
+    // State for New Sector Modal
+    const [showNewSectorModal, setShowNewSectorModal] = useState(false);
+    const [uploadQueue, setUploadQueue] = useState<{ name: string, status: string }[]>([]);
 
     // Login State
     const [loginUser, setLoginUser] = useState('');
@@ -768,6 +772,65 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
             setIsSavingSectors(false);
         }
     };
+        // --- NEW: MULTI-FILE UPLOAD LOGIC ---
+        const handleMultiFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+            const files = e.target.files;
+            if (!files || files.length === 0) return;
+
+            const newQueue = Array.from(files).map(f => ({ name: f.name, status: 'Uploading...' }));
+            setUploadQueue(newQueue);
+
+            let firstUrl = '';
+            let appendedContent = '';
+
+            try {
+                for (let i = 0; i < files.length; i++) {
+                    const formData = new FormData();
+                    formData.append('file', files[i]);
+
+                    const res = await fetch(`${API_URL}/api/admin/upload`, {
+                        method: 'POST',
+                        headers: { 'x-csrf-token': csrfToken },
+                        body: formData,
+                        credentials: 'include'
+                    });
+
+                    const data = await res.json();
+                    if (res.ok && data.url) {
+                        // Update Status
+                        setUploadQueue(prev => prev.map((q, idx) => idx === i ? { ...q, status: 'Done' } : q));
+
+                        if (!firstUrl) firstUrl = data.url;
+
+                        // Create HTML link for content
+                        const fileIcon = files[i].type.includes('pdf') ? '📄' : (files[i].type.includes('video') ? '🎥' : '📁');
+                        appendedContent += `<br/><a href="${data.url}" target="_blank" class="px-4 py-2 mt-2 bg-white/10 border border-white/20 rounded-lg inline-flex items-center gap-2 hover:bg-white/20 transition-all text-sm font-bold no-underline text-white">${fileIcon} ${files[i].name}</a>`;
+                    } else {
+                        setUploadQueue(prev => prev.map((q, idx) => idx === i ? { ...q, status: 'Failed' } : q));
+                    }
+                }
+
+                // Update Form
+                setItemForm(prev => ({
+                    ...prev,
+                    fileUrl: prev.fileUrl || firstUrl, // Keep first one as primary
+                    content: prev.content + (appendedContent ? `<br/><div class="mt-4 border-t border-white/10 pt-2 font-bold text-xs opacity-50 uppercase">Attached Files:</div>${appendedContent}` : '')
+                }));
+
+                setTimeout(() => setUploadQueue([]), 3000);
+
+            } catch (e) {
+                alert('Batch upload failed.');
+                setUploadQueue([]);
+            }
+        };
+
+        // --- NEW: HANDLE SECTOR ADDITION ---
+        const handleAddSector = (newSector: Sector, position: number) => {
+            const updated = [...editedSectors];
+            updated.splice(position, 0, newSector);
+            setEditedSectors(updated);
+        };
 
     // --- EXPORT/IMPORT ---
     const handleExportData = async () => {
@@ -1286,16 +1349,30 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                                 </div>
 
                                                 {/* File Attachment Upload */}
-                                                <div className="flex gap-2">
-                                                    <input
-                                                        value={itemForm.fileUrl || ''}
-                                                        onChange={e => setItemForm({ ...itemForm, fileUrl: e.target.value })}
-                                                        placeholder="Attachment URL (PDF, Video...)"
-                                                        className="flex-1 bg-white/5 border border-white/10 rounded p-2 text-xs"
-                                                    />
-                                                    <label className="p-2 bg-white/10 rounded cursor-pointer hover:bg-white/20" title="Upload File (PDF/Video)">
-                                                        <FileText size={14} />
-                                                        <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'fileUrl')} />
+                                                <div className="flex gap-2 items-start">
+                                                    <div className="flex-1">
+                                                        <input
+                                                            value={itemForm.fileUrl || ''}
+                                                            onChange={e => setItemForm({ ...itemForm, fileUrl: e.target.value })}
+                                                            placeholder="Primary Attachment URL"
+                                                            className="w-full bg-white/5 border border-white/10 rounded p-2 text-xs"
+                                                        />
+                                                        {/* Upload Queue Display */}
+                                                        {uploadQueue.length > 0 && (
+                                                            <div className="mt-2 space-y-1">
+                                                                {uploadQueue.map((q, i) => (
+                                                                    <div key={i} className="text-[10px] flex justify-between px-2 py-1 bg-white/5 rounded">
+                                                                        <span className="truncate max-w-[150px]">{q.name}</span>
+                                                                        <span className={q.status === 'Done' ? 'text-green-400' : 'text-yellow-400'}>{q.status}</span>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <label className="p-2 bg-white/10 rounded cursor-pointer hover:bg-white/20 flex flex-col items-center gap-1 min-h-[42px]" title="Upload Multiple Files">
+                                                        <FileUp size={16} />
+                                                        <span className="text-[8px] uppercase font-bold">Multi</span>
+                                                        <input type="file" className="hidden" multiple onChange={handleMultiFileUpload} />
                                                     </label>
                                                 </div>
                                             </div>
@@ -2399,22 +2476,40 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
                             {/* STRUCTURE TAB */}
                             {activeTab === 'structure' && (
-                                // ... Existing Structure Code ...
                                 <div className="space-y-6 pb-20">
+                                    {/* Header with Add Button */}
                                     <div className="sticky top-0 z-20 bg-black/80 backdrop-blur-md p-4 -mx-4 -mt-4 border-b border-white/10 flex justify-between items-center mb-4">
                                         <div>
                                             <h3 className="font-bold text-xl text-white">Sector Configuration</h3>
-                                            <p className="text-xs opacity-50">Manage section names, icons, and sorting rules.</p>
+                                            <p className="text-xs opacity-50">Manage layout, templates, and ordering.</p>
                                         </div>
-                                        <button onClick={handleSaveSectors} disabled={isSavingSectors} className="px-6 py-2 rounded-full font-bold bg-blue-600 text-white flex items-center gap-2">
-                                            {isSavingSectors ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} SAVE ALL
-                                        </button>
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={() => setShowNewSectorModal(true)}
+                                                className={`px-4 py-2 rounded-full font-bold text-xs flex items-center gap-2 shadow-lg transition-transform hover:scale-105 ${isWizard ? 'bg-emerald-600 text-black' : 'bg-fuchsia-600 text-black'}`}
+                                            >
+                                                <PlusCircle size={16} /> ADD SECTOR
+                                            </button>
+                                            <button onClick={handleSaveSectors} disabled={isSavingSectors} className="px-6 py-2 rounded-full font-bold bg-blue-600 text-white flex items-center gap-2">
+                                                {isSavingSectors ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} SAVE ALL
+                                            </button>
+                                        </div>
                                     </div>
+
+                                    {/* List */}
                                     <div className="grid gap-6">
                                         {editedSectors.map((sector, idx) => (
                                             <div key={sector.id} className="p-6 rounded-xl border bg-white/5 border-white/10 shadow-lg relative group">
-                                                <div className="absolute top-4 right-4 text-xs font-mono opacity-30">
-                                                    {sector.id ? sector.id.toUpperCase() : 'UNKNOWN_ID'}
+                                                {/* Add UI Template Badge */}
+                                                <div className="absolute top-4 right-4 flex items-center gap-2">
+                                                    <span className="px-2 py-1 rounded bg-white/10 border border-white/5 text-[10px] uppercase font-bold tracking-wider opacity-60">
+                                                        Template: {sector.uiTemplate || 'Standard'}
+                                                    </span>
+                                                    <button onClick={() => {
+                                                        const newSectors = [...editedSectors];
+                                                        newSectors.splice(idx, 1);
+                                                        setEditedSectors(newSectors);
+                                                    }} className="p-1 hover:bg-red-900/50 text-red-500 rounded"><Trash2 size={14} /></button>
                                                 </div>
 
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -2429,7 +2524,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                                             <input value={sector.wizardIcon} onChange={e => handleUpdateSector(idx, 'wizardIcon', e.target.value)} className="w-full p-2 bg-black border border-white/10 rounded text-white text-sm" />
                                                         </div>
                                                     </div>
-
                                                     <div className="space-y-4">
                                                         <h4 className="text-xs font-bold uppercase opacity-50 text-fuchsia-400">Muggle Mode</h4>
                                                         <div>
@@ -2442,29 +2536,18 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                                         </div>
                                                     </div>
                                                 </div>
-
-                                                <div className="mt-4 pt-4 border-t border-white/10 grid grid-cols-1 md:grid-cols-3 gap-4">
-                                                    <div className="md:col-span-2">
-                                                        <label className="text-[10px] uppercase opacity-50 block mb-1">Description</label>
-                                                        <input value={sector.description} onChange={e => handleUpdateSector(idx, 'description', e.target.value)} className="w-full p-2 bg-black border border-white/10 rounded text-white text-sm" />
-                                                    </div>
-                                                    <div>
-                                                        <label className="text-[10px] uppercase opacity-50 block mb-1">Sorting Rule</label>
-                                                        <select
-                                                            value={sector.sortOrder || 'newest'}
-                                                            onChange={e => handleUpdateSector(idx, 'sortOrder', e.target.value)}
-                                                            className="w-full p-2 bg-black border border-white/10 rounded text-white text-sm"
-                                                        >
-                                                            <option value="newest">Newest First</option>
-                                                            <option value="oldest">Oldest First</option>
-                                                            <option value="alphabetical">Alphabetical (A-Z)</option>
-                                                            <option value="manual">Manual Drag & Drop</option>
-                                                        </select>
-                                                    </div>
-                                                </div>
                                             </div>
                                         ))}
                                     </div>
+
+                                    {/* Modal */}
+                                    <NewSector
+                                        isOpen={showNewSectorModal}
+                                        onClose={() => setShowNewSectorModal(false)}
+                                        onSave={handleAddSector}
+                                        existingSectors={editedSectors}
+                                        isWizard={isWizard}
+                                    />
                                 </div>
                             )}
 

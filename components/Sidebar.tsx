@@ -1,38 +1,6 @@
-
-
 import React from 'react';
 import { Lineage, Sector, GlobalConfig } from '../types';
-// Explicitly import icons to avoid runtime errors with dynamic lookups
-import { 
-  Settings2, CircleHelp,
-  Scroll, Megaphone,
-  Bird, Hash,
-  Feather, BellRing,
-  Lock, Book,
-  Waves, FileText,
-  DoorOpen, Library,
-  ScrollText, ClipboardList
-} from 'lucide-react';
-
-// Map string names from types.ts to actual Icon components
-const ICON_MAP: Record<string, React.ElementType> = {
-  'Scroll': Scroll,
-  'Megaphone': Megaphone,
-  'Bird': Bird,
-  'Hash': Hash,
-  'Feather': Feather,
-  'BellRing': BellRing,
-  'Lock': Lock,
-  'Book': Book,
-  'Waves': Waves,
-  'FileText': FileText,
-  'DoorOpen': DoorOpen,
-  'Library': Library,
-  'ScrollText': ScrollText,
-  'ClipboardList': ClipboardList,
-  'Settings2': Settings2,
-  'CircleHelp': CircleHelp
-};
+import * as LucideIcons from 'lucide-react'; // 👈 Import ALL icons dynamically
 
 interface SidebarProps {
   lineage: Lineage;
@@ -90,8 +58,11 @@ const Sidebar: React.FC<SidebarProps> = ({ lineage, sectors, config, selectedSec
           <ul className="space-y-3 px-3">
             {sectors.map((sector) => {
               const IconName = isWizard ? sector.wizardIcon : sector.muggleIcon;
-              // Safe lookup from map, fallback to CircleHelp
-              const Icon = ICON_MAP[IconName] || CircleHelp;
+              
+              // ⚡️ DYNAMIC LOOKUP:
+              // @ts-ignore
+              const Icon = LucideIcons[IconName] || LucideIcons.CircleHelp;
+              
               const isSelected = selectedSectorId === sector.id;
 
               return (
@@ -140,7 +111,8 @@ const Sidebar: React.FC<SidebarProps> = ({ lineage, sectors, config, selectedSec
              `}
              title="Admin Access"
            >
-              <Settings2 size={24} className="group-hover/settings:rotate-90 transition-transform" />
+              {/* @ts-ignore */}
+              <LucideIcons.Settings2 size={24} className="group-hover/settings:rotate-90 transition-transform" />
               <span className={`text-xs uppercase tracking-widest transition-opacity ${isOpen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} ${isWizard ? 'font-wizard' : 'font-muggle'}`}>
                 System Config
               </span>
