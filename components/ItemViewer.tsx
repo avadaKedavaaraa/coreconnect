@@ -9,6 +9,7 @@ import {
   Settings, Type, Camera
 } from 'lucide-react';
 import DOMPurify from 'dompurify';
+import OfficeViewer from './OfficeViewer'; // NEW: Import OfficeViewer component
 import { trackActivity } from '../services/tracking';
 
 interface ItemViewerProps {
@@ -147,6 +148,14 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
   const safePdfUrl = isValidUrl(item.fileUrl) ? item.fileUrl! : "";
   const isVideoFile = item.type === 'video' || (safePdfUrl && safePdfUrl.match(/\.(mp4|webm|ogg|mov)$/i));
   const isPdf = safePdfUrl.toLowerCase().endsWith('.pdf');
+  // --- NEW: DETECT OFFICE FILES ---
+  const isOfficeFile = /\.(ppt|pptx|doc|docx|xls|xlsx|csv)$/i.test(safePdfUrl);
+  
+  if (isOfficeFile) {
+      // Dynamically load the OfficeViewer
+      // Note: Ensure you have imported it at the top: import OfficeViewer from './OfficeViewer';
+      return <OfficeViewer item={item} lineage={lineage} onClose={onClose} />;
+  }
   const isGoogleDrive = safePdfUrl.includes('drive.google.com');
   const isMediaView = (item.type === 'file' || item.type === 'video' || item.type === 'link' || item.isLecture) && !!safePdfUrl;
 
