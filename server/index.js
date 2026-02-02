@@ -668,72 +668,59 @@ router.post('/admin/import', requireAuth, async (req, res) => {
 
 router.post('/admin/drive-scan', requireAuth, async (req, res) => {
     if(!hasPermission(req.user, 'canEdit')) return res.status(403).json({error: "Forbidden"});
-    
-    // Check for API Key
     const apiKey = process.env.GOOGLE_DRIVE_KEY;
-    
-    if (!apiKey) {
-        return res.status(400).json({ error: "Missing Google Drive API Key. Please provide it in the input field or set GOOGLE_DRIVE_KEY on the server." });
-    }
+    if (!apiKey) return res.status(400).json({ error: "Missing Drive API Key." });
 
     try {
         const { folderLink, sector, subject } = req.body;
-        
-        // Extract Folder ID
         let folderId = '';
         if (folderLink.includes('/folders/')) {
             folderId = folderLink.split('/folders/')[1].split('?')[0];
         } else if (folderLink.includes('id=')) {
             folderId = new URLSearchParams(folderLink.split('?')[1]).get('id');
         }
+        if (!folderId) return res.status(400).json({ error: "Invalid Link" });
 
-        if (!folderId) return res.status(400).json({ error: "Invalid Drive Link. Ensure it contains '/folders/ID'" });
-
-        // Query Google Drive API
-        const driveApiUrl = `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents+and+mimeType='application/pdf'&key=${apiKey}&fields=files(id,name,webViewLink)`;
+        // 🟢 FIX 1: Allow EVERYTHING except folders (removed mimeType='application/pdf')
+        const driveRes = await fetch(`https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents+and+mimeType!='application/vnd.google-apps.folder'+and+trashed=false&key=${apiKey}&fields=files(id,name,webViewLink)`);
         
-        const driveRes = await fetch(driveApiUrl);
         const driveData = await driveRes.json();
-
-        if (!driveRes.ok) {
-            throw new Error(driveData.error?.message || "Failed to fetch from Drive API");
-        }
+        if (!driveRes.ok) throw new Error(driveData.error?.message || "Drive API Failed");
 
         const files = driveData.files || [];
-        const newItems = [];
         const todayStr = new Date().toISOString().split('T')[0].replace(/-/g, '.');
 
-        for (const file of files) {
-            let finalSubject = subject || 'Drive Import';
-            let finalTitle = file.name.replace('.pdf', '');
+        const newItems = files.map(file => {
+             // 🟢 FIX 2: Detect Extension
+             const ext = file.name.split('.').pop();
+             
+             // 🟢 FIX 3: Clean Title (Remove .pptx, .docx, .pdf, etc.)
+             const finalTitle = file.name.replace(/\.(pdf|docx?|xlsx?|pptx?|txt|csv)$/i, '');
 
-            const newItem = {
+             // 🟢 FIX 4: Append Hash Tag so ItemViewer knows the type!
+             const taggedUrl = `${file.webViewLink}#.${ext}`;
+
+             return {
                 id: crypto.randomUUID(),
                 title: finalTitle,
                 content: `Imported from Google Drive.`,
                 date: todayStr,
                 type: 'file',
                 sector: sector || 'resources',
-                subject: finalSubject,
-                fileUrl: file.webViewLink, // Use the preview link
+                subject: subject || 'Drive Import',
+                fileUrl: taggedUrl, // <--- Using the tagged URL
                 author: 'System Import',
                 isUnread: true,
-                likes: 0
+                order_index: 0
             };
-            newItems.push(newItem);
-        }
+        });
 
-        // Save to DB immediately
         if (newItems.length > 0) {
-             const { error } = await supabase.from('items').insert(newItems.map(({isUnread, likes, ...rest}) => rest));
+             const { error } = await supabase.from('items').insert(newItems);
              if (error) throw error;
         }
-
         res.json({ success: true, count: newItems.length, items: newItems });
-
-    } catch(e) {
-        res.status(500).json({ error: "Drive Scan Error: " + e.message });
-    }
+    } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 app.use('/api', router);

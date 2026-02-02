@@ -323,16 +323,16 @@ function App() {
         profileRef.current = profile;
     }, [profile]);
 
-    // Heartbeat Timer
-    useEffect(() => {
-        const interval = setInterval(() => {
-            const p = profileRef.current;
-            if (p.id && p.id !== 'guest') {
-                trackActivity(p.id, 'HEARTBEAT', '', '', 0, p.displayName);
-            }
-        }, 10000);
-        return () => clearInterval(interval);
-    }, []);
+    // // Heartbeat Timer
+    // useEffect(() => {
+    //     const interval = setInterval(() => {
+    //         const p = profileRef.current;
+    //         if (p.id && p.id !== 'guest') {
+    //             trackActivity(p.id, 'HEARTBEAT', '', '', 0, p.displayName);
+    //         }
+    //     }, 10000);
+    //     return () => clearInterval(interval);
+    // }, []);
 
     // --- DYNAMIC UPDATE CHECKER (V2.5) ---
     useEffect(() => {
@@ -466,13 +466,13 @@ function App() {
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [fetchData, shouldSkip]);
 
-    useEffect(() => {
-        if (adminPanelOpen) return;
-        const interval = setInterval(() => {
-            fetchData();
-        }, 10000);
-        return () => clearInterval(interval);
-    }, [adminPanelOpen, fetchData]);
+    // useEffect(() => {
+    //     if (adminPanelOpen) return;
+    //     const interval = setInterval(() => {
+    //         fetchData();
+    //     }, 10000);
+    //     return () => clearInterval(interval);
+    // }, [adminPanelOpen, fetchData]);
 
     useEffect(() => {
         if (profile.id && activeSectorId && profile.id !== 'guest') {

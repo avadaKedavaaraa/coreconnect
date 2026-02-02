@@ -3,7 +3,7 @@ import { Lineage, type CarouselItem } from '../types';
 import { 
   X, FileText, ExternalLink, Maximize2, Minimize2, ZoomIn, ZoomOut, 
   RotateCw, Moon, Sun, StickyNote, Eye, Save, Trash2, AlignJustify, Loader2,
-  Monitor, Smartphone, PenTool, Layout, FileSpreadsheet, Presentation
+  Monitor, PenTool, FileSpreadsheet, Presentation, AlertTriangle
 } from 'lucide-react';
 
 interface OfficeViewerProps {
@@ -37,25 +37,23 @@ const OfficeViewer: React.FC<OfficeViewerProps> = ({ item, lineage, onClose }) =
   // --- INIT ---
   useEffect(() => {
     setIsLoading(true);
-    // Load saved notes
     const saved = localStorage.getItem(`core_notes_${item.id}`);
     if (saved) setNotes(saved);
   }, [item.id]);
 
-  // --- URL HANDLER (Microsoft Engine) ---
+  // --- URL HANDLER (UNIVERSAL VERSION) ---
   const getMicrosoftUrl = (url: string) => {
     let directUrl = url;
 
-    // CRITICAL FIX: Convert Google Drive "View" links to "Download" links
-    // The Microsoft Engine requires a direct file stream to render the document.
-    if (url.includes('drive.google.com') && url.includes('/file/d/')) {
-        const match = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
-        if (match && match[1]) {
-            directUrl = `https://drive.google.com/uc?export=download&id=${match[1]}`;
-        }
+    // 🟢 UNIVERSAL REGEX: Captures ID from /file/d/, /presentation/d/, /spreadsheets/d/, or ?id=
+    const matchId = url.match(/(?:\/d\/|id=)([a-zA-Z0-9_-]+)/);
+    
+    if (matchId && matchId[1]) {
+        // Force the "Download" export. Microsoft Engine needs to "download" the file to render it.
+        directUrl = `https://drive.google.com/uc?export=download&id=${matchId[1]}`;
     }
 
-    // Encodes the URL to pass it safely to Microsoft's viewer
+    // Pass the direct download link to Microsoft's Viewer
     return `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(directUrl)}`;
   };
 
@@ -136,7 +134,7 @@ const OfficeViewer: React.FC<OfficeViewerProps> = ({ item, lineage, onClose }) =
             {/* Controls */}
             <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto no-scrollbar">
                 
-                {/* Zoom Controls (Applied to Container) */}
+                {/* Zoom Controls */}
                 <div className="flex items-center bg-black/20 rounded p-1">
                     <button onClick={() => setZoomLevel(z => Math.max(50, z - 10))} className="p-1.5 hover:bg-white/10 rounded text-white/70" title="Zoom Out"><ZoomOut size={16}/></button>
                     <span className="text-[10px] font-mono w-8 text-center hidden sm:block">{zoomLevel}%</span>
@@ -197,15 +195,15 @@ const OfficeViewer: React.FC<OfficeViewerProps> = ({ item, lineage, onClose }) =
             >
                 {/* LOADING STATE */}
                 {isLoading && (
-                    <div className={`absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm transition-opacity duration-300`}>
+                    <div className={`absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm transition-opacity duration-300 pointer-events-none`}>
                         <Loader2 className={`w-12 h-12 mb-4 animate-spin ${isWizard ? 'text-emerald-500' : 'text-fuchsia-500'}`} />
                         <div className={`text-sm font-bold tracking-widest animate-pulse ${isWizard ? 'text-emerald-200' : 'text-fuchsia-200'}`}>
-                            {isWizard ? 'DECODING RUNES...' : 'LOADING DOCUMENT...'}
+                            {isWizard ? 'CONNECTING TO OFFICE ENGINE...' : 'LOADING DOCUMENT...'}
                         </div>
                     </div>
                 )}
 
-                {/* IFRAME CONTAINER (Apply Zoom/Rotate Here) */}
+                {/* IFRAME CONTAINER */}
                 <div 
                     className="w-full h-full transition-all duration-300 origin-center relative z-10 bg-white"
                     style={{ 
@@ -221,6 +219,20 @@ const OfficeViewer: React.FC<OfficeViewerProps> = ({ item, lineage, onClose }) =
                         onError={() => setIsLoading(false)}
                     />
                 </div>
+
+                {/* PERMISSION HINT (Crucial for MS Engine)
+                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 pointer-events-none opacity-0 animate-[fade-in_4s_ease-in_forwards] z-20 w-3/4 max-w-md text-center">
+                    <div className="bg-black/80 backdrop-blur px-4 py-3 rounded-xl border border-white/10 shadow-xl">
+                        <div className="flex items-center justify-center gap-2 mb-1 text-yellow-500 font-bold text-xs uppercase tracking-wider">
+                                <AlertTriangle size={12} /> Troubleshooting
+                        </div>
+                        <p className="text-[10px] text-zinc-300 leading-relaxed">
+                            If you see <b>"File not found"</b>, the file permissions on Google Drive are likely restricted.
+                            <br/><br/>
+                            <span className="text-white bg-white/10 px-1 rounded">Fix:</span> Set the file's General Access to <b>"Anyone with the link"</b> in Google Drive.
+                        </p>
+                    </div>
+                </div> */}
 
                 {/* Ruler Overlay */}
                 {showRuler && (
@@ -281,6 +293,7 @@ const OfficeViewer: React.FC<OfficeViewerProps> = ({ item, lineage, onClose }) =
       
       <style dangerouslySetInnerHTML={{ __html: `
         @keyframes fade-in-left { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+        @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       `}} />

@@ -536,7 +536,8 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                                             <video
                                                 ref={videoRef}
                                                 src={safePdfUrl}
-                                                className={isNativeMode ? "w-full h-full object-contain" : "max-w-full max-h-[85vh] shadow-2xl"}
+                                                // Isme humne 'w-full' (poori chaudai) aur 'h-full' (poori lambai) de di hai
+className="w-full h-full object-cover shadow-2xl"
                                                 onLoadStart={() => setIsLoading(true)}
                                                 onLoadedData={() => setIsLoading(false)}
                                                 onError={() => setLoadError(true)}
