@@ -30,8 +30,6 @@ const Carousel: React.FC<CarouselProps> = ({ items, lineage, onExtract, isAdmin,
   // ✨ SMART SORTING & FILTERING
   const displayItems = useMemo(() => {
     let filtered = [...localItems];
-
-    // 1. Sort by Time (Latest First)
     filtered.sort((a, b) => {
         const dateA = new Date(a.date.replace(/\./g, '-')).getTime();
         const dateB = new Date(b.date.replace(/\./g, '-')).getTime();
@@ -39,11 +37,9 @@ const Carousel: React.FC<CarouselProps> = ({ items, lineage, onExtract, isAdmin,
         return dateB - dateA;
     });
 
-    // 2. Identify Top 2 Dates
     const uniqueDates = Array.from(new Set(filtered.map(i => i.date.split('T')[0])));
     const topTwoDates = uniqueDates.slice(0, 2);
 
-    // 3. Filter
     return filtered.filter(item => {
         if (filter === 'pinned') return item.isPinned;
         if (filter === 'new') {
@@ -264,7 +260,6 @@ const Carousel: React.FC<CarouselProps> = ({ items, lineage, onExtract, isAdmin,
                               {item.title || 'Untitled'}
                           </h2>
                           
-                          {/* 👇 CHANGED: 'leading-tight' instead of 'leading-relaxed' */}
                           <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar">
                               <div 
                                 className="text-[11px] text-white/70 font-sans leading-tight break-words whitespace-pre-wrap html-content"
@@ -313,22 +308,24 @@ const Carousel: React.FC<CarouselProps> = ({ items, lineage, onExtract, isAdmin,
             })}
           </div>
           
-          <div className="hidden md:block">
+          {/* ✅ NAVIGATION BUTTONS (Visible Everywhere but Positioned Differently) */}
+          <div className="absolute inset-0 pointer-events-none flex items-center justify-between z-[60]">
+            {/* LEFT BUTTON */}
             <button 
               onClick={(e) => { e.stopPropagation(); setActiveIndex(prev => (prev - 1 + safeLength) % safeLength); }}
-              className={`absolute top-1/2 -translate-y-1/2 z-30 p-4 rounded-full border backdrop-blur-sm transition-transform active:scale-95 pointer-events-auto shadow-xl hover:scale-110
+              className={`absolute left-2 md:left-[calc(50%-230px)] pointer-events-auto p-4 rounded-full border backdrop-blur-sm transition-transform active:scale-95 shadow-xl hover:scale-110
                 ${lineage === Lineage.WIZARD ? 'border-emerald-500/30 text-emerald-400 bg-black/60 hover:bg-emerald-900/40' : 'border-fuchsia-500/30 text-fuchsia-400 bg-black/60 hover:bg-fuchsia-900/40'}
               `}
-              style={{ left: 'calc(50% - 230px)' }}
             >
               <ChevronLeft size={24} />
             </button>
-             <button 
+            
+            {/* RIGHT BUTTON */}
+            <button 
               onClick={(e) => { e.stopPropagation(); setActiveIndex(prev => (prev + 1) % safeLength); }}
-              className={`absolute top-1/2 -translate-y-1/2 z-30 p-4 rounded-full border backdrop-blur-sm transition-transform active:scale-95 pointer-events-auto shadow-xl hover:scale-110
+              className={`absolute right-2 md:right-[calc(50%-230px)] pointer-events-auto p-4 rounded-full border backdrop-blur-sm transition-transform active:scale-95 shadow-xl hover:scale-110
                 ${lineage === Lineage.WIZARD ? 'border-emerald-500/30 text-emerald-400 bg-black/60 hover:bg-emerald-900/40' : 'border-fuchsia-500/30 text-fuchsia-400 bg-black/60 hover:bg-fuchsia-900/40'}
               `}
-              style={{ right: 'calc(50% - 230px)' }}
             >
               <ChevronRight size={24} />
             </button>
