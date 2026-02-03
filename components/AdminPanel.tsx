@@ -149,7 +149,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     const [selectedVisitor, setSelectedVisitor] = useState<VisitorLog | null>(null);
     const [visitorDetails, setVisitorDetails] = useState<{ activity: any[], chats: any[] } | null>(null);
     const [loadingDetails, setLoadingDetails] = useState(false);
-    
+
 
     // AI Lab State
     const [aiPrompt, setAiPrompt] = useState('');
@@ -1799,7 +1799,17 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                                                                 {v.display_name.charAt(0)}
                                                                             </div>
                                                                             <div>
-                                                                                <div className="font-bold text-white">{v.display_name}</div>
+                                                                                {/* Name ke aage Visit Count dikhao */}
+                                                                                <div className="font-bold text-white flex items-center gap-2">
+                                                                                    {v.display_name}
+                                                                                    {/* 👇 Ye naya Badge hai */}
+                                                                                    <span className={`text-[9px] px-1.5 py-0.5 rounded font-mono border ${v.visit_count > 50
+                                                                                            ? 'bg-yellow-900/30 text-yellow-500 border-yellow-500/30' // High Traffic (Hoarder)
+                                                                                            : 'bg-white/10 text-zinc-500 border-white/5' // Normal
+                                                                                        }`}>
+                                                                                        {v.visit_count}
+                                                                                    </span>
+                                                                                </div>
                                                                                 <div className="text-[10px] opacity-40 font-mono">{v.visitor_id.substring(0, 8)}...</div>
                                                                             </div>
                                                                         </div>
@@ -1836,45 +1846,45 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                                                                 <Trash2 size={14} />
                                                                             </button>
                                                                             {/* 🔒 BAN HAMMER BUTTON */}
-                                            <button 
-                                                onClick={async (e) => {
-                                                    e.stopPropagation();
-                                                    // 1. Reason poocho
-                                                    const reason = prompt("Restrict User? Enter message (Leave empty to Unban):");
-                                                    if (reason === null) return; // Cancelled
+                                                                            <button
+                                                                                onClick={async (e) => {
+                                                                                    e.stopPropagation();
+                                                                                    // 1. Reason poocho
+                                                                                    const reason = prompt("Restrict User? Enter message (Leave empty to Unban):");
+                                                                                    if (reason === null) return; // Cancelled
 
-                                                    const isBanning = reason.trim() !== ""; // Text hai to BAN, nahi to UNBAN
+                                                                                    const isBanning = reason.trim() !== ""; // Text hai to BAN, nahi to UNBAN
 
-                                                    try {
-                                                        // 2. API Call lagao
-                                                        await fetch(`${API_URL}/api/admin/restrict-user`, { 
-                                                            method: 'POST', 
-                                                            headers: {
-                                                                'Content-Type': 'application/json',
-                                                                'x-csrf-token': csrfToken
-                                                            },
-                                                            body: JSON.stringify({
-                                                                visitorId: v.visitor_id,
-                                                                isRestricted: isBanning,
-                                                                message: reason
-                                                            }),
-                                                            credentials: 'include'
-                                                        });
-                                                        fetchVisitors(); // List refresh
-                                                        alert(isBanning ? "User Blocked! 🚫" : "User Unblocked! ✅");
-                                                    } catch(e) { alert("Action Failed"); }
-                                                }}
-                                                className={`p-1.5 rounded border ml-2 transition-all opacity-0 group-hover:opacity-100
-                                                    ${v.is_restricted 
-                                                        ? 'bg-red-900/50 border-red-500 text-red-200 hover:bg-red-800' // Agar Blocked hai (Red)
-                                                        : 'bg-yellow-900/20 border-yellow-500/30 text-yellow-400 hover:bg-yellow-600 hover:text-white' // Agar Normal hai (Yellow)
-                                                    }
+                                                                                    try {
+                                                                                        // 2. API Call lagao
+                                                                                        await fetch(`${API_URL}/api/admin/restrict-user`, {
+                                                                                            method: 'POST',
+                                                                                            headers: {
+                                                                                                'Content-Type': 'application/json',
+                                                                                                'x-csrf-token': csrfToken
+                                                                                            },
+                                                                                            body: JSON.stringify({
+                                                                                                visitorId: v.visitor_id,
+                                                                                                isRestricted: isBanning,
+                                                                                                message: reason
+                                                                                            }),
+                                                                                            credentials: 'include'
+                                                                                        });
+                                                                                        fetchVisitors(); // List refresh
+                                                                                        alert(isBanning ? "User Blocked! 🚫" : "User Unblocked! ✅");
+                                                                                    } catch (e) { alert("Action Failed"); }
+                                                                                }}
+                                                                                className={`p-1.5 rounded border ml-2 transition-all opacity-0 group-hover:opacity-100
+                                                    ${v.is_restricted
+                                                                                        ? 'bg-red-900/50 border-red-500 text-red-200 hover:bg-red-800' // Agar Blocked hai (Red)
+                                                                                        : 'bg-yellow-900/20 border-yellow-500/30 text-yellow-400 hover:bg-yellow-600 hover:text-white' // Agar Normal hai (Yellow)
+                                                                                    }
                                                 `}
-                                                title={v.is_restricted ? "Unban User" : "Restrict Access"}
-                                            >
-                                                {/* Icon change hoga status ke hisaab se */}
-                                                {v.is_restricted ? <Lock size={14} /> : <Unlock size={14} />}
-                                            </button>
+                                                                                title={v.is_restricted ? "Unban User" : "Restrict Access"}
+                                                                            >
+                                                                                {/* Icon change hoga status ke hisaab se */}
+                                                                                {v.is_restricted ? <Lock size={14} /> : <Unlock size={14} />}
+                                                                            </button>
                                                                         </div>
                                                                     </td>
                                                                 </tr>
@@ -1971,7 +1981,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                                                         <div className="flex-1 bg-black/40 border border-white/5 p-3 rounded-lg hover:border-white/20 hover:bg-white/10 transition-all shadow-sm -mt-1 group-hover:translate-x-1">
                                                                             <div className="flex justify-between items-start">
                                                                                 <span className={`font-bold text-sm tracking-wide ${act.activity_type.includes('PDF') ? 'text-red-300' :
-                                                                                        act.activity_type.includes('VIDEO') ? 'text-purple-300' : 'text-blue-300'
+                                                                                    act.activity_type.includes('VIDEO') ? 'text-purple-300' : 'text-blue-300'
                                                                                     }`}>
                                                                                     {act.activity_type.replace(/_/g, ' ')}
                                                                                 </span>
