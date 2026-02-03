@@ -587,6 +587,43 @@ router.post('/admin/import', requireAuth, async (req, res) => {
         res.json({ success: true });
     } catch(e) { res.status(500).json({ error: e.message }); }
 });
+//
+
+// 1. ADMIN: Kisi user ko Restrict/Unrestrict karne ke liye
+router.post('/admin/restrict-user', requireAuth, async (req, res) => {
+    const { visitorId, isRestricted, message } = req.body;
+    
+    try {
+        const { error } = await supabase
+            .from('visitor_logs')
+            .update({ 
+                is_restricted: isRestricted, 
+                restriction_message: message 
+            })
+            .eq('visitor_id', visitorId);
+
+        if (error) throw error;
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// 2. VISITOR: Check karne ke liye ki main blocked hu ya nahi?
+router.get('/visitor/status/:id', async (req, res) => {
+    try {
+        const { data, error } = await supabase
+            .from('visitor_logs')
+            .select('is_restricted, restriction_message')
+            .eq('visitor_id', req.params.id)
+            .single();
+
+        if (error) return res.json({ is_restricted: false }); // Agar naya user hai
+        res.json(data);
+    } catch (e) {
+        res.json({ is_restricted: false });
+    }
+});
 
 router.post('/admin/drive-scan', requireAuth, async (req, res) => {
     if(!hasPermission(req.user, 'canEdit')) return res.status(403).json({error: "Forbidden"});

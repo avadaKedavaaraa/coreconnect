@@ -47,6 +47,32 @@ const LoadingScanner: React.FC = () => {
     const [status, setStatus] = useState("SUMMONING ARCHIVES...");
     const [progress, setProgress] = useState(0);
 
+    // 🔒 CHECK BAN STATUS ON LOAD
+    useEffect(() => {
+        const checkStatus = async () => {
+            try {
+                // Local Storage se Visitor ID nikalo
+                const profile = localStorage.getItem('core_connect_profile');
+                if (!profile) return;
+                
+                const { id } = JSON.parse(profile);
+                
+                // Server se poocho
+                const res = await fetch(`${API_URL}/api/visitor/status/${id}`);
+                const data = await res.json();
+
+                // Agar restricted hai, to State set karo
+                if (data.is_restricted) {
+                    setIsBanned(true);
+                    setBanMessage(data.restriction_message || "Access Restricted by Admin.");
+                }
+            } catch (e) {
+                console.error("Ban check failed", e);
+            }
+        };
+        checkStatus();
+    }, []);
+
     useEffect(() => {
         const interval = setInterval(() => {
             setProgress(prev => {
@@ -267,6 +293,11 @@ const UpdatePopup = ({ onClose, isWizard, accentColor, updateData }: { onClose: 
 
 
 function App() {
+    // App.tsx ke andar, function ke shuru mein:
+
+    // 🔒 BAN STATE (Naya Code)
+    const [isBanned, setIsBanned] = useState(false);
+    const [banMessage, setBanMessage] = useState('');
     const [isAdmin, setIsAdmin] = useState(false);
     const [csrfToken, setCsrfToken] = useState('');
     const [permissions, setPermissions] = useState<AdminPermissions | null>(null);
@@ -811,11 +842,11 @@ function App() {
                     <div className="px-6 py-8 md:px-12 md:py-12 text-center relative">
                         <h2
                             className={`text-3xl md:text-5xl font-bold mb-4 tracking-wider ${isWizard ? 'font-wizardTitle text-emerald-100' : 'font-muggle text-fuchsia-100'}`}
-                            style={{ 
+                            style={{
                                 // NEW: Handle Gradient Text or Solid Color
                                 color: profile.themeColor ? accentColor : (themeSettings.useGradient ? 'transparent' : accentColor),
-                                backgroundImage: themeSettings.useGradient 
-                                    ? `linear-gradient(to right, ${currentPrimary}, ${currentSecondary})` 
+                                backgroundImage: themeSettings.useGradient
+                                    ? `linear-gradient(to right, ${currentPrimary}, ${currentSecondary})`
                                     : 'none',
                                 WebkitBackgroundClip: themeSettings.useGradient ? 'text' : 'border-box',
                                 backgroundClip: themeSettings.useGradient ? 'text' : 'border-box'

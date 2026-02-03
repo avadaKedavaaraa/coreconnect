@@ -6,7 +6,7 @@ import {
     BrainCircuit, ScanFace, Users, Activity, Settings, LayoutTemplate, Search,
     Filter, Replace, Edit3, Trash2, Plus, ImageIcon, Save,
     FolderInput, AlertCircle, Wand2, RefreshCw, Pin, Share2, Link as LinkIcon, ImagePlus,
-    AlertTriangle, FileText, Sparkles, Network, MessageSquare, ArrowDownUp, BellRing, Paperclip, Zap, Palmtree, Smartphone, Monitor, FileUp, PlusCircle, Clock, Calendar,
+    AlertTriangle, FileText, Sparkles, Network, MessageSquare, ArrowDownUp, BellRing, Paperclip, Zap, Palmtree, Smartphone, Monitor, FileUp, PlusCircle, Clock, Calendar, User,
 } from 'lucide-react';
 import DOMPurify from 'dompurify';
 
@@ -66,6 +66,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 }) => {
     const isWizard = lineage === Lineage.WIZARD;
     const [activeTab, setActiveTab] = useState<'creator' | 'ai-lab' | 'database' | 'visitors' | 'structure' | 'users' | 'logs' | 'config' | 'backup' | 'scheduler' | 'link-tree'>(initialTab || 'database');
+    const [showGuests, setShowGuests] = useState(false); // <-- Ye naya switch hai!
     // State for New Sector Modal
     const [showNewSectorModal, setShowNewSectorModal] = useState(false);
     const [uploadQueue, setUploadQueue] = useState<{ name: string, status: string }[]>([]);
@@ -82,6 +83,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     const [findText, setFindText] = useState('');
     const [replaceText, setReplaceText] = useState('');
     const [foundMatches, setFoundMatches] = useState<{ id: string, title: string, context: string }[]>([]);
+
+
 
     // Creator Tab State
     const [itemForm, setItemForm] = useState<CarouselItem>({
@@ -146,6 +149,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     const [selectedVisitor, setSelectedVisitor] = useState<VisitorLog | null>(null);
     const [visitorDetails, setVisitorDetails] = useState<{ activity: any[], chats: any[] } | null>(null);
     const [loadingDetails, setLoadingDetails] = useState(false);
+    
 
     // AI Lab State
     const [aiPrompt, setAiPrompt] = useState('');
@@ -772,65 +776,65 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
             setIsSavingSectors(false);
         }
     };
-        // --- NEW: MULTI-FILE UPLOAD LOGIC ---
-        const handleMultiFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-            const files = e.target.files;
-            if (!files || files.length === 0) return;
+    // --- NEW: MULTI-FILE UPLOAD LOGIC ---
+    const handleMultiFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = e.target.files;
+        if (!files || files.length === 0) return;
 
-            const newQueue = Array.from(files).map(f => ({ name: f.name, status: 'Uploading...' }));
-            setUploadQueue(newQueue);
+        const newQueue = Array.from(files).map(f => ({ name: f.name, status: 'Uploading...' }));
+        setUploadQueue(newQueue);
 
-            let firstUrl = '';
-            let appendedContent = '';
+        let firstUrl = '';
+        let appendedContent = '';
 
-            try {
-                for (let i = 0; i < files.length; i++) {
-                    const formData = new FormData();
-                    formData.append('file', files[i]);
+        try {
+            for (let i = 0; i < files.length; i++) {
+                const formData = new FormData();
+                formData.append('file', files[i]);
 
-                    const res = await fetch(`${API_URL}/api/admin/upload`, {
-                        method: 'POST',
-                        headers: { 'x-csrf-token': csrfToken },
-                        body: formData,
-                        credentials: 'include'
-                    });
+                const res = await fetch(`${API_URL}/api/admin/upload`, {
+                    method: 'POST',
+                    headers: { 'x-csrf-token': csrfToken },
+                    body: formData,
+                    credentials: 'include'
+                });
 
-                    const data = await res.json();
-                    if (res.ok && data.url) {
-                        // Update Status
-                        setUploadQueue(prev => prev.map((q, idx) => idx === i ? { ...q, status: 'Done' } : q));
+                const data = await res.json();
+                if (res.ok && data.url) {
+                    // Update Status
+                    setUploadQueue(prev => prev.map((q, idx) => idx === i ? { ...q, status: 'Done' } : q));
 
-                        if (!firstUrl) firstUrl = data.url;
+                    if (!firstUrl) firstUrl = data.url;
 
-                        // Create HTML link for content
-                        const fileIcon = files[i].type.includes('pdf') ? '📄' : (files[i].type.includes('video') ? '🎥' : '📁');
-                        appendedContent += `<br/><a href="${data.url}" target="_blank" class="px-4 py-2 mt-2 bg-white/10 border border-white/20 rounded-lg inline-flex items-center gap-2 hover:bg-white/20 transition-all text-sm font-bold no-underline text-white">${fileIcon} ${files[i].name}</a>`;
-                    } else {
-                        setUploadQueue(prev => prev.map((q, idx) => idx === i ? { ...q, status: 'Failed' } : q));
-                    }
+                    // Create HTML link for content
+                    const fileIcon = files[i].type.includes('pdf') ? '📄' : (files[i].type.includes('video') ? '🎥' : '📁');
+                    appendedContent += `<br/><a href="${data.url}" target="_blank" class="px-4 py-2 mt-2 bg-white/10 border border-white/20 rounded-lg inline-flex items-center gap-2 hover:bg-white/20 transition-all text-sm font-bold no-underline text-white">${fileIcon} ${files[i].name}</a>`;
+                } else {
+                    setUploadQueue(prev => prev.map((q, idx) => idx === i ? { ...q, status: 'Failed' } : q));
                 }
-
-                // Update Form
-                setItemForm(prev => ({
-                    ...prev,
-                    fileUrl: prev.fileUrl || firstUrl, // Keep first one as primary
-                    content: prev.content + (appendedContent ? `<br/><div class="mt-4 border-t border-white/10 pt-2 font-bold text-xs opacity-50 uppercase">Attached Files:</div>${appendedContent}` : '')
-                }));
-
-                setTimeout(() => setUploadQueue([]), 3000);
-
-            } catch (e) {
-                alert('Batch upload failed.');
-                setUploadQueue([]);
             }
-        };
 
-        // --- NEW: HANDLE SECTOR ADDITION ---
-        const handleAddSector = (newSector: Sector, position: number) => {
-            const updated = [...editedSectors];
-            updated.splice(position, 0, newSector);
-            setEditedSectors(updated);
-        };
+            // Update Form
+            setItemForm(prev => ({
+                ...prev,
+                fileUrl: prev.fileUrl || firstUrl, // Keep first one as primary
+                content: prev.content + (appendedContent ? `<br/><div class="mt-4 border-t border-white/10 pt-2 font-bold text-xs opacity-50 uppercase">Attached Files:</div>${appendedContent}` : '')
+            }));
+
+            setTimeout(() => setUploadQueue([]), 3000);
+
+        } catch (e) {
+            alert('Batch upload failed.');
+            setUploadQueue([]);
+        }
+    };
+
+    // --- NEW: HANDLE SECTOR ADDITION ---
+    const handleAddSector = (newSector: Sector, position: number) => {
+        const updated = [...editedSectors];
+        updated.splice(position, 0, newSector);
+        setEditedSectors(updated);
+    };
 
     // --- EXPORT/IMPORT ---
     const handleExportData = async () => {
@@ -1735,200 +1739,258 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                             )}
 
                             {/* VISITOR SURVEILLANCE TAB */}
+                            {/* VISITOR SURVEILLANCE TAB - UPGRADED PRO VERSION */}
                             {activeTab === 'visitors' && (
-                                // ... Existing Visitors Code ...
                                 <div className="space-y-6 h-full flex flex-col">
                                     {!selectedVisitor ? (
+                                        // --- LIST VIEW (Sabki List) ---
                                         <div className="bg-white/5 border border-white/10 rounded-xl flex flex-col flex-1 overflow-hidden shadow-2xl animate-[fade-in_0.3s]">
-                                            {/* TOP BAR: SEARCH & REFRESH */}
-                                            <div className="p-4 bg-black/40 border-b border-white/10 flex flex-col md:flex-row gap-4 justify-between items-center backdrop-blur-md z-10">
-                                                <div className="flex items-center gap-3 w-full md:w-auto">
+
+                                            {/* HEADER: Filter Buttons */}
+                                            <div className="p-4 bg-black/40 border-b border-white/10 flex flex-wrap justify-between items-center gap-4">
+                                                <div className="flex items-center gap-3">
                                                     <ScanFace className="text-blue-400" size={24} />
                                                     <div>
-                                                        <h3 className="font-bold text-white">Visitor Surveillance</h3>
-                                                        <p className="text-[10px] text-white/50 uppercase tracking-widest">Real-time Tracking</p>
+                                                        <h3 className="font-bold text-white">Visitor Logs</h3>
+                                                        <p className="text-[10px] text-white/50 uppercase">
+                                                            Showing: {showGuests ? 'Everyone' : 'Students Only'}
+                                                        </p>
                                                     </div>
                                                 </div>
 
-                                                <div className="flex gap-2 w-full md:w-auto">
-                                                    <div className="relative flex-1 md:w-64">
-                                                        <Search className="absolute left-3 top-2.5 text-white/30" size={14} />
-                                                        <input
-                                                            placeholder="Search Name or ID..."
-                                                            className="w-full pl-9 pr-4 py-2 bg-white/5 border border-white/10 rounded-lg text-xs text-white outline-none focus:border-blue-500/50 transition-colors"
-                                                            onChange={(e) => {
-                                                                const term = e.target.value.toLowerCase();
-                                                                const rows = document.querySelectorAll('.visitor-row');
-                                                                rows.forEach(row => {
-                                                                    const text = row.textContent?.toLowerCase() || '';
-                                                                    (row as HTMLElement).style.display = text.includes(term) ? 'table-row' : 'none';
-                                                                });
-                                                            }}
-                                                        />
-                                                    </div>
-                                                    <button onClick={fetchVisitors} className="p-2 bg-blue-600/20 text-blue-400 border border-blue-500/30 rounded-lg hover:bg-blue-600 hover:text-white transition-all">
+                                                <div className="flex items-center gap-2">
+                                                    {/* ✨ NEW: Guest Toggle Button ✨ */}
+                                                    <button
+                                                        onClick={() => setShowGuests(!showGuests)}
+                                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all flex items-center gap-2
+                                                            ${showGuests ? 'bg-purple-900/30 border-purple-500/50 text-purple-200' : 'bg-white/5 border-white/10 text-white/50 hover:text-white'}
+                                                        `}
+                                                    >
+                                                        {showGuests ? <Users size={14} /> : <User size={14} />}
+                                                        {showGuests ? 'Hide Guests' : 'Show Guests'}
+                                                    </button>
+
+                                                    <button onClick={fetchVisitors} className="p-2 bg-white/10 rounded-lg hover:bg-white/20 text-white transition-colors">
                                                         <RefreshCw size={16} />
                                                     </button>
                                                 </div>
                                             </div>
 
-                                            {/* MAIN DATA TABLE */}
+                                            {/* TABLE LIST */}
                                             <div className="flex-1 overflow-y-auto custom-scrollbar">
-                                                <table className="w-full text-sm text-left border-collapse">
-                                                    <thead className="bg-white/5 text-xs uppercase font-bold text-zinc-400 sticky top-0 z-10 backdrop-blur-md shadow-sm">
+                                                <table className="w-full text-sm text-left">
+                                                    <thead className="bg-white/5 text-xs uppercase font-bold text-zinc-400 sticky top-0 z-10">
                                                         <tr>
-                                                            <th className="p-4 border-b border-white/10">Identity</th>
-                                                            <th className="p-4 border-b border-white/10">Engagement</th>
-                                                            <th className="p-4 border-b border-white/10">Last Signal</th>
-                                                            <th className="p-4 border-b border-white/10 text-right">Actions</th>
+                                                            <th className="p-4">Identity</th>
+                                                            <th className="p-4">Last Visit</th>
+                                                            <th className="p-4 text-right">Controls</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody>
-                                                        {visitors.map((v) => (
-                                                            <tr key={v.visitor_id} className="visitor-row border-b border-white/5 hover:bg-white/5 group transition-colors">
-                                                                <td className="p-4">
-                                                                    <div className="flex items-center gap-3">
-                                                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg border shadow-lg ${v.display_name === 'Guest'
-                                                                            ? 'bg-zinc-800 border-zinc-600 text-zinc-400'
-                                                                            : 'bg-blue-900/30 border-blue-500 text-blue-400'
-                                                                            }`}>
-                                                                            {v.display_name.charAt(0).toUpperCase()}
-                                                                        </div>
-                                                                        <div>
-                                                                            <div className="font-bold text-white flex items-center gap-2">
-                                                                                {v.display_name}
-                                                                                {v.visit_count > 10 && <span className="text-[10px] bg-yellow-500/20 text-yellow-500 px-1.5 rounded border border-yellow-500/30">REGULAR</span>}
+                                                        {visitors
+                                                            // 👇 Yahan MAGIC hai: Guests ko filter karna
+                                                            .filter(v => showGuests || v.display_name !== 'Guest')
+                                                            .map((v) => (
+                                                                <tr key={v.visitor_id} onClick={() => handleVisitorSelect(v)} className="border-b border-white/5 hover:bg-white/5 cursor-pointer group transition-colors">
+                                                                    <td className="p-4">
+                                                                        <div className="flex items-center gap-3">
+                                                                            <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs border shadow-lg 
+                                                                            ${v.display_name === 'Guest' ? 'bg-zinc-800 border-zinc-600 text-zinc-400' : 'bg-blue-900/50 border-blue-500/50 text-blue-200'}`}>
+                                                                                {v.display_name.charAt(0)}
                                                                             </div>
-                                                                            <div className="font-mono text-[10px] opacity-40">{(v.visitor_id || '').substring(0, 12)}...</div>
+                                                                            <div>
+                                                                                <div className="font-bold text-white">{v.display_name}</div>
+                                                                                <div className="text-[10px] opacity-40 font-mono">{v.visitor_id.substring(0, 8)}...</div>
+                                                                            </div>
                                                                         </div>
-                                                                    </div>
-                                                                </td>
-                                                                <td className="p-4">
-                                                                    <div className="flex flex-col gap-1">
-                                                                        <div className="flex items-center gap-2 text-xs">
-                                                                            <Activity size={12} className="text-green-400" />
-                                                                            <span className="opacity-80 font-mono">{v.visit_count} Sessions</span>
+                                                                    </td>
+                                                                    <td className="p-4">
+                                                                        <div className="flex flex-col">
+                                                                            <span className="text-xs font-mono opacity-80">{new Date(v.last_active).toLocaleDateString()}</span>
+                                                                            <span className="text-[10px] opacity-40">{new Date(v.last_active).toLocaleTimeString()}</span>
                                                                         </div>
-                                                                        <div className="flex items-center gap-2 text-xs">
-                                                                            <Monitor size={12} className="text-purple-400" />
-                                                                            <span className="opacity-80 font-mono">{(v.total_time_spent / 60).toFixed(1)}m Active</span>
-                                                                        </div>
-                                                                    </div>
-                                                                </td>
-                                                                <td className="p-4">
-                                                                    <div className="text-xs">
-                                                                        <div className="opacity-80">{new Date(v.last_active).toLocaleDateString()}</div>
-                                                                        <div className="opacity-40 font-mono">{new Date(v.last_active).toLocaleTimeString()}</div>
-                                                                    </div>
-                                                                </td>
-                                                                <td className="p-4 text-right">
-                                                                    <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                        <button
-                                                                            onClick={() => handleVisitorSelect(v)}
-                                                                            className="px-3 py-1.5 rounded bg-blue-600/20 border border-blue-500/30 text-blue-300 text-xs font-bold hover:bg-blue-600 hover:text-white transition-all"
-                                                                        >
-                                                                            DOSSIER
-                                                                        </button>
-                                                                        <button
-                                                                            onClick={async (e) => {
-                                                                                e.stopPropagation();
-                                                                                if (!confirm(`PERMANENTLY DELETE records for ${v.display_name}?`)) return;
+                                                                    </td>
+                                                                    <td className="p-4 text-right">
+                                                                        <div className="flex justify-end gap-2">
+                                                                            <span className="px-3 py-1 rounded bg-blue-500/10 text-blue-400 text-[10px] font-bold border border-blue-500/20 group-hover:bg-blue-600 group-hover:text-white transition-all">
+                                                                                OPEN LOGS
+                                                                            </span>
 
-                                                                                try {
-                                                                                    const res = await fetch(`${API_URL}/api/admin/visitors/${v.visitor_id}`, {
-                                                                                        method: 'DELETE',
-                                                                                        headers: { 'x-csrf-token': csrfToken },
-                                                                                        credentials: 'include'
-                                                                                    });
-                                                                                    if (res.ok) {
-                                                                                        fetchVisitors();
-                                                                                    } else {
-                                                                                        alert("Delete failed");
-                                                                                    }
-                                                                                } catch (err) { alert("Error deleting"); }
-                                                                            }}
-                                                                            className="p-1.5 rounded bg-red-900/20 border border-red-500/30 text-red-400 hover:bg-red-600 hover:text-white transition-all"
-                                                                            title="Delete Visitor Log"
-                                                                        >
-                                                                            <Trash2 size={14} />
-                                                                        </button>
-                                                                    </div>
-                                                                </td>
-                                                            </tr>
-                                                        ))}
+                                                                            {/* 🗑️ NEW: Quick Delete Button */}
+                                                                            <button
+                                                                                onClick={async (e) => {
+                                                                                    e.stopPropagation();
+                                                                                    if (!confirm(`Delete history for ${v.display_name}?`)) return;
+                                                                                    try {
+                                                                                        await fetch(`${API_URL}/api/admin/visitors/${v.visitor_id}`, {
+                                                                                            method: 'DELETE',
+                                                                                            headers: { 'x-csrf-token': csrfToken },
+                                                                                            credentials: 'include'
+                                                                                        });
+                                                                                        fetchVisitors(); // List refresh karo
+                                                                                    } catch (e) { alert("Failed to delete"); }
+                                                                                }}
+                                                                                className="p-1.5 rounded bg-red-900/20 border border-red-500/30 text-red-400 hover:bg-red-600 hover:text-white transition-all opacity-0 group-hover:opacity-100"
+                                                                                title="Delete User History"
+                                                                            >
+                                                                                <Trash2 size={14} />
+                                                                            </button>
+                                                                            {/* 🔒 BAN HAMMER BUTTON */}
+                                            <button 
+                                                onClick={async (e) => {
+                                                    e.stopPropagation();
+                                                    // 1. Reason poocho
+                                                    const reason = prompt("Restrict User? Enter message (Leave empty to Unban):");
+                                                    if (reason === null) return; // Cancelled
+
+                                                    const isBanning = reason.trim() !== ""; // Text hai to BAN, nahi to UNBAN
+
+                                                    try {
+                                                        // 2. API Call lagao
+                                                        await fetch(`${API_URL}/api/admin/restrict-user`, { 
+                                                            method: 'POST', 
+                                                            headers: {
+                                                                'Content-Type': 'application/json',
+                                                                'x-csrf-token': csrfToken
+                                                            },
+                                                            body: JSON.stringify({
+                                                                visitorId: v.visitor_id,
+                                                                isRestricted: isBanning,
+                                                                message: reason
+                                                            }),
+                                                            credentials: 'include'
+                                                        });
+                                                        fetchVisitors(); // List refresh
+                                                        alert(isBanning ? "User Blocked! 🚫" : "User Unblocked! ✅");
+                                                    } catch(e) { alert("Action Failed"); }
+                                                }}
+                                                className={`p-1.5 rounded border ml-2 transition-all opacity-0 group-hover:opacity-100
+                                                    ${v.is_restricted 
+                                                        ? 'bg-red-900/50 border-red-500 text-red-200 hover:bg-red-800' // Agar Blocked hai (Red)
+                                                        : 'bg-yellow-900/20 border-yellow-500/30 text-yellow-400 hover:bg-yellow-600 hover:text-white' // Agar Normal hai (Yellow)
+                                                    }
+                                                `}
+                                                title={v.is_restricted ? "Unban User" : "Restrict Access"}
+                                            >
+                                                {/* Icon change hoga status ke hisaab se */}
+                                                {v.is_restricted ? <Lock size={14} /> : <Unlock size={14} />}
+                                            </button>
+                                                                        </div>
+                                                                    </td>
+                                                                </tr>
+                                                            ))}
                                                     </tbody>
                                                 </table>
-                                                {visitors.length === 0 && (
-                                                    <div className="flex flex-col items-center justify-center h-64 opacity-30">
-                                                        <ScanFace size={64} />
-                                                        <p className="mt-4 text-sm font-mono">NO SIGNALS DETECTED</p>
+
+                                                {/* Empty State Message */}
+                                                {visitors.filter(v => showGuests || v.display_name !== 'Guest').length === 0 && (
+                                                    <div className="flex flex-col items-center justify-center h-64 opacity-30 text-center">
+                                                        <ScanFace size={48} className="mb-2" />
+                                                        <p className="text-xs uppercase tracking-widest font-bold">No Active Users Found</p>
+                                                        {!showGuests && <p className="text-[10px] mt-1">(Guests are hidden. Click 'Show Guests')</p>}
                                                     </div>
                                                 )}
                                             </div>
                                         </div>
                                     ) : (
-                                        // DETAIL VIEW (DOSSIER)
+                                        // --- DETAIL VIEW (Timeline with Dates) ---
                                         <div className="flex flex-col h-full animate-[fade-in-up_0.2s]">
-                                            <div className="flex items-center gap-4 mb-4">
-                                                <button onClick={() => setSelectedVisitor(null)} className="p-2 rounded bg-white/10 hover:bg-white/20 text-xs font-bold flex items-center gap-2">
-                                                    <ArrowDownUp className="rotate-90" size={14} /> BACK
+                                            <div className="flex items-center justify-between mb-4 bg-black/40 p-4 rounded-xl border border-white/10">
+                                                <div className="flex items-center gap-4">
+                                                    <button onClick={() => setSelectedVisitor(null)} className="p-2 rounded bg-white/10 text-xs font-bold hover:bg-white/20 transition-colors flex items-center gap-1">
+                                                        <ArrowDownUp className="rotate-90" size={14} /> BACK
+                                                    </button>
+                                                    <div>
+                                                        <h3 className="text-xl font-bold flex items-center gap-2">
+                                                            {selectedVisitor.display_name}
+                                                        </h3>
+                                                        <p className="text-xs opacity-50 flex items-center gap-1">
+                                                            <Activity size={12} /> Activity Timeline
+                                                        </p>
+                                                    </div>
+                                                </div>
+
+                                                {/* 🗑️ NEW: Delete Entire History Button */}
+                                                <button className="px-4 py-2 rounded bg-red-900/20 text-red-400 text-xs font-bold border border-red-500/30 hover:bg-red-600 hover:text-white flex items-center gap-2 transition-all"
+                                                    onClick={async () => {
+                                                        if (!confirm("⚠️ Delete ALL history for this user? This cannot be undone.")) return;
+                                                        await fetch(`${API_URL}/api/admin/visitors/${selectedVisitor.visitor_id}`, { method: 'DELETE', headers: { 'x-csrf-token': csrfToken }, credentials: 'include' });
+                                                        setSelectedVisitor(null);
+                                                        fetchVisitors();
+                                                    }}
+                                                >
+                                                    <Trash2 size={14} /> DELETE HISTORY
                                                 </button>
-                                                <h3 className="text-xl font-bold">{selectedVisitor.display_name}'s Dossier</h3>
-                                                <span className="px-2 py-1 rounded bg-blue-900/50 text-blue-200 text-xs font-mono">{selectedVisitor.visitor_id}</span>
                                             </div>
 
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-1 min-h-0">
-                                                {/* ACTIVITY LOG - UPDATED TO HIDE HEARTBEATS */}
-                                                <div className="bg-white/5 border border-white/10 rounded-xl flex flex-col overflow-hidden">
-                                                    <div className="p-3 bg-black/20 border-b border-white/10 font-bold flex items-center gap-2 text-sm text-blue-300">
-                                                        <Activity size={16} /> Activity History
-                                                    </div>
-                                                    <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
-                                                        {loadingDetails ? <div className="text-center p-4"><Loader2 className="animate-spin mx-auto" /></div> :
-                                                            visitorDetails?.activity ? (
-                                                                (() => {
-                                                                    const visibleActivity = visitorDetails.activity.filter(a => a.activity_type !== 'HEARTBEAT');
+                                            <div className="flex-1 overflow-y-auto p-6 custom-scrollbar bg-white/5 border border-white/10 rounded-xl relative">
+                                                {/* Vertical Line */}
+                                                <div className="absolute left-[4.5rem] top-6 bottom-6 w-px bg-gradient-to-b from-transparent via-white/10 to-transparent"></div>
 
-                                                                    if (visibleActivity.length > 0) {
-                                                                        return visibleActivity.map((act, i) => (
-                                                                            <div key={i} className="flex gap-3 text-xs border-b border-white/5 pb-2">
-                                                                                <div className="opacity-50 font-mono whitespace-nowrap w-16 text-right">{new Date(act.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
-                                                                                <div>
-                                                                                    <div className="font-bold text-white mb-0.5">{act.activity_type.replace('_', ' ')}</div>
-                                                                                    <div className="opacity-70">{act.resource_title || act.resource_id}</div>
-                                                                                    {act.duration_seconds > 0 && <div className="text-[10px] text-green-400 mt-1">{act.duration_seconds}s duration</div>}
-                                                                                </div>
+                                                {loadingDetails ? (
+                                                    <div className="flex justify-center items-center h-full"><Loader2 className="animate-spin text-blue-500" size={32} /></div>
+                                                ) : visitorDetails?.activity && visitorDetails.activity.length > 0 ? (
+                                                    (() => {
+                                                        let lastDate = '';
+                                                        return visitorDetails.activity.map((act, i) => {
+                                                            // 📅 Date Header Logic
+                                                            const dateObj = new Date(act.timestamp);
+                                                            const dateStr = dateObj.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
+                                                            const showDateHeader = dateStr !== lastDate;
+                                                            lastDate = dateStr;
+
+                                                            return (
+                                                                <React.Fragment key={i}>
+                                                                    {/* 📅 Date Separator */}
+                                                                    {showDateHeader && (
+                                                                        <div className="flex items-center gap-4 mb-6 mt-8 ml-14 animate-[fade-in_0.3s]">
+                                                                            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
+                                                                            <span className="text-[10px] font-bold uppercase tracking-widest text-blue-300 bg-blue-900/20 px-4 py-1 rounded-full border border-blue-500/20 shadow-lg backdrop-blur-md">
+                                                                                {dateStr}
+                                                                            </span>
+                                                                            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
+                                                                        </div>
+                                                                    )}
+
+                                                                    <div className="flex gap-6 mb-6 relative group">
+                                                                        {/* Time Bubble */}
+                                                                        <div className="z-10 w-14 text-right shrink-0 pt-2">
+                                                                            <div className="text-xs font-mono font-bold text-white/70 group-hover:text-white transition-colors">
+                                                                                {new Date(act.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                                                             </div>
-                                                                        ));
-                                                                    } else {
-                                                                        return <div className="opacity-50 text-center text-xs">No significant activity recorded (Heartbeats hidden).</div>;
-                                                                    }
-                                                                })()
-                                                            ) : <div className="opacity-50 text-center text-xs">No data found.</div>
-                                                        }
-                                                    </div>
-                                                </div>
+                                                                        </div>
 
-                                                {/* CHAT LOG */}
-                                                <div className="bg-white/5 border border-white/10 rounded-xl flex flex-col overflow-hidden">
-                                                    <div className="p-3 bg-black/20 border-b border-white/10 font-bold flex items-center gap-2 text-sm text-purple-300">
-                                                        <MessageSquare size={16} /> Oracle Interactions
-                                                    </div>
-                                                    <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
-                                                        {loadingDetails ? <div className="text-center p-4"><Loader2 className="animate-spin mx-auto" /></div> :
-                                                            visitorDetails?.chats && visitorDetails.chats.length > 0 ? (
-                                                                visitorDetails.chats.map((chat, i) => (
-                                                                    <div key={i} className="flex flex-col gap-2 text-xs border-b border-white/5 pb-3">
-                                                                        <div className="font-mono opacity-30 text-[10px]">{new Date(chat.timestamp).toLocaleString()}</div>
-                                                                        <div className="bg-white/5 p-2 rounded text-white italic">"{chat.user_query}"</div>
-                                                                        <div className="pl-2 border-l-2 border-purple-500/50 text-purple-100 opacity-80 line-clamp-3 hover:line-clamp-none transition-all cursor-pointer">
-                                                                            {chat.bot_response.replace(/<[^>]+>/g, '')}
+                                                                        {/* Colored Dot */}
+                                                                        <div className={`z-10 w-3 h-3 rounded-full mt-2.5 shrink-0 border-2 border-[#0f0a15] shadow-lg transition-transform group-hover:scale-125
+                                                                            ${act.activity_type.includes('PDF') ? 'bg-red-500 shadow-red-500/50' :
+                                                                                act.activity_type.includes('VIDEO') ? 'bg-purple-500 shadow-purple-500/50' :
+                                                                                    act.activity_type.includes('LINK') ? 'bg-green-500 shadow-green-500/50' : 'bg-blue-500 shadow-blue-500/50'} 
+                                                                        `}></div>
+
+                                                                        {/* Event Card */}
+                                                                        <div className="flex-1 bg-black/40 border border-white/5 p-3 rounded-lg hover:border-white/20 hover:bg-white/10 transition-all shadow-sm -mt-1 group-hover:translate-x-1">
+                                                                            <div className="flex justify-between items-start">
+                                                                                <span className={`font-bold text-sm tracking-wide ${act.activity_type.includes('PDF') ? 'text-red-300' :
+                                                                                        act.activity_type.includes('VIDEO') ? 'text-purple-300' : 'text-blue-300'
+                                                                                    }`}>
+                                                                                    {act.activity_type.replace(/_/g, ' ')}
+                                                                                </span>
+                                                                            </div>
+                                                                            <div className="text-xs text-zinc-400 mt-1 font-mono break-all">
+                                                                                {act.resource_title || 'Unknown Item'}
+                                                                            </div>
                                                                         </div>
                                                                     </div>
-                                                                ))
-                                                            ) : <div className="opacity-50 text-center text-xs">No conversations found.</div>}
+                                                                </React.Fragment>
+                                                            );
+                                                        });
+                                                    })()
+                                                ) : (
+                                                    <div className="text-center opacity-30 py-20 flex flex-col items-center">
+                                                        <Activity size={48} className="mb-4" />
+                                                        <p>No activity recorded yet.</p>
                                                     </div>
-                                                </div>
+                                                )}
                                             </div>
                                         </div>
                                     )}

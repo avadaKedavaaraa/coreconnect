@@ -114,12 +114,24 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
         const saved = localStorage.getItem(`core_notes_${item.id}`);
         if (saved) setNotes(saved);
 
+        // --- 🟢 NEW JASOOSI LOGIC START ---
         try {
             const profile = JSON.parse(localStorage.getItem('core_connect_profile') || '{}');
             if (profile.id) {
-                trackActivity(profile.id, 'VIEW_ITEM', item.id, item.title, 0);
+                // 1. Pata lagao ye kya cheez hai?
+                let actionType = 'VIEW_ITEM'; // Default
+                const url = item.fileUrl?.toLowerCase() || '';
+                
+                if (url.endsWith('.pdf')) actionType = 'OPEN_PDF';
+                else if (item.type === 'video' || url.match(/\.(mp4|mov|webm)$/)) actionType = 'WATCH_VIDEO';
+                else if (item.type === 'link') actionType = 'CLICK_LINK';
+                else if (url.includes('drive.google.com')) actionType = 'OPEN_DRIVE_FILE';
+
+                // 2. Server ko batao (Sirf ek baar)
+                trackActivity(profile.id, actionType, item.id, item.title, 0);
             }
-        } catch (e) { }
+        } catch (e) { console.error("Tracking failed", e); }
+        // --- 🔴 END ---
 
     }, [item.id]);
 
