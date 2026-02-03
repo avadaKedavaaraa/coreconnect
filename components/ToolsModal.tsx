@@ -229,8 +229,9 @@ const ToolsModal: React.FC<ToolsModalProps> = ({ lineage, onClose, profile, setP
     }, [editProfile, profile]);
 
     const handleSaveProfile = () => {
-        setProfile(prev => ({
-            ...prev,
+        // 1. Updated Profile Object banayein
+        const updatedProfile = {
+            ...profile, // Purana data (ID, stats etc.) retain karein
             displayName: editProfile.displayName,
             preferredFont: editProfile.preferredFont,
             themeColor: editProfile.themeColor,
@@ -238,17 +239,25 @@ const ToolsModal: React.FC<ToolsModalProps> = ({ lineage, onClose, profile, setP
             highContrast: editProfile.highContrast,
             brightness: editProfile.brightness,
             contrast: editProfile.contrast,
-            skipIntro: editProfile.skipIntro // <-- ADDED: Save skipIntro
-        }));
+            skipIntro: editProfile.skipIntro
+        };
 
-        // Update localStorage immediately so next reload works even if they don't navigate
+        // 2. React State Update karein (Taaki UI foran change ho)
+        setProfile(updatedProfile);
+
+        // 3. Local Storage Update karein (Taaki Refresh ke baad bhi data rahe)
         const saved = localStorage.getItem('core_connect_profile');
         if (saved) {
             const p = JSON.parse(saved);
-            localStorage.setItem('core_connect_profile', JSON.stringify({ ...p, skipIntro: editProfile.skipIntro }));
+            // Yahan hum pehle sirf 'skipIntro' save kar rahe the, ab pura 'updatedProfile' merge karenge
+            localStorage.setItem('core_connect_profile', JSON.stringify({ ...p, ...updatedProfile }));
+        } else {
+            localStorage.setItem('core_connect_profile', JSON.stringify(updatedProfile));
         }
 
         setHasChanges(false);
+        
+        // Button Feedback logic (Optional)
         const btn = document.getElementById('save-btn');
         if (btn) {
             const originalText = btn.innerText;
