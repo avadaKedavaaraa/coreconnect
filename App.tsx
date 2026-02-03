@@ -46,7 +46,28 @@ const safeFetch = async (url: string, options: RequestInit = {}) => {
 const LoadingScanner: React.FC = () => {
     const [status, setStatus] = useState("SUMMONING ARCHIVES...");
     const [progress, setProgress] = useState(0);
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setProgress(prev => {
+                if (prev >= 100) return 100;
+                // Non-linear progress for realism
+                const increment = Math.random() * 2 + 0.5;
+                return Math.min(100, prev + increment);
+            });
+        }, 50);
 
+        const timeouts = [
+            setTimeout(() => setStatus("ALIGNING LEY LINES..."), 1000),
+            setTimeout(() => setStatus("DECRYPTING RUNES..."), 2500),
+            setTimeout(() => setStatus("WEAVING REALITY..."), 3800),
+            setTimeout(() => setStatus("GATEWAY OPENING..."), 4500)
+        ];
+
+        return () => {
+            clearInterval(interval);
+            timeouts.forEach(clearTimeout);
+        };
+    }, []);
     // 🔒 CHECK BAN STATUS ON LOAD
     useEffect(() => {
         const checkStatus = async () => {
@@ -71,29 +92,6 @@ const LoadingScanner: React.FC = () => {
             }
         };
         checkStatus();
-    }, []);
-
-    useEffect(() => {
-        const interval = setInterval(() => {
-            setProgress(prev => {
-                if (prev >= 100) return 100;
-                // Non-linear progress for realism
-                const increment = Math.random() * 2 + 0.5;
-                return Math.min(100, prev + increment);
-            });
-        }, 50);
-
-        const timeouts = [
-            setTimeout(() => setStatus("ALIGNING LEY LINES..."), 1000),
-            setTimeout(() => setStatus("DECRYPTING RUNES..."), 2500),
-            setTimeout(() => setStatus("WEAVING REALITY..."), 3800),
-            setTimeout(() => setStatus("GATEWAY OPENING..."), 4500)
-        ];
-
-        return () => {
-            clearInterval(interval);
-            timeouts.forEach(clearTimeout);
-        };
     }, []);
 
     // Generate random particles
@@ -353,6 +351,35 @@ function App() {
     useEffect(() => {
         profileRef.current = profile;
     }, [profile]);
+    // 👇 YAHAN PASTE KARNA HAI 👇
+
+    // 🔒 CHECK BAN STATUS ON LOAD
+    useEffect(() => {
+        const checkStatus = async () => {
+            try {
+                // 1. Local Storage se ID nikalo
+                const profile = localStorage.getItem('core_connect_profile');
+                if (!profile) return;
+                
+                const { id } = JSON.parse(profile);
+                
+                // 2. Server se pucho: "Kya main banned hu?"
+                const res = await fetch(`${API_URL}/api/visitor/status/${id}`);
+                const data = await res.json();
+
+                // 3. Agar banned hai, to lock laga do
+                if (data.is_restricted) {
+                    setIsBanned(true);
+                    setBanMessage(data.restriction_message || "Access Restricted by Admin.");
+                }
+            } catch (e) {
+                console.error("Ban check failed", e);
+            }
+        };
+        checkStatus();
+    }, []);
+
+    // 👆 YAHAN KHATAM 👆
 
     // // Heartbeat Timer
     // useEffect(() => {
@@ -791,7 +818,25 @@ function App() {
 
     // 4. Set Accent Color (User Profile Preference overrides Global Config)
     const accentColor = profile.themeColor || currentPrimary;
-
+    // 🚫 THE BLOCK SCREEN (Agar user banned hai to ye dikhao)
+    if (isBanned) {
+        return (
+            <div className="fixed inset-0 bg-black flex flex-col items-center justify-center p-6 text-center z-[9999] animate-in fade-in zoom-in duration-300">
+                <div className="text-6xl mb-6 animate-bounce">🚫</div>
+                <h1 className="text-red-500 font-bold text-4xl mb-4 font-serif tracking-widest border-b-2 border-red-900 pb-2">
+                    ACCESS DENIED
+                </h1>
+                <div className="bg-red-950/30 border border-red-500/30 p-8 rounded-xl max-w-lg shadow-[0_0_50px_rgba(220,38,38,0.2)]">
+                    <p className="text-red-200 text-lg font-mono leading-relaxed">
+                        "{banMessage}"
+                    </p>
+                </div>
+                <p className="mt-8 text-white/20 text-[10px] font-mono uppercase tracking-[0.2em]">
+                    System ID: {JSON.parse(localStorage.getItem('core_connect_profile') || '{}').id || 'UNKNOWN'}
+                </p>
+            </div>
+        );
+    }
     return (
         <div
             // REMOVED hardcoded bg-[#...] classes here. We use inline style for background now.
