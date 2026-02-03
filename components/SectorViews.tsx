@@ -245,7 +245,7 @@ interface SectorViewProps {
     quickInputOnly?: boolean;
 }
 
-const ACADEMIC_SECTORS = ['books', 'notes', 'resources', 'tasks'];
+const ACADEMIC_SECTORS = ['books', 'notes', 'resources', 'tasks',];
 
 // --- TIMEZONE HELPERS (IST - Asia/Kolkata) ---
 const getISTDateStr = () => {
@@ -320,27 +320,33 @@ export const SectorView: React.FC<SectorViewProps> = ({
     const inputRef = useRef<HTMLInputElement>(null);
 
     // --- 🔒 EFFECT: DEFAULT VIEW LOGIC (UPDATED FOR REQUEST) ---
+    // --- 🔒 EFFECT: SAFEGUARDED DEFAULT VIEW LOGIC ---
     useEffect(() => {
-        setSearch(''); setDateFilter(''); setSubjectFilter(''); setShowPinnedOnly(false);
+        // 1. Sabse pehle purane filters saaf karo
+        setSearch(''); 
+        setDateFilter(''); 
+        setSubjectFilter(''); 
+        setShowPinnedOnly(false);
 
+        // 2. Ab check karo ki kaunsa Sector hai aur uska Default View kya hona chahiye
         if (isLectures) {
+            // Case A: LECTURES (Hamesha Grid/Columns)
             const isMobile = window.innerWidth < 768;
             setViewMode(isMobile ? 'grid' : 'columns');
             setDateFilter(getISTDateStr());
-        } else if (isBooks) {
-            setViewMode('folders');
-        } else if (isTasks) {
-            setViewMode('masonry');
-        } else if (sectorId === 'announcements') {
-            // ✅ Only Announcements default to LIST (Swimlane)
+        } 
+        else if (sectorId === 'announcements') {
+            // Case B: ANNOUNCEMENTS (Sirf ye Default List/Swimlane hoga)
             setViewMode('list');
             setDateFilter('');
-        } else {
-            // ✅ Everyone else defaults to FOLDERS
+        } 
+        else {
+            // Case C: BAAKI SAB (Tutorials, Books, Notes, Resources -> FOLDERS)
+            // Chahe wo 'tasks' ho ya 'tutorial_sheets', sab Folders mein khulenge.
             setViewMode('folders');
             setDateFilter('');
         }
-    }, [sectorId, isLectures, isBooks, isTasks]);
+    }, [sectorId, isLectures]);
 
     // --- ✅ CHANGE 2: FUNCTIONAL SWIMLANE "VIEW ALL" CLICK ---
     const handleOpenCategory = (categoryName: string) => {
