@@ -32,24 +32,28 @@ const HUD: React.FC<HUDProps> = ({
   onOpenTools, isOffline, config, onEditConfig, onNavigate 
 }) => {
   
-  // --- 1. STATE MANAGEMENT ---
+  // --- STATE MANAGEMENT ---
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [isActionDone, setIsActionDone] = useState(false);
   const [time, setTime] = useState(new Date());
   const [battery, setBattery] = useState<{level: number, charging: boolean} | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
 
-  // --- 2. CORE SYSTEM LOGIC (Unified Effects) ---
+  // --- CORE SYSTEM LOGIC (Unified Effects) ---
   useEffect(() => {
     // A. Initialize Clock Timer
     const timer = setInterval(() => setTime(new Date()), 1000);
 
-    // B. PWA Install Event Listener (Detects if PC/Android allows installation)
+    // B. Detect Device Type
+    setIsMobile(/iPhone|iPad|iPod|Android/i.test(navigator.userAgent));
+
+    // C. PWA Install Event Listener (Only useful if we want official prompt on Android)
     const handleInstallPrompt = (e: any) => {
       e.preventDefault();
       setInstallPrompt(e);
     };
 
-    // C. Storage Sync Listener (Updates HUD instantly when the Popup marks action as "Done")
+    // D. Storage Sync Listener (Updates HUD instantly when the Popup marks action as "Done")
     const handleStorageChange = () => {
       setIsActionDone(!!localStorage.getItem('cc_action_done'));
     };
@@ -93,7 +97,7 @@ const HUD: React.FC<HUDProps> = ({
     };
   }, []);
 
-  // --- 3. FORMATTING HELPERS ---
+  // --- FORMATTING HELPERS ---
   const formatTime = (date: Date) => date.toLocaleTimeString('en-GB', { hour12: false, hour: '2-digit', minute: '2-digit' });
   const formatDate = (date: Date) => {
     const day = String(date.getDate()).padStart(2, '0');
@@ -122,7 +126,7 @@ const HUD: React.FC<HUDProps> = ({
     >
       {/* --- LEFT SECTOR: STATUS & CORE CMDs --- */}
       <div className="flex items-center gap-3 sm:gap-6">
-        <div className="flex items-center gap-2" title={isWizard ? "Protective Wards Active" : "SEC: ENCRYPTED"}>
+        <div className="flex items-center gap-2" title={isWizard ? "Protective Wards Active: Shielding your magical timeline" : "Encryption: 256-bit Secure Layer Active"}>
           {isOffline ? (
              <div className="flex items-center gap-1 text-red-500 animate-pulse">
                 <WifiOff size={16} />
@@ -131,17 +135,19 @@ const HUD: React.FC<HUDProps> = ({
           ) : (
              <>
                <ShieldCheck size={16} className={isWizard ? "animate-pulse" : ""} />
-               <span className="text-xs uppercase tracking-wider hidden md:block">SEC: ENCRYPTED</span>
+               <span className="text-xs uppercase tracking-wider hidden md:block">
+                 {isWizard ? "Wards: Secure" : "SEC: ENCRYPTED"}
+               </span>
              </>
           )}
         </div>
         
-        <button onClick={onOpenOracle} className={`flex items-center gap-2 px-3 py-1 rounded-full border transition-all hover:scale-105 active:scale-95 ${isWizard ? 'bg-emerald-900/20 border-emerald-500/40' : 'bg-fuchsia-900/20 border-fuchsia-900/40'}`}>
+        <button onClick={onOpenOracle} className={`flex items-center gap-2 px-3 py-1 rounded-full border transition-all hover:scale-105 active:scale-95 ${isWizard ? 'bg-emerald-900/20 border-emerald-500/40' : 'bg-fuchsia-900/20 border-fuchsia-900/40'}`} title={isWizard ? "Consult the Oracle: Speak with the AI for arcane knowledge" : "Access Command Interface: Execute System AI Queries"}>
             {isWizard ? <Sparkles size={14} /> : <Terminal size={14} />}
             <span className="text-xs font-bold whitespace-nowrap">{isWizard ? "Ask Oracle" : "Sys_Cmd"}</span>
         </button>
 
-        <button onClick={() => onNavigate && onNavigate('system_info')} className="relative flex items-center justify-center p-1.5 rounded-full border border-cyan-500/50 bg-cyan-900/20 text-cyan-300">
+        <button onClick={() => onNavigate && onNavigate('system_info')} className="relative flex items-center justify-center p-1.5 rounded-full border border-cyan-500/50 bg-cyan-900/20 text-cyan-300" title="System Protocols: View Help, Shortcuts and Core Documentation">
           <div className="absolute inset-0 rounded-full blur-[8px] opacity-60 animate-pulse bg-cyan-500"></div>
           <HelpCircle size={16} className="relative z-10" />
         </button>
@@ -149,7 +155,7 @@ const HUD: React.FC<HUDProps> = ({
 
       {/* --- CENTER SECTOR: REALITY SWITCHER --- */}
       <div className="flex items-center hidden sm:flex">
-        <button onClick={onToggleLineage} className={`flex items-center gap-2 px-3 py-1 rounded-full border transition-all duration-300 hover:scale-105 ${isWizard ? 'bg-emerald-900/30 border-emerald-500/50 text-emerald-200' : 'bg-fuchsia-900/30 border-fuchsia-500/50 text-fuchsia-200'}`}>
+        <button onClick={onToggleLineage} className={`flex items-center gap-2 px-3 py-1 rounded-full border transition-all duration-300 hover:scale-105 ${isWizard ? 'bg-emerald-900/30 border-emerald-500/50 text-emerald-200' : 'bg-fuchsia-900/30 border-fuchsia-500/50 text-fuchsia-200'}`} title="Reality Shift: Toggle between Wizard and Muggle consciousness">
           <RotateCw size={14} className={isWizard ? 'animate-spin-slow' : ''} />
           <span className="text-[10px] font-bold tracking-widest uppercase hidden sm:block">{isWizard ? "Muggle View" : "Wizard View"}</span>
         </button>
@@ -158,20 +164,21 @@ const HUD: React.FC<HUDProps> = ({
       {/* --- RIGHT SECTOR: ACTIONS & USER INFO --- */}
       <div className="flex items-center gap-3 sm:gap-4">
         
-        {/* 🔖 SMART PROMOTION BUTTON (PC + MOBILE) */}
+        {/* 🔖 SMART PROMOTION BUTTON (STRICT PC = BOOKMARK ONLY) */}
         <button 
             onClick={async () => {
-                // CASE 1: PC/Android Native Install
-                if (installPrompt) {
-                    installPrompt.prompt();
-                    const { outcome } = await installPrompt.userChoice;
-                    if (outcome === 'accepted') setInstallPrompt(null);
+                // CASE 1: Mobile Browser manual installation
+                if (isMobile) {
+                    // Try native prompt first on mobile
+                    if (installPrompt) {
+                        installPrompt.prompt();
+                        const { outcome } = await installPrompt.userChoice;
+                        if (outcome === 'accepted') setInstallPrompt(null);
+                    } else {
+                        alert("📲 To Install App:\n\n1. Tap Menu (⋮ or Share)\n2. Select 'Add to Home Screen'");
+                    }
                 } 
-                // CASE 2: Mobile Browser Manual Instructions
-                else if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
-                    alert("📲 To Install App:\n\n1. Tap Menu (⋮ or Share)\n2. Select 'Add to Home Screen'");
-                } 
-                // CASE 3: Desktop Fallback (Bookmark)
+                // CASE 2: PC/Desktop -> Always Bookmark
                 else {
                     const isMac = /Mac/.test(navigator.platform);
                     alert(`🔖 Press ${isMac ? 'Command + D' : 'Ctrl + D'} to bookmark!`);
@@ -181,38 +188,38 @@ const HUD: React.FC<HUDProps> = ({
             }}
             className={`p-2 rounded-full border transition-all hover:scale-110 active:scale-95 flex items-center justify-center relative group
                 ${isWizard ? 'bg-emerald-900/50 border-emerald-500/30' : 'bg-fuchsia-900/50 border-fuchsia-500/30'}`}
-            title={installPrompt ? "Install System App" : "Secure this Link"}
+            title={isMobile ? "Install CoreConnect Neural Interface" : "Anchor this Archive to your browser bookmarks"}
         >
-            {isActionDone ? (
-                <Sparkles size={16} className="text-yellow-400 animate-pulse" />
-            ) : (
-                <>
-                    {/* Animated Bookmark Icon for Desktop, Static Install Icon for Mobile */}
-                    {(installPrompt || /iPhone|Android/i.test(navigator.userAgent)) ? (
-                        <img src="https://img.icons8.com/?size=100&id=101121&format=png&color=000000" className="w-5 h-5 object-contain invert opacity-90" alt="Install" />
-                    ) : (
-                        <img src="https://img.icons8.com/?size=100&id=B7hNQrX3PbdD&format=png&color=000000" className="w-6 h-6 object-contain invert opacity-90" alt="Bookmark" />
-                    )}
+            <>
+                {/* Icons: Show Install on Mobile, Bookmark on PC */}
+                {isMobile ? (
+                    <img src="https://img.icons8.com/?size=100&id=101121&format=png&color=000000" className="w-5 h-5 object-contain invert opacity-90" alt="Install" />
+                ) : (
+                    <img src="https://img.icons8.com/?size=100&id=B7hNQrX3PbdD&format=png&color=000000" className="w-6 h-6 object-contain invert opacity-90" alt="Bookmark" />
+                )}
 
-                    {/* ALWAYS BLINKING DOT (Until Action Taken) */}
-                    <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
-                        <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isWizard ? 'bg-emerald-400' : 'bg-fuchsia-400'}`}></span>
-                        <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${isWizard ? 'bg-emerald-500' : 'bg-fuchsia-500'}`}></span>
-                    </span>
-                </>
-            )}
+                {/* Blinking Pulse Dot only shows if not done */}
+                {!isActionDone && (
+                  <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                      <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isWizard ? 'bg-emerald-400' : 'bg-fuchsia-400'}`}></span>
+                      <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${isWizard ? 'bg-emerald-500' : 'bg-fuchsia-500'}`}></span>
+                  </span>
+                )}
+            </>
         </button>
 
         {/* Telegram Redirect */}
         <button onClick={() => config?.telegramLink ? window.open(config.telegramLink, '_blank') : onEditConfig?.()}
             className={`p-2 rounded-full border transition-all hover:scale-110 active:scale-95 flex items-center justify-center relative group
-                ${isWizard ? 'bg-emerald-900/50 border-emerald-500 text-emerald-400' : 'bg-fuchsia-900/50 border-fuchsia-500 text-fuchsia-400'}`}>
+                ${isWizard ? 'bg-emerald-900/50 border-emerald-500 text-emerald-400' : 'bg-fuchsia-900/50 border-fuchsia-500 text-fuchsia-400'}`}
+            title={config?.telegramLink ? "Join the Official Telegram Nexus" : "Configure Secure Telegram Uplink Link"}
+        >
             <Send size={16} />
             <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full animate-ping"></div>
         </button>
 
         {/* System Status Display */}
-        <div className="text-right leading-tight opacity-70">
+        <div className="text-right leading-tight opacity-70" title="System Status: Power Level and Local Synchronized Time">
           <div className="text-[10px] font-bold flex items-center justify-end gap-1">
              {getBatteryIcon()} {battery ? `${Math.round(battery.level * 100)}%` : ''}
           </div>
@@ -220,7 +227,7 @@ const HUD: React.FC<HUDProps> = ({
         </div>
 
         {/* Profile/Tools Trigger */}
-        <button onClick={onOpenTools} className={`w-8 h-8 rounded-full border flex items-center justify-center transition-all hover:scale-110 active:scale-95 overflow-hidden ${isWizard ? 'bg-emerald-900/50 border-emerald-500' : 'bg-fuchsia-900/50 border-fuchsia-500'}`}>
+        <button onClick={onOpenTools} className={`w-8 h-8 rounded-full border flex items-center justify-center transition-all hover:scale-110 active:scale-95 overflow-hidden ${isWizard ? 'bg-emerald-900/50 border-emerald-500' : 'bg-fuchsia-900/50 border-fuchsia-500'}`} title="Identity Gate: Access Settings, Themes and Neural Profile">
             <User size={16} />
         </button>
       </div>
