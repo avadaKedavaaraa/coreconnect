@@ -1,0 +1,29 @@
+<!-- Save this as logo.svg -->
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="wizardGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#10b981;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#064e3b;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="muggleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#d946ef;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#701a75;stop-opacity:1" />
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="2.5" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <circle cx="100" cy="100" r="85" fill="none" stroke="white" stroke-width="0.5" opacity="0.2" />
+  <path d="M100 20 L170 55 V125 L100 180 L30 125 V55 Z" fill="none" stroke="url(#wizardGrad)" stroke-width="2" filter="url(#glow)">
+    <animate attributeName="stroke-dasharray" from="0, 500" to="500, 0" dur="4s" repeatCount="indefinite" />
+  </path>
+  <circle cx="100" cy="100" r="40" fill="none" stroke="url(#muggleGrad)" stroke-width="5" stroke-dasharray="10 5" filter="url(#glow)">
+    <animateTransform attributeName="transform" type="rotate" from="0 100 100" to="360 100 100" dur="10s" repeatCount="indefinite" />
+  </circle>
+  <circle cx="100" cy="100" r="12" fill="white" filter="url(#glow)">
+    <animate attributeName="opacity" values="1;0.5;1" dur="2s" repeatCount="indefinite" />
+  </circle>
+</svg>
