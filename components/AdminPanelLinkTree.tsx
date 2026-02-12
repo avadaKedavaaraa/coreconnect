@@ -3,9 +3,15 @@ import { CarouselItem } from '../types';
 import { 
   Network, Trash2, Edit3, PlayCircle, Maximize2, X, RefreshCw, 
   Layers, MonitorPlay, Image as ImageIcon, AlertTriangle, ExternalLink,
-  ChevronLeft, ChevronRight, FolderOpen 
+  ChevronLeft, ChevronRight, FolderOpen, Search, ChevronDown, ChevronUp,
+  ImagePlus, Loader2
 } from 'lucide-react';
 import DOMPurify from 'dompurify';
+
+// --- CONFIGURATION ---
+// 🟢 LOADING FROM ENVIRONMENT VARIABLES 🟢
+// This works for both .env.local (Localhost) and Netlify Environment Variables
+const UNSPLASH_ACCESS_KEY = import.meta.env.VITE_UNSPLASH_ACCESS_KEY || '';
 
 interface AdminPanelLinkTreeProps {
   items: CarouselItem[];
@@ -36,6 +42,15 @@ export const AdminPanelLinkTree: React.FC<AdminPanelLinkTreeProps> = ({
   const [cinemaMode, setCinemaMode] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [activePreviewIndex, setActivePreviewIndex] = useState(0);
+
+  // Accordion State
+  const [expandedSubject, setExpandedSubject] = useState<string | null>(null);
+
+  // Image Search State
+  const [showImageModal, setShowImageModal] = useState(false);
+  const [imageQuery, setImageQuery] = useState('');
+  const [imageResults, setImageResults] = useState<string[]>([]);
+  const [isSearchingImages, setIsSearchingImages] = useState(false);
 
   // --- DERIVED DATA ---
   const uniqueSubjects = Array.from(new Set(items.map(i => i.subject || 'General'))).sort();
@@ -79,10 +94,13 @@ export const AdminPanelLinkTree: React.FC<AdminPanelLinkTreeProps> = ({
       return;
     }
 
+    // Fix for "Treating as text" bug: Ensure content is trimmed and robust
+    const finalContent = form.embedCode ? form.embedCode.trim() : 'Link Tree Item';
+
     const payload: CarouselItem = {
       id: isEditing ? form.id : crypto.randomUUID(),
       title: form.title,
-      content: form.embedCode || 'Link Tree Item',
+      content: finalContent, // Using the cleaned content
       date: new Date().toISOString().split('T')[0].replace(/-/g, '.'),
       type: 'link_tree',
       sector: 'resources',
@@ -114,6 +132,42 @@ export const AdminPanelLinkTree: React.FC<AdminPanelLinkTreeProps> = ({
     setForm({ id: '', title: '', url: '', image: '', embedCode: '', subject: '', batch: 'AICS' });
     setIsEditing(false);
     setShowPreview(false);
+  };
+
+  // --- IMAGE SEARCH HANDLERS ---
+  const handleImageSearch = async () => {
+    if (!imageQuery) return;
+    setIsSearchingImages(true);
+    
+    // Safety Check for missing key
+    if (!UNSPLASH_ACCESS_KEY) {
+        alert("Configuration Error: VITE_UNSPLASH_ACCESS_KEY is missing in Environment Variables.");
+        setIsSearchingImages(false);
+        return;
+    }
+
+    try {
+      // Fetching from Unsplash
+      const response = await fetch(`https://api.unsplash.com/search/photos?page=1&per_page=12&query=${imageQuery}&client_id=${UNSPLASH_ACCESS_KEY}`);
+      
+      if (!response.ok) {
+         throw new Error(`Error ${response.status}: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      
+      if (data.results) {
+         const urls = data.results.map((img: any) => img.urls.regular);
+         setImageResults(urls);
+      } else {
+         alert("No results found.");
+      }
+    } catch (error) {
+      console.error(error);
+      alert("Failed to fetch images. Check your Internet or API Key.");
+    } finally {
+      setIsSearchingImages(false);
+    }
   };
 
   // --- EFFECTS ---
@@ -311,15 +365,23 @@ export const AdminPanelLinkTree: React.FC<AdminPanelLinkTreeProps> = ({
                 </div>
                 
                 <div className="md:col-span-2">
-                    <label className="text-xs font-bold opacity-50 block mb-1 uppercase">Thumbnail URL</label>
+                    <label className="text-xs font-bold opacity-50 block mb-1 uppercase flex justify-between">
+                        <span>Thumbnail URL</span>
+                        <button 
+                            onClick={() => setShowImageModal(true)}
+                            className="text-[10px] flex items-center gap-1 text-blue-300 hover:text-white transition-colors"
+                        >
+                            <ImagePlus size={12} /> Search Online
+                        </button>
+                    </label>
                     <div className="flex gap-2">
                     <div className="relative flex-1">
                         <ImageIcon className="absolute left-3 top-3 text-white/30" size={16} />
                         <input
-                        value={form.image}
-                        onChange={e => setForm(prev => ({ ...prev, image: e.target.value }))}
-                        className="w-full pl-10 p-3 bg-black/40 border border-white/10 rounded-lg text-sm text-white outline-none focus:border-white/30 transition-colors"
-                        placeholder="https://..."
+                            value={form.image}
+                            onChange={e => setForm(prev => ({ ...prev, image: e.target.value }))}
+                            className="w-full pl-10 p-3 bg-black/40 border border-white/10 rounded-lg text-sm text-white outline-none focus:border-white/30 transition-colors"
+                            placeholder="https://..."
                         />
                     </div>
                     {form.image && (
@@ -372,54 +434,66 @@ export const AdminPanelLinkTree: React.FC<AdminPanelLinkTreeProps> = ({
             </button>
           </div>
 
-          {/* LIST OF EXISTING ITEMS - GROUPED */}
+          {/* LIST OF EXISTING ITEMS - NEW ACCORDION STYLE */}
           <div className="space-y-2">
             <h4 className="font-bold text-sm opacity-60 uppercase flex items-center gap-2 border-b border-white/10 pb-2">
               <Layers size={14}/> Database Entries ({existingTreeItems.length})
             </h4>
             
-            <div className="max-h-[600px] overflow-y-auto space-y-4 pr-2 custom-scrollbar p-1">
+            <div className="max-h-[600px] overflow-y-auto space-y-2 pr-2 custom-scrollbar p-1">
               {existingTreeItems.length === 0 ? (
                   <div className="text-center opacity-30 py-8 text-xs">No entries found.</div>
               ) : (
                   Object.entries(groupedItems).sort((a,b) => a[0].localeCompare(b[0])).map(([subject, batches]) => (
                     <div key={subject} className="bg-white/5 border border-white/10 rounded-xl overflow-hidden">
-                      {/* Subject Header */}
-                      <div className="bg-white/5 p-3 flex items-center gap-2 border-b border-white/5">
-                        <FolderOpen size={16} className="text-yellow-500 opacity-80" />
-                        <span className="font-bold text-sm text-yellow-100">{subject}</span>
-                      </div>
+                      {/* Subject Header (Clickable Accordion) */}
+                      <button 
+                        onClick={() => setExpandedSubject(expandedSubject === subject ? null : subject)}
+                        className="w-full bg-white/5 p-3 flex items-center justify-between hover:bg-white/10 transition-colors"
+                      >
+                        <div className="flex items-center gap-2">
+                            <FolderOpen size={16} className="text-yellow-500 opacity-80" />
+                            <span className="font-bold text-sm text-yellow-100">{subject}</span>
+                            <span className="text-[10px] bg-white/10 px-2 py-0.5 rounded-full text-zinc-400">
+                                {batches.AICS.length + batches.CSDA.length} items
+                            </span>
+                        </div>
+                        {expandedSubject === subject ? <ChevronUp size={16} className="text-zinc-500"/> : <ChevronDown size={16} className="text-zinc-500"/>}
+                      </button>
 
-                      <div className="p-2 space-y-3">
-                         {/* AICS Group */}
-                         {batches.AICS.length > 0 && (
-                           <div className="space-y-2">
-                              <h5 className="text-[10px] font-bold text-blue-300 uppercase tracking-wider pl-2 border-l-2 border-blue-500/30">
-                                AICS Batch ({batches.AICS.length})
-                              </h5>
-                              <div className="space-y-2 pl-2">
-                                {batches.AICS.map(item => renderItemCard(item))}
-                              </div>
-                           </div>
-                         )}
+                      {/* Content - Only show if expanded */}
+                      {expandedSubject === subject && (
+                          <div className="p-2 space-y-3 bg-black/20 animate-[fade-in_0.2s]">
+                             {/* AICS Group */}
+                             {batches.AICS.length > 0 && (
+                               <div className="space-y-2">
+                                  <h5 className="text-[10px] font-bold text-blue-300 uppercase tracking-wider pl-2 border-l-2 border-blue-500/30">
+                                    AICS Batch
+                                  </h5>
+                                  <div className="space-y-2 pl-2">
+                                    {batches.AICS.map(item => renderItemCard(item))}
+                                  </div>
+                               </div>
+                             )}
 
-                         {/* Separator if both exist */}
-                         {batches.AICS.length > 0 && batches.CSDA.length > 0 && (
-                            <div className="h-px bg-white/5 w-full"></div>
-                         )}
+                             {/* Separator if both exist */}
+                             {batches.AICS.length > 0 && batches.CSDA.length > 0 && (
+                                <div className="h-px bg-white/5 w-full"></div>
+                             )}
 
-                         {/* CSDA Group */}
-                         {batches.CSDA.length > 0 && (
-                           <div className="space-y-2">
-                              <h5 className="text-[10px] font-bold text-fuchsia-300 uppercase tracking-wider pl-2 border-l-2 border-fuchsia-500/30">
-                                CSDA Batch ({batches.CSDA.length})
-                              </h5>
-                              <div className="space-y-2 pl-2">
-                                {batches.CSDA.map(item => renderItemCard(item))}
-                              </div>
-                           </div>
-                         )}
-                      </div>
+                             {/* CSDA Group */}
+                             {batches.CSDA.length > 0 && (
+                               <div className="space-y-2">
+                                  <h5 className="text-[10px] font-bold text-fuchsia-300 uppercase tracking-wider pl-2 border-l-2 border-fuchsia-500/30">
+                                    CSDA Batch
+                                  </h5>
+                                  <div className="space-y-2 pl-2">
+                                    {batches.CSDA.map(item => renderItemCard(item))}
+                                  </div>
+                               </div>
+                             )}
+                          </div>
+                      )}
                     </div>
                   ))
               )}
@@ -488,6 +562,76 @@ export const AdminPanelLinkTree: React.FC<AdminPanelLinkTreeProps> = ({
           </div>
         </div>
       </div>
+
+      {/* --- IMAGE SEARCH MODAL --- */}
+      {showImageModal && (
+        <div className="fixed inset-0 z-[10000] bg-black/90 flex items-center justify-center p-4">
+            <div className="w-full max-w-3xl bg-[#111] border border-white/10 rounded-2xl flex flex-col max-h-[80vh]">
+                {/* Modal Header */}
+                <div className="p-4 border-b border-white/10 flex justify-between items-center bg-white/5 rounded-t-2xl">
+                    <h3 className="font-bold text-white flex items-center gap-2">
+                        <ImagePlus className="text-pink-400" size={20}/> 
+                        Search Unsplash Images
+                    </h3>
+                    <button onClick={() => setShowImageModal(false)} className="p-2 hover:bg-white/10 rounded-full text-zinc-400">
+                        <X size={20}/>
+                    </button>
+                </div>
+
+                {/* Search Bar */}
+                <div className="p-4 border-b border-white/10 flex gap-2">
+                    <div className="flex-1 relative">
+                        <Search className="absolute left-3 top-3 text-white/30" size={18}/>
+                        <input 
+                            value={imageQuery}
+                            onChange={(e) => setImageQuery(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleImageSearch()}
+                            className="w-full pl-10 p-2.5 bg-black border border-white/10 rounded-lg text-white outline-none focus:border-pink-500/50"
+                            placeholder="Type a keyword (e.g., Computer, Nature, Coding)..."
+                        />
+                    </div>
+                    <button 
+                        onClick={handleImageSearch}
+                        disabled={isSearchingImages}
+                        className="px-6 py-2 bg-pink-600 hover:bg-pink-500 text-white rounded-lg font-bold transition-colors disabled:opacity-50"
+                    >
+                        {isSearchingImages ? <Loader2 className="animate-spin" size={20}/> : 'Search'}
+                    </button>
+                </div>
+
+                {/* Results Grid */}
+                <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+                    {imageResults.length === 0 ? (
+                        <div className="h-64 flex flex-col items-center justify-center text-zinc-500 opacity-50">
+                            <ImageIcon size={48} className="mb-2"/>
+                            <p>Enter a keyword to find images.</p>
+                            <p className="text-[10px] mt-2 max-w-xs text-center">
+                                {UNSPLASH_ACCESS_KEY ? "Powered by Unsplash." : "⚠️ API Key Missing in Environment Variables"}
+                            </p>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            {imageResults.map((url, idx) => (
+                                <button 
+                                    key={idx}
+                                    onClick={() => {
+                                        setForm(prev => ({ ...prev, image: url }));
+                                        setShowImageModal(false);
+                                    }}
+                                    className="group relative aspect-video rounded-lg overflow-hidden border border-white/10 hover:border-pink-500 transition-all"
+                                >
+                                    <img src={url} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                        <span className="text-xs font-bold text-white bg-black/50 px-2 py-1 rounded">SELECT</span>
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+      )}
 
       {/* CINEMA MODE MODAL (Z-9999 Fix) */}
       {cinemaMode && (
