@@ -1,8 +1,9 @@
-
-
 import React, { useState, useEffect } from 'react';
 import { Lineage, type UserProfile, GlobalConfig } from '../types';
-import { ShieldCheck, RotateCw, BatteryMedium, BatteryFull, BatteryLow, Terminal, Sparkles, WifiOff, Zap, User, Accessibility, Send, Edit2, HelpCircle, Bookmark, Download } from 'lucide-react';
+import { 
+  ShieldCheck, RotateCw, BatteryMedium, BatteryFull, BatteryLow, 
+  Terminal, Sparkles, WifiOff, Zap, User, Send, HelpCircle 
+} from 'lucide-react';
 
 interface HUDProps {
   lineage: Lineage;
@@ -12,7 +13,7 @@ interface HUDProps {
   profile: UserProfile;
   isOffline?: boolean;
   config?: GlobalConfig;
-  onEditConfig?: () => void; // Shortcut to open config
+  onEditConfig?: () => void;
   onNavigate?: (sectorId: string) => void;
 }
 
@@ -22,29 +23,56 @@ interface BatteryManager extends EventTarget {
   chargingTime: number;
   dischargingTime: number;
   level: number;
-  addEventListener(type: string, listener: EventListenerOrEventListenerObject | null, options?: boolean | AddEventListenerOptions): void;
-  removeEventListener(type: string, listener: EventListenerOrEventListenerObject | null, options?: boolean | EventListenerOptions): void;
+  addEventListener(type: string, listener: EventListenerOrEventListenerObject | null): void;
+  removeEventListener(type: string, listener: EventListenerOrEventListenerObject | null): void;
 }
 
-const HUD: React.FC<HUDProps> = ({ lineage, onToggleLineage, profile, onOpenOracle, onOpenTools, isOffline, config, onEditConfig, onNavigate }) => {
+const HUD: React.FC<HUDProps> = ({ 
+  lineage, onToggleLineage, profile, onOpenOracle, 
+  onOpenTools, isOffline, config, onEditConfig, onNavigate 
+}) => {
+  
+  // --- 1. STATE MANAGEMENT ---
+  const [installPrompt, setInstallPrompt] = useState<any>(null);
+  const [isActionDone, setIsActionDone] = useState(false);
   const [time, setTime] = useState(new Date());
   const [battery, setBattery] = useState<{level: number, charging: boolean} | null>(null);
 
+  // --- 2. CORE SYSTEM LOGIC (Unified Effects) ---
   useEffect(() => {
+    // A. Initialize Clock Timer
     const timer = setInterval(() => setTime(new Date()), 1000);
-    return () => clearInterval(timer);
+
+    // B. PWA Install Event Listener (Detects if PC/Android allows installation)
+    const handleInstallPrompt = (e: any) => {
+      e.preventDefault();
+      setInstallPrompt(e);
+    };
+
+    // C. Storage Sync Listener (Updates HUD instantly when the Popup marks action as "Done")
+    const handleStorageChange = () => {
+      setIsActionDone(!!localStorage.getItem('cc_action_done'));
+    };
+
+    window.addEventListener('beforeinstallprompt', handleInstallPrompt);
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Initial check for existing "Done" status
+    setIsActionDone(!!localStorage.getItem('cc_action_done'));
+
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener('beforeinstallprompt', handleInstallPrompt);
+      window.removeEventListener('storage', handleStorageChange);
+    };
   }, []);
 
-  // Battery API Logic
+  // Battery API Implementation
   useEffect(() => {
     let batteryManager: BatteryManager | null = null;
-
     const updateBattery = () => {
       if (batteryManager) {
-        setBattery({
-          level: batteryManager.level,
-          charging: batteryManager.charging
-        });
+        setBattery({ level: batteryManager.level, charging: batteryManager.charging });
       }
     };
 
@@ -65,20 +93,16 @@ const HUD: React.FC<HUDProps> = ({ lineage, onToggleLineage, profile, onOpenOrac
     };
   }, []);
 
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString('en-GB', { hour12: false, hour: '2-digit', minute: '2-digit' });
-  };
-
+  // --- 3. FORMATTING HELPERS ---
+  const formatTime = (date: Date) => date.toLocaleTimeString('en-GB', { hour12: false, hour: '2-digit', minute: '2-digit' });
   const formatDate = (date: Date) => {
     const day = String(date.getDate()).padStart(2, '0');
     const month = String(date.getMonth() + 1).padStart(2, '0');
-    const year = String(date.getFullYear()).slice(-2);
-    return `${day}.${month}.${year}`;
+    return `${day}.${month}.${date.getFullYear().toString().slice(-2)}`;
   };
 
   const isWizard = lineage === Lineage.WIZARD;
 
-  // Battery Icon Logic
   const getBatteryIcon = () => {
     if (!battery) return <BatteryMedium size={18} className="opacity-50" />;
     if (battery.charging) return <Zap size={18} className="text-yellow-400 animate-pulse" />;
@@ -86,18 +110,6 @@ const HUD: React.FC<HUDProps> = ({ lineage, onToggleLineage, profile, onOpenOrac
     if (battery.level < 0.2) return <BatteryLow size={18} className="text-red-500 animate-pulse" />;
     return <BatteryMedium size={18} />;
   };
-  // Add this inside the HUD function:
-  const [isActionDone, setIsActionDone] = useState(false);
-
-  useEffect(() => {
-    // Check initial state
-    setIsActionDone(!!localStorage.getItem('cc_action_done'));
-
-    // Listen for updates from the popup
-    const handleStorage = () => setIsActionDone(!!localStorage.getItem('cc_action_done'));
-    window.addEventListener('storage', handleStorage);
-    return () => window.removeEventListener('storage', handleStorage);
-  }, []);
 
   return (
     <div className={`
@@ -108,115 +120,81 @@ const HUD: React.FC<HUDProps> = ({ lineage, onToggleLineage, profile, onOpenOrac
     `}
     style={profile.themeColor ? { borderColor: `${profile.themeColor}40`, color: profile.themeColor } : {}}
     >
-      {/* Left Status */}
+      {/* --- LEFT SECTOR: STATUS & CORE CMDs --- */}
       <div className="flex items-center gap-3 sm:gap-6">
-        <div className="flex items-center gap-2" title={isWizard ? "Protective Wards Active" : "Encryption: 256-bit"}>
+        <div className="flex items-center gap-2" title={isWizard ? "Protective Wards Active" : "SEC: ENCRYPTED"}>
           {isOffline ? (
              <div className="flex items-center gap-1 text-red-500 animate-pulse">
                 <WifiOff size={16} />
-                <span className="text-[10px] font-bold uppercase tracking-wider hidden sm:block">{isWizard ? 'Connection Severed' : 'OFFLINE'}</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider hidden sm:block">OFFLINE</span>
              </div>
           ) : (
              <>
                <ShieldCheck size={16} className={isWizard ? "animate-pulse" : ""} />
-               <span className="text-xs uppercase tracking-wider hidden md:block">
-                 {isWizard ? "Wards: Secure" : "SEC: ENCRYPTED"}
-               </span>
+               <span className="text-xs uppercase tracking-wider hidden md:block">SEC: ENCRYPTED</span>
              </>
           )}
         </div>
         
-        {/* Chat Trigger */}
-        <button 
-          onClick={onOpenOracle}
-          className={`flex items-center gap-2 px-3 py-1 rounded-full border transition-all hover:scale-105 active:scale-95
-             ${isWizard ? 'bg-emerald-900/20 border-emerald-500/40 hover:bg-emerald-900/40' : 'bg-fuchsia-900/20 border-fuchsia-900/40 hover:bg-fuchsia-900/40'}
-          `}
-          style={profile.themeColor ? { borderColor: `${profile.themeColor}60`, backgroundColor: `${profile.themeColor}20` } : {}}
-          title={isWizard ? "Consult the Oracle (AI Chat)" : "Access Command Interface (AI Chat)"}
-        >
+        <button onClick={onOpenOracle} className={`flex items-center gap-2 px-3 py-1 rounded-full border transition-all hover:scale-105 active:scale-95 ${isWizard ? 'bg-emerald-900/20 border-emerald-500/40' : 'bg-fuchsia-900/20 border-fuchsia-900/40'}`}>
             {isWizard ? <Sparkles size={14} /> : <Terminal size={14} />}
             <span className="text-xs font-bold whitespace-nowrap">{isWizard ? "Ask Oracle" : "Sys_Cmd"}</span>
         </button>
 
-        {/* HELP / SYSTEM INFO TRIGGER - GLOWING */}
-        <button
-          onClick={() => onNavigate && onNavigate('system_info')}
-          className={`relative flex items-center justify-center p-1.5 rounded-full border transition-all hover:scale-110 active:scale-95 group
-            ${isWizard ? 'border-yellow-500/50 bg-yellow-900/20 text-yellow-300' : 'border-cyan-500/50 bg-cyan-900/20 text-cyan-300'}
-          `}
-          title="System Protocols / Help"
-        >
-          {/* Intense constant glow effect */}
-          <div className={`absolute inset-0 rounded-full blur-[8px] opacity-60 animate-pulse 
-             ${isWizard ? 'bg-yellow-500' : 'bg-cyan-500'}
-          `}></div>
+        <button onClick={() => onNavigate && onNavigate('system_info')} className="relative flex items-center justify-center p-1.5 rounded-full border border-cyan-500/50 bg-cyan-900/20 text-cyan-300">
+          <div className="absolute inset-0 rounded-full blur-[8px] opacity-60 animate-pulse bg-cyan-500"></div>
           <HelpCircle size={16} className="relative z-10" />
         </button>
-
       </div>
 
-      {/* Center: Reality Switcher (Hidden on Mobile) */}
+      {/* --- CENTER SECTOR: REALITY SWITCHER --- */}
       <div className="flex items-center hidden sm:flex">
-        <button
-          onClick={onToggleLineage}
-          className={`flex items-center gap-2 px-3 py-1 rounded-full border transition-all duration-300 hover:scale-105
-            ${isWizard 
-              ? 'bg-emerald-900/30 border-emerald-500/50 hover:bg-emerald-800/40 text-emerald-200' 
-              : 'bg-fuchsia-900/30 border-fuchsia-500/50 hover:bg-fuchsia-800/40 text-fuchsia-200'}
-          `}
-          title="Switch between Wizard and Muggle Reality"
-        >
+        <button onClick={onToggleLineage} className={`flex items-center gap-2 px-3 py-1 rounded-full border transition-all duration-300 hover:scale-105 ${isWizard ? 'bg-emerald-900/30 border-emerald-500/50 text-emerald-200' : 'bg-fuchsia-900/30 border-fuchsia-500/50 text-fuchsia-200'}`}>
           <RotateCw size={14} className={isWizard ? 'animate-spin-slow' : ''} />
-          <span className="text-[10px] font-bold tracking-widest uppercase hidden sm:block">
-            {isWizard ? "Muggle View" : "Wizard View"}
-          </span>
+          <span className="text-[10px] font-bold tracking-widest uppercase hidden sm:block">{isWizard ? "Muggle View" : "Wizard View"}</span>
         </button>
       </div>
 
-      {/* Right: User Actions & Info */}
+      {/* --- RIGHT SECTOR: ACTIONS & USER INFO --- */}
       <div className="flex items-center gap-3 sm:gap-4">
-
-        {/* NEW: BOOKMARK / INSTALL PROMOTION BUTTON */}
-        {/* 🔖 LIVE BOOKMARK / INSTALL BUTTON */}
-        {/* 🟢 UPDATED: PROMOTION BUTTON (Live Icons) */}
+        
+        {/* 🔖 SMART PROMOTION BUTTON (PC + MOBILE) */}
         <button 
-            onClick={() => {
-                const mobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-                if (mobile) {
-                    alert("📲 Open Menu > 'Add to Home Screen' to install!");
-                } else {
+            onClick={async () => {
+                // CASE 1: PC/Android Native Install
+                if (installPrompt) {
+                    installPrompt.prompt();
+                    const { outcome } = await installPrompt.userChoice;
+                    if (outcome === 'accepted') setInstallPrompt(null);
+                } 
+                // CASE 2: Mobile Browser Manual Instructions
+                else if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+                    alert("📲 To Install App:\n\n1. Tap Menu (⋮ or Share)\n2. Select 'Add to Home Screen'");
+                } 
+                // CASE 3: Desktop Fallback (Bookmark)
+                else {
                     const isMac = /Mac/.test(navigator.platform);
                     alert(`🔖 Press ${isMac ? 'Command + D' : 'Ctrl + D'} to bookmark!`);
                 }
                 localStorage.setItem('cc_action_done', 'true');
-                setIsActionDone(true); // Stop blinking immediately
+                setIsActionDone(true);
             }}
             className={`p-2 rounded-full border transition-all hover:scale-110 active:scale-95 flex items-center justify-center relative group
-                ${isWizard ? 'bg-emerald-900/50 border-emerald-500/30' : 'bg-fuchsia-900/50 border-fuchsia-500/30'}
-            `}
-            title={/iPhone|Android/i.test(navigator.userAgent) ? "Install App" : "Bookmark"}
+                ${isWizard ? 'bg-emerald-900/50 border-emerald-500/30' : 'bg-fuchsia-900/50 border-fuchsia-500/30'}`}
+            title={installPrompt ? "Install System App" : "Secure this Link"}
         >
             {isActionDone ? (
                 <Sparkles size={16} className="text-yellow-400 animate-pulse" />
             ) : (
                 <>
-                    {/* ICON LOGIC: Mobile gets Static Install, Desktop gets Animated Bookmark */}
-                    {/iPhone|Android/i.test(navigator.userAgent) ? (
-                        <img 
-                            src="https://img.icons8.com/?size=100&id=101121&format=png&color=000000" 
-                            className="w-5 h-5 object-contain invert opacity-90" 
-                            alt="Install App"
-                        />
+                    {/* Animated Bookmark Icon for Desktop, Static Install Icon for Mobile */}
+                    {(installPrompt || /iPhone|Android/i.test(navigator.userAgent)) ? (
+                        <img src="https://img.icons8.com/?size=100&id=101121&format=png&color=000000" className="w-5 h-5 object-contain invert opacity-90" alt="Install" />
                     ) : (
-                        <img 
-                            src="https://img.icons8.com/?size=100&id=B7hNQrX3PbdD&format=png&color=000000" 
-                            className="w-6 h-6 object-contain invert opacity-90" 
-                            alt="Bookmark Animated"
-                        />
+                        <img src="https://img.icons8.com/?size=100&id=B7hNQrX3PbdD&format=png&color=000000" className="w-6 h-6 object-contain invert opacity-90" alt="Bookmark" />
                     )}
 
-                    {/* 🔴 ALWAYS BLINKING DOT (Until Action Taken) */}
+                    {/* ALWAYS BLINKING DOT (Until Action Taken) */}
                     <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
                         <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isWizard ? 'bg-emerald-400' : 'bg-fuchsia-400'}`}></span>
                         <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${isWizard ? 'bg-emerald-500' : 'bg-fuchsia-500'}`}></span>
@@ -224,50 +202,27 @@ const HUD: React.FC<HUDProps> = ({ lineage, onToggleLineage, profile, onOpenOrac
                 </>
             )}
         </button>
-        
-        {/* Telegram - Always visible if link exists OR if we want to edit it */}
-        <button 
-            onClick={() => {
-                if (config?.telegramLink) {
-                    window.open(config.telegramLink, '_blank');
-                } else if (onEditConfig) {
-                    onEditConfig(); // Prompt to add link
-                }
-            }}
+
+        {/* Telegram Redirect */}
+        <button onClick={() => config?.telegramLink ? window.open(config.telegramLink, '_blank') : onEditConfig?.()}
             className={`p-2 rounded-full border transition-all hover:scale-110 active:scale-95 flex items-center justify-center relative group
-                ${isWizard ? 'bg-emerald-900/50 border-emerald-500 text-emerald-400' : 'bg-fuchsia-900/50 border-fuchsia-500 text-fuchsia-400'}
-            `}
-            title={config?.telegramLink ? "Join Official Telegram Channel" : "Configure Telegram Link (Admin Only)"}
-        >
+                ${isWizard ? 'bg-emerald-900/50 border-emerald-500 text-emerald-400' : 'bg-fuchsia-900/50 border-fuchsia-500 text-fuchsia-400'}`}>
             <Send size={16} />
-            {/* Always Blink Pulse for Visibility */}
             <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full animate-ping"></div>
-            <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></div>
         </button>
 
-        {/* Battery & Time (Visible on mobile now) */}
-        <div className="text-right leading-tight opacity-70" title="System Status">
+        {/* System Status Display */}
+        <div className="text-right leading-tight opacity-70">
           <div className="text-[10px] font-bold flex items-center justify-end gap-1">
              {getBatteryIcon()} {battery ? `${Math.round(battery.level * 100)}%` : ''}
           </div>
           <div className="text-[10px] font-mono hidden sm:block">{formatDate(time)} {formatTime(time)}</div>
         </div>
 
-        <div className="h-6 w-px bg-white/10 hidden md:block"></div>
-
-        {/* User Profile Action */}
-        <div className="flex items-center gap-2">
-            <button 
-                onClick={onOpenTools}
-                className={`w-8 h-8 rounded-full border flex items-center justify-center transition-all hover:scale-110 active:scale-95 overflow-hidden
-                    ${isWizard ? 'bg-emerald-900/50 border-emerald-500' : 'bg-fuchsia-900/50 border-fuchsia-500'}
-                `}
-                title="User Profile & Settings"
-            >
-                <User size={16} />
-            </button>
-        </div>
-
+        {/* Profile/Tools Trigger */}
+        <button onClick={onOpenTools} className={`w-8 h-8 rounded-full border flex items-center justify-center transition-all hover:scale-110 active:scale-95 overflow-hidden ${isWizard ? 'bg-emerald-900/50 border-emerald-500' : 'bg-fuchsia-900/50 border-fuchsia-500'}`}>
+            <User size={16} />
+        </button>
       </div>
     </div>
   );

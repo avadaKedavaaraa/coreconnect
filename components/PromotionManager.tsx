@@ -15,6 +15,7 @@ const PromotionManager: React.FC<PromotionManagerProps> = ({ isWizard }) => {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
 
   useEffect(() => {
+    // 1. Device and OS Detection
     const ua = navigator.userAgent;
     const mobile = /iPhone|iPad|iPod|Android/i.test(ua);
     setIsMobile(mobile);
@@ -24,15 +25,16 @@ const PromotionManager: React.FC<PromotionManagerProps> = ({ isWizard }) => {
       setOsCommand(isMac ? '⌘ + D' : 'Ctrl + D');
     }
 
+    // 2. Check if user should see the popup
     const hasSeen = localStorage.getItem('cc_promo_seen');
     const isDone = localStorage.getItem('cc_action_done');
 
-    // Show after 2.5s for a smooth entrance
     if (!hasSeen && !isDone) {
       const timer = setTimeout(() => setShowPopup(true), 2500);
       return () => clearTimeout(timer);
     }
 
+    // 3. Listen for PC/Android Install Prompt
     const handler = (e: any) => {
       e.preventDefault();
       setDeferredPrompt(e);
@@ -42,28 +44,47 @@ const PromotionManager: React.FC<PromotionManagerProps> = ({ isWizard }) => {
   }, []);
 
   const handleAction = async () => {
-    // 1. Android/Chrome PWA
-    if (deferredPrompt) {
-      deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
-      if (outcome === 'accepted') finalize();
-      return;
-    }
+    // --- STRICT DEVICE CHECK ---
+    const isMobileDevice = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
-    // 2. iOS Instructions
-    const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
-    if (isIOS) {
-        alert("👇 To Install on iPhone:\n\n1. Tap the 'Share' icon (square with arrow) at the bottom.\n2. Scroll down and tap 'Add to Home Screen' (+).");
+    if (isMobileDevice) {
+        // A. If Android Official Prompt is ready
+        if (deferredPrompt) {
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            if (outcome === 'accepted') {
+                setDeferredPrompt(null);
+                finalize();
+            }
+            return;
+        }
+
+        // B. Fallback for iOS or Android without prompt
+        alert("📲 To Install App:\n\n1. Tap your browser's Menu (⋮ or Share icon).\n2. Select 'Add to Home Screen' or 'Install App'.");
+        
+        // Mark as done so we don't annoy them
+        finalize(); 
         return; 
     }
 
-    // 3. Desktop / Default
+    // --- DESKTOP LOGIC ---
+    if (deferredPrompt) {
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        if (outcome === 'accepted') {
+            setDeferredPrompt(null);
+            finalize();
+            return;
+        }
+    }
+
+    // Desktop Fallback: Bookmark
     alert(`🔖 Pro Tip: Press ${osCommand} to instantly bookmark this timeline!`);
     finalize();
   };
 
   const finalize = () => {
-    // 🎉 Dynamic Confetti Colors based on Theme
+    // 🎉 Confetti Blast
     const colors = isWizard ? ['#10b981', '#34d399', '#ffffff'] : ['#d946ef', '#f0abfc', '#ffffff'];
     
     confetti({
@@ -77,9 +98,10 @@ const PromotionManager: React.FC<PromotionManagerProps> = ({ isWizard }) => {
     localStorage.setItem('cc_action_done', 'true');
     setStatus('thanks');
     
+    // Notify HUD and Close
     setTimeout(() => {
       closePopup();
-      window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new Event('storage')); // HUD updates its state
     }, 3500);
   };
 
@@ -88,7 +110,7 @@ const PromotionManager: React.FC<PromotionManagerProps> = ({ isWizard }) => {
     setShowPopup(false);
   };
 
-  // --- STYLES ---
+  // --- Theme Styles ---
   const themeBg = isWizard ? 'bg-emerald-500' : 'bg-fuchsia-600';
   const themeBorder = isWizard ? 'border-emerald-500/40' : 'border-fuchsia-500/40';
   const themeGlow = isWizard ? 'shadow-[0_0_40px_-10px_rgba(16,185,129,0.3)]' : 'shadow-[0_0_40px_-10px_rgba(217,70,239,0.3)]';
@@ -100,14 +122,15 @@ const PromotionManager: React.FC<PromotionManagerProps> = ({ isWizard }) => {
     <AnimatePresence>
       {showPopup && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
-          {/* Dark Backdrop with Blur */}
+          
+          {/* 🌑 Glass Backdrop */}
           <motion.div 
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             onClick={closePopup}
           />
 
-          {/* MAIN CARD */}
+          {/* 📦 Main Card */}
           <motion.div 
             initial={{ opacity: 0, scale: 0.8, y: 50, rotateX: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0, rotateX: 0 }}
@@ -119,12 +142,11 @@ const PromotionManager: React.FC<PromotionManagerProps> = ({ isWizard }) => {
             `}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Animated Rotating Nebula Background */}
+            {/* 🌀 Rotating Nebula Effect */}
             <div className={`absolute -top-[50%] -left-[50%] w-[200%] h-[200%] opacity-20 animate-spin-slow pointer-events-none 
                 bg-[conic-gradient(from_90deg_at_50%_50%,#00000000_50%,${isWizard ? '#10b981' : '#d946ef'}_100%)]`}>
             </div>
             
-            {/* Close Button */}
             <button onClick={closePopup} className="absolute top-4 right-4 z-20 p-2 text-white/30 hover:text-white transition-colors rounded-full hover:bg-white/10">
               <X size={18} />
             </button>
@@ -132,32 +154,19 @@ const PromotionManager: React.FC<PromotionManagerProps> = ({ isWizard }) => {
             {status === 'prompt' ? (
               <div className="relative z-10 p-8 flex flex-col items-center text-center space-y-6">
                 
-                {/* Floating 3D Icon Container */}
+                {/* 🎨 Floating Icon UI */}
                 <div className="relative">
                     <div className={`absolute inset-0 blur-2xl opacity-40 ${themeBg} animate-pulse-slow`}></div>
                     <div className={`
                         relative w-24 h-24 rounded-2xl flex items-center justify-center border border-white/10 
-                        bg-gradient-to-br from-white/10 to-transparent shadow-2xl backdrop-blur-md
-                        animate-float
+                        bg-gradient-to-br from-white/10 to-transparent shadow-2xl backdrop-blur-md animate-float
                     `}>
                         {isMobile ? (
-                            // Static Install Icon (Inverted to White)
-                            <img 
-                                src="https://img.icons8.com/?size=100&id=101121&format=png&color=000000" 
-                                className="w-12 h-12 object-contain invert drop-shadow-lg" 
-                                alt="Install App"
-                            />
+                            <img src="https://img.icons8.com/?size=100&id=101121&format=png&color=000000" className="w-12 h-12 object-contain invert drop-shadow-lg" alt="Install" />
                         ) : (
-                            // Animated Bookmark Icon (Inverted to White)
-                            <img 
-                                src="https://img.icons8.com/?size=100&id=B7hNQrX3PbdD&format=png&color=000000" 
-                                className="w-16 h-16 object-contain invert drop-shadow-lg" 
-                                alt="Bookmark"
-                            />
+                            <img src="https://img.icons8.com/?size=100&id=B7hNQrX3PbdD&format=png&color=000000" className="w-16 h-16 object-contain invert drop-shadow-lg" alt="Bookmark" />
                         )}
                     </div>
-                    {/* Tiny orbiting particles */}
-                    <div className={`absolute top-0 right-0 w-2 h-2 rounded-full ${themeBg} animate-ping`}></div>
                 </div>
 
                 <div className="space-y-2">
@@ -167,12 +176,12 @@ const PromotionManager: React.FC<PromotionManagerProps> = ({ isWizard }) => {
                   </h3>
                   <p className="text-sm text-zinc-400 font-sans leading-relaxed px-2">
                     {isMobile 
-                        ? "Install the neural interface (App) for instant, full-screen offline access." 
-                        : "Don't get lost in the void. Anchor this timeline to your browser now."}
+                        ? "Install the interface for instant, full-screen offline access." 
+                        : "Anchor this timeline to your browser to never lose your progress."}
                   </p>
                 </div>
 
-                {/* Shiny CTA Button */}
+                {/* ⚡ Action Button */}
                 <button
                   onClick={handleAction}
                   className={`
@@ -181,7 +190,6 @@ const PromotionManager: React.FC<PromotionManagerProps> = ({ isWizard }) => {
                     ${buttonGradient}
                   `}
                 >
-                  {/* Shimmer Effect */}
                   <div className="absolute inset-0 -translate-x-[100%] group-hover:translate-x-[100%] transition-transform duration-700 bg-gradient-to-r from-transparent via-white/20 to-transparent z-10"></div>
                   
                   <div className="relative z-20 flex items-center justify-center gap-2 tracking-widest text-xs uppercase">
@@ -194,17 +202,13 @@ const PromotionManager: React.FC<PromotionManagerProps> = ({ isWizard }) => {
                 </button>
 
                 <p className="text-[10px] text-zinc-600 font-mono uppercase tracking-widest">
-                    {isWizard ? "Magic consumes memory. Save it." : "Session persistence recommended."}
+                    {isWizard ? "Bind the magic to your device." : "System persistence recommended."}
                 </p>
               </div>
             ) : (
-              // SUCCESS STATE
+              // 🎉 Success State
               <div className="relative z-10 p-10 flex flex-col items-center text-center space-y-4">
-                <motion.div 
-                    initial={{ scale: 0 }} animate={{ scale: 1 }} 
-                    transition={{ type: "spring", bounce: 0.5 }}
-                    className="relative"
-                >
+                <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", bounce: 0.5 }} className="relative">
                     <Heart size={64} className="text-red-500 fill-red-600 drop-shadow-[0_0_15px_rgba(220,38,38,0.5)]" />
                     <Sparkles size={24} className="absolute -top-2 -right-4 text-yellow-400 animate-spin-slow" />
                 </motion.div>
