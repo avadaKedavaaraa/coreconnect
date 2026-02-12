@@ -11,6 +11,7 @@ import { promisify } from 'util';
 import helmet from 'helmet';
 import hpp from 'hpp';
 import rateLimit from 'express-rate-limit';
+import serverless from 'serverless-http'; // Required for Netlify
 
 // Load env vars
 dotenv.config();
@@ -20,6 +21,9 @@ const scryptAsync = promisify(crypto.scrypt);
 const app = express();
 const IS_PROD = process.env.NODE_ENV === 'production';
 const PORT = process.env.PORT || 3000;
+
+// ✅ PASTE THIS LINE HERE:
+app.set('trust proxy', 1); 
 
 // --- SECURITY CHECKS ---
 if (!process.env.VITE_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -66,11 +70,15 @@ const limiter = rateLimit({
   max: 3000, 
   standardHeaders: true,
   legacyHeaders: false,
+  // This prevents blocking the whole college WiFi:
+  keyGenerator: (req) => {
+    return req.cookies?.session_id || req.headers['x-forwarded-for'] || req.ip;
+  }
 });
 
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, 
-  max: 20, 
+  max: 3, 
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -683,6 +691,9 @@ router.post('/admin/drive-scan', requireAuth, async (req, res) => {
 });
 
 app.use('/api', router);
+// Export for Netlify
+const handler = serverless(app);
+export { handler };
 
 if (process.argv[1] && process.argv[1].endsWith('index.js')) {
     app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));

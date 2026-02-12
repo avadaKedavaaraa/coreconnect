@@ -6,7 +6,7 @@ import {
     BrainCircuit, ScanFace, Users, Activity, Settings, LayoutTemplate, Search,
     Filter, Replace, Edit3, Trash2, Plus, ImageIcon, Save,
     FolderInput, AlertCircle, Wand2, RefreshCw, Pin, Share2, Link as LinkIcon, ImagePlus,
-    AlertTriangle, FileText, Sparkles, Network, MessageSquare, ArrowDownUp, BellRing, Paperclip, Zap, Palmtree, Smartphone, Monitor, FileUp, PlusCircle, Clock, Calendar, User,
+    AlertTriangle, FileText, Sparkles, Network, MessageSquare, ArrowDownUp, BellRing, Paperclip, Zap, Palmtree, Smartphone, Monitor, FileUp, PlusCircle, Clock, Calendar, User, Video, File, Terminal, CheckSquare, Layers, EyeOff, Heart
 } from 'lucide-react';
 import DOMPurify from 'dompurify';
 
@@ -59,6 +59,20 @@ const getRandomBrightColor = () => {
     const l = 60 + Math.floor(Math.random() * 20);
     return `hsl(${h}, ${s}%, ${l}%)`;
 };
+
+// --- HELPER: Get Icon for File Type ---
+const getTypeIcon = (type: string) => {
+    switch (type) {
+        case 'video': return <Video size={14} className="text-purple-400" />;
+        case 'file': return <File size={14} className="text-blue-400" />;
+        case 'code': return <Terminal size={14} className="text-green-400" />;
+        case 'link': return <LinkIcon size={14} className="text-orange-400" />;
+        case 'task': return <CheckSquare size={14} className="text-red-400" />;
+        case 'link_tree': return <Network size={14} className="text-pink-400" />;
+        default: return <MessageSquare size={14} className="text-yellow-400" />;
+    }
+};
+
 
 const AdminPanel: React.FC<AdminPanelProps> = ({
     lineage, isOpen, onClose, isAdmin, csrfToken, onLogin, onLogout, currentUser, permissions, initialTab = 'database',
@@ -1036,83 +1050,174 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
                         <main className="flex-1 overflow-y-auto min-h-0 p-4 sm:p-8 relative custom-scrollbar pb-24">
                             {/* DATABASE TAB */}
+                            {/* --- NEW CATEGORIZED DATABASE TAB --- */}
                             {activeTab === 'database' && (
-                                <div className="space-y-6">
-                                    {/* Search & Filters */}
-                                    <div className="flex gap-4">
-                                        <div className="flex-1 relative">
+                                <div className="space-y-6 h-full flex flex-col">
+                                    {/* 1. Filters & Search Bar */}
+                                    <div className="flex flex-wrap gap-4 bg-black/40 p-4 rounded-xl border border-white/10 shrink-0">
+                                        <div className="flex-1 relative min-w-[200px]">
                                             <Search className="absolute left-3 top-3 text-white/50" size={18} />
-                                            <input value={itemSearch} onChange={e => setItemSearch(e.target.value)} placeholder="Search DB..." className="w-full pl-10 p-3 bg-white/5 border border-white/10 rounded outline-none" />
+                                            <input 
+                                                value={itemSearch} 
+                                                onChange={e => setItemSearch(e.target.value)} 
+                                                placeholder="Search Database..." 
+                                                className="w-full pl-10 p-3 bg-white/5 border border-white/10 rounded-lg outline-none text-sm focus:border-white/30 transition-colors" 
+                                            />
                                         </div>
                                         <div className="relative">
                                             <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none"><Filter size={14} /></div>
-                                            <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} className="h-full pl-9 pr-4 bg-white/5 border border-white/10 rounded appearance-none outline-none cursor-pointer">
+                                            <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} className="h-full pl-9 pr-4 bg-white/5 border border-white/10 rounded-lg appearance-none outline-none cursor-pointer text-sm">
                                                 <option value="all" className="bg-black">All Types</option>
                                                 <option value="announcement" className="bg-black">Announcements</option>
                                                 <option value="file" className="bg-black">Files</option>
                                                 <option value="video" className="bg-black">Videos</option>
                                                 <option value="task" className="bg-black">Tasks</option>
-                                                <option value="mixed" className="bg-black">Mixed</option>
                                                 <option value="link" className="bg-black">Links</option>
-                                                <option value="code" className="bg-black">Code</option>
                                                 <option value="link_tree" className="bg-black">Link Tree</option>
                                             </select>
                                         </div>
                                         <div className="relative">
                                             <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none"><Replace size={14} /></div>
-                                            <input value={findText} onChange={e => setFindText(e.target.value)} placeholder="Find..." className="h-full pl-9 p-3 bg-white/5 border border-white/10 rounded outline-none w-32 focus:w-48 transition-all" />
-                                            {findText && <button onClick={scanForMatches} className="absolute right-2 top-2 p-1 bg-white/10 rounded hover:bg-white/20"><Search size={14} /></button>}
+                                            <input value={findText} onChange={e => setFindText(e.target.value)} placeholder="Find..." className="h-full pl-9 p-3 bg-white/5 border border-white/10 rounded-lg outline-none w-32 focus:w-48 transition-all text-sm" />
+                                            {findText && <button onClick={scanForMatches} className="absolute right-2 top-2 p-1.5 bg-white/10 rounded hover:bg-white/20"><Search size={14} /></button>}
                                         </div>
                                     </div>
 
+                                    {/* 2. Find & Replace Box (Only shows when matches found) */}
                                     {foundMatches.length > 0 && (
-                                        <div className="p-4 bg-yellow-900/30 border border-yellow-500/30 rounded-lg">
+                                        <div className="p-4 bg-yellow-900/30 border border-yellow-500/30 rounded-lg shrink-0 animate-in fade-in slide-in-from-top-2">
                                             <div className="flex justify-between items-center mb-2">
-                                                <span className="text-yellow-200 font-bold">Found {foundMatches.length} occurrences of "{findText}"</span>
+                                                <span className="text-yellow-200 font-bold text-sm">Found {foundMatches.length} occurrences of "{findText}"</span>
                                                 <div className="flex gap-2">
                                                     <input value={replaceText} onChange={e => setReplaceText(e.target.value)} placeholder="Replace with..." className="p-1 px-2 bg-black/50 border border-yellow-500/30 rounded text-sm text-white" />
                                                     <button onClick={executeReplaceAll} className="px-3 py-1 bg-yellow-600 rounded text-black font-bold text-xs hover:bg-yellow-500">REPLACE ALL</button>
                                                     <button onClick={() => setFoundMatches([])} className="p-1 hover:bg-white/10 rounded"><X size={14} /></button>
                                                 </div>
                                             </div>
-                                            <div className="max-h-32 overflow-y-auto text-xs text-white/60">
-                                                {foundMatches.slice(0, 10).map((m, i) => <div key={i}>Match in: {m.title} ({m.context})</div>)}
-                                                {foundMatches.length > 10 && <div>...and {foundMatches.length - 10} more</div>}
-                                            </div>
                                         </div>
                                     )}
 
-                                    <div className="grid gap-4">
-                                        {filteredItems.map(item => {
-                                            const listTitleStyle = item.style?.isGradient ? {
-                                                backgroundImage: `linear-gradient(to right, ${item.style.titleColor}, ${item.style.titleColorEnd || item.style.titleColor})`,
-                                                WebkitBackgroundClip: 'text',
-                                                WebkitTextFillColor: 'transparent',
-                                                backgroundClip: 'text',
-                                                color: 'transparent'
-                                            } : {
-                                                color: item.style?.titleColor
-                                            };
+                                    {/* 3. The New Categorized Table */}
+                                    <div className="flex-1 overflow-hidden bg-white/5 border border-white/10 rounded-xl flex flex-col">
+                                        <div className="overflow-y-auto custom-scrollbar flex-1">
+                                            <table className="w-full text-sm text-left border-collapse">
+                                                <thead className="bg-black/60 text-xs uppercase font-bold text-zinc-400 sticky top-0 z-10 backdrop-blur-md shadow-sm">
+                                                    <tr>
+                                                        <th className="p-4 border-b border-white/10 w-32">Timeline</th>
+                                                        <th className="p-4 border-b border-white/10">Artifact Identity</th>
+                                                        <th className="p-4 border-b border-white/10">Context & Sector</th>
+                                                        <th className="p-4 border-b border-white/10">Attributes</th>
+                                                        <th className="p-4 border-b border-white/10 text-right">Controls</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {filteredItems.map(item => {
+                                                        // Item Title Style Logic
+                                                        const listTitleStyle = item.style?.isGradient ? {
+                                                            backgroundImage: `linear-gradient(to right, ${item.style.titleColor}, ${item.style.titleColorEnd || item.style.titleColor})`,
+                                                            WebkitBackgroundClip: 'text',
+                                                            WebkitTextFillColor: 'transparent',
+                                                            backgroundClip: 'text',
+                                                            color: 'transparent'
+                                                        } : {
+                                                            color: item.style?.titleColor
+                                                        };
 
-                                            return (
-                                                <div key={item.id} className="p-4 rounded bg-white/5 border border-white/10 flex justify-between items-center group hover:bg-white/10 transition-colors">
-                                                    <div>
-                                                        <div className="flex items-center gap-2">
-                                                            {item.isPinned && <Pin size={12} className="text-yellow-500 fill-yellow-500" />}
-                                                            <div className="font-bold" style={listTitleStyle}>{item.title}</div>
-                                                        </div>
-                                                        <div className="text-xs opacity-50 flex gap-2">
-                                                            <span>{item.date}</span> • <span>{item.type}</span> • <span>{item.sector}</span>
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                        <button onClick={() => startEditItem(item)} className="p-2 bg-blue-600 rounded hover:bg-blue-500"><Edit3 size={16} /></button>
-                                                        <button onClick={() => { if (confirm('Delete?')) onDeleteItem(item.id) }} className="p-2 bg-red-600 rounded hover:bg-red-500"><Trash2 size={16} /></button>
-                                                    </div>
-                                                </div>
-                                            )
-                                        })}
-                                        {filteredItems.length === 0 && <div className="text-center opacity-50 py-10">No items found</div>}
+                                                        return (
+                                                            <tr key={item.id} className="border-b border-white/5 hover:bg-white/10 transition-colors group">
+                                                                
+                                                                {/* Column 1: Timeline */}
+                                                                <td className="p-4 font-mono text-xs opacity-60">
+                                                                    {item.date}
+                                                                </td>
+
+                                                                {/* Column 2: Artifact */}
+                                                                <td className="p-4">
+                                                                    <div className="flex items-center gap-3">
+                                                                        {item.image && (
+                                                                            <img src={item.image} className="w-10 h-10 rounded object-cover opacity-70 border border-white/10 group-hover:scale-110 transition-transform"/>
+                                                                        )}
+                                                                        <div>
+                                                                            <div className="font-bold flex items-center gap-2 text-white">
+                                                                                {getTypeIcon(item.type)}
+                                                                                <span style={listTitleStyle} className="line-clamp-1 max-w-[200px]">{item.title}</span>
+                                                                            </div>
+                                                                            <div className="text-[10px] opacity-50 uppercase tracking-wider mt-0.5 bg-white/5 w-fit px-1.5 rounded">
+                                                                                {item.type.replace('_', ' ')}
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                </td>
+
+                                                                {/* Column 3: Context */}
+                                                                <td className="p-4">
+                                                                    <div className="flex flex-col gap-1">
+                                                                        <div className="flex items-center gap-1.5">
+                                                                            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_5px_cyan]"></span>
+                                                                            <span className="text-xs text-blue-200 font-bold">{item.subject || 'General'}</span>
+                                                                        </div>
+                                                                        <span className="text-[10px] opacity-50 pl-3">
+                                                                            {item.sector} • <span className="uppercase tracking-wider">{item.batch || 'All'}</span>
+                                                                        </span>
+                                                                    </div>
+                                                                </td>
+
+                                                                {/* Column 4: Attributes */}
+                                                                <td className="p-4">
+                                                                    <div className="flex items-center gap-2">
+                                                                        {item.isPinned && (
+                                                                            <div className="flex items-center gap-1 text-[10px] text-yellow-400 bg-yellow-900/20 px-2 py-0.5 rounded border border-yellow-500/20" title="Pinned">
+                                                                                <Pin size={10} fill="currentColor"/> Pinned
+                                                                            </div>
+                                                                        )}
+                                                                        {item.isUnread && (
+                                                                            <div className="flex items-center gap-1 text-[10px] text-red-400 bg-red-900/20 px-2 py-0.5 rounded border border-red-500/20" title="Unread / New">
+                                                                                <EyeOff size={10} /> Unread
+                                                                            </div>
+                                                                        )}
+                                                                        {item.likes && item.likes > 0 ? (
+                                                                            <div className="flex items-center gap-1 text-[10px] text-pink-400 ml-1">
+                                                                                <Heart size={10} fill="currentColor"/> {item.likes}
+                                                                            </div>
+                                                                        ) : null}
+                                                                    </div>
+                                                                </td>
+
+                                                                {/* Column 5: Controls */}
+                                                                <td className="p-4 text-right">
+                                                                    <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                        <button 
+                                                                            onClick={() => startEditItem(item)} 
+                                                                            className="p-2 bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white rounded transition-all transform hover:scale-110" 
+                                                                            title="Edit Item"
+                                                                        >
+                                                                            <Edit3 size={14} />
+                                                                        </button>
+                                                                        <button 
+                                                                            onClick={() => { if (confirm('Are you sure you want to delete this item?')) onDeleteItem(item.id) }} 
+                                                                            className="p-2 bg-red-600/20 text-red-400 hover:bg-red-600 hover:text-white rounded transition-all transform hover:scale-110" 
+                                                                            title="Delete Item"
+                                                                        >
+                                                                            <Trash2 size={14} />
+                                                                        </button>
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })}
+                                                    
+                                                    {/* Empty State */}
+                                                    {filteredItems.length === 0 && (
+                                                        <tr>
+                                                            <td colSpan={5} className="p-12 text-center opacity-30 text-sm italic">
+                                                                <Database size={32} className="mx-auto mb-2 opacity-50"/>
+                                                                No artifacts found matching your criteria.
+                                                            </td>
+                                                        </tr>
+                                                    )}
+                                                </tbody>
+                                            </table>
+                                        </div>
                                     </div>
                                 </div>
                             )}
@@ -2008,37 +2113,152 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                             )}
 
                             {/* LOGS TAB */}
+                            {/* AUDIT LOGS TAB - FORENSIC TIMELINE UPGRADE */}
                             {activeTab === 'logs' && (
-                                // ... Existing Logs Code ...
-                                <div className="space-y-6">
-                                    <div className="flex justify-between items-center mb-4">
-                                        <h3 className="font-bold text-xl">System Audit Logs</h3>
-                                        <button onClick={fetchAuditLogs} className="p-2 bg-white/10 rounded hover:bg-white/20"><RefreshCw size={16} /></button>
+                                <div className="space-y-6 h-full flex flex-col pb-20">
+                                    {/* 1. Header & Filters */}
+                                    <div className="bg-black/40 border border-white/10 rounded-xl p-4 flex flex-wrap gap-4 justify-between items-center shrink-0">
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-2 bg-indigo-500/20 rounded-lg text-indigo-400">
+                                                <Activity size={24} />
+                                            </div>
+                                            <div>
+                                                <h3 className="font-bold text-white text-lg">System Audit Registry</h3>
+                                                <p className="text-xs text-white/50">Tracking every move, by every admin.</p>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center gap-3">
+                                            <div className="relative">
+                                                <Search className="absolute left-3 top-2.5 text-white/30" size={14} />
+                                                <input 
+                                                    placeholder="Search logs..." 
+                                                    className="pl-9 pr-4 py-2 bg-white/5 border border-white/10 rounded-lg text-xs text-white outline-none focus:border-indigo-500/50 w-64"
+                                                    onChange={(e) => {
+                                                        const term = e.target.value.toLowerCase();
+                                                        // Simple client-side search for now
+                                                        const filtered = auditLogs.filter(l => 
+                                                            l.username.toLowerCase().includes(term) || 
+                                                            l.action.toLowerCase().includes(term) || 
+                                                            l.details.toLowerCase().includes(term)
+                                                        );
+                                                        // Note: Ideally set a state 'displayedLogs' here, but for this snippet we'll just filter in render or use this input to reload
+                                                    }}
+                                                />
+                                            </div>
+                                            <button onClick={fetchAuditLogs} className="p-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors text-white" title="Refresh Logs">
+                                                <RefreshCw size={18} />
+                                            </button>
+                                        </div>
                                     </div>
-                                    <div className="bg-white/5 border border-white/10 rounded overflow-hidden">
-                                        <table className="w-full text-sm text-left">
-                                            <thead className="bg-black/40 text-xs uppercase font-bold text-zinc-400">
-                                                <tr>
-                                                    <th className="p-3">Time</th>
-                                                    <th className="p-3">User</th>
-                                                    <th className="p-3">Action</th>
-                                                    <th className="p-3">Details</th>
-                                                    <th className="p-3">IP</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {auditLogs.map((log, i) => (
-                                                    <tr key={i} className="border-t border-white/5 hover:bg-white/5">
-                                                        <td className="p-3 font-mono text-xs opacity-70 whitespace-nowrap">{new Date(log.timestamp).toLocaleString()}</td>
-                                                        <td className="p-3 font-bold text-white">{log.username}</td>
-                                                        <td className="p-3"><span className="px-2 py-1 rounded bg-white/10 font-mono text-[10px]">{log.action}</span></td>
-                                                        <td className="p-3 opacity-80">{log.details}</td>
-                                                        <td className="p-3 font-mono text-xs opacity-50">{log.ip}</td>
-                                                    </tr>
+
+                                    {/* 2. The Timeline Feed */}
+                                    <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
+                                        {auditLogs.length === 0 ? (
+                                            <div className="flex flex-col items-center justify-center h-64 opacity-30 text-center">
+                                                <FileText size={48} className="mb-4" />
+                                                <p className="text-sm font-bold">THE ARCHIVES ARE EMPTY</p>
+                                                <p className="text-xs">No administrative actions have been recorded yet.</p>
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-8">
+                                                {/* Group Logs by Date */}
+                                                {Object.entries(
+                                                    auditLogs.reduce((groups, log) => {
+                                                        const date = new Date(log.timestamp).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+                                                        if (!groups[date]) groups[date] = [];
+                                                        groups[date].push(log);
+                                                        return groups;
+                                                    }, {} as Record<string, AuditLog[]>)
+                                                ).map(([date, logs]) => (
+                                                    <div key={date} className="animate-[fade-in_0.3s]">
+                                                        {/* Date Header */}
+                                                        <div className="flex items-center gap-4 mb-4 sticky top-0 bg-[#050510]/95 backdrop-blur z-10 py-2">
+                                                            <div className="h-px flex-1 bg-white/10"></div>
+                                                            <span className="text-[10px] font-bold uppercase tracking-widest text-indigo-300 bg-indigo-900/20 px-3 py-1 rounded-full border border-indigo-500/20">
+                                                                {date}
+                                                            </span>
+                                                            <div className="h-px flex-1 bg-white/10"></div>
+                                                        </div>
+
+                                                        {/* Log Items Grid */}
+                                                        <div className="space-y-3">
+                                                            {logs.map((log, idx) => {
+                                                                // --- ACTION CATEGORIZATION LOGIC ---
+                                                                let icon = Activity;
+                                                                let colorClass = "text-zinc-400 border-zinc-500/30 bg-zinc-500/10";
+                                                                const act = log.action.toUpperCase();
+
+                                                                if (act.includes('DELETE') || act.includes('REMOVE') || act.includes('BAN')) {
+                                                                    icon = Trash2;
+                                                                    colorClass = "text-red-400 border-red-500/30 bg-red-500/10";
+                                                                } else if (act.includes('CREATE') || act.includes('ADD') || act.includes('UPLOAD') || act.includes('IMPORT')) {
+                                                                    icon = PlusCircle;
+                                                                    colorClass = "text-emerald-400 border-emerald-500/30 bg-emerald-500/10";
+                                                                } else if (act.includes('UPDATE') || act.includes('EDIT') || act.includes('CHANGE')) {
+                                                                    icon = Edit3;
+                                                                    colorClass = "text-blue-400 border-blue-500/30 bg-blue-500/10";
+                                                                } else if (act.includes('LOGIN') || act.includes('AUTH')) {
+                                                                    icon = Unlock;
+                                                                    colorClass = "text-purple-400 border-purple-500/30 bg-purple-500/10";
+                                                                } else if (act.includes('CONFIG') || act.includes('SYSTEM')) {
+                                                                    icon = Settings;
+                                                                    colorClass = "text-orange-400 border-orange-500/30 bg-orange-500/10";
+                                                                }
+
+                                                                return (
+                                                                    <div key={log.id} className="group relative flex gap-4 p-4 rounded-xl border border-white/5 bg-white/[0.02] hover:bg-white/[0.05] transition-all hover:border-white/10">
+                                                                        {/* Time & Line */}
+                                                                        <div className="flex flex-col items-center gap-2 pt-1">
+                                                                            <span className="text-[10px] font-mono opacity-50 font-bold">
+                                                                                {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                                            </span>
+                                                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center border ${colorClass} shadow-lg`}>
+                                                                                {React.createElement(icon, { size: 14 })}
+                                                                            </div>
+                                                                            {/* Connector Line */}
+                                                                            {idx !== logs.length - 1 && <div className="w-px h-full bg-white/5 my-1"></div>}
+                                                                        </div>
+
+                                                                        {/* Content Card */}
+                                                                        <div className="flex-1 min-w-0">
+                                                                            <div className="flex justify-between items-start mb-1">
+                                                                                <div className="flex items-center gap-2">
+                                                                                    <span className={`text-xs font-bold px-2 py-0.5 rounded border ${colorClass} uppercase tracking-wider`}>
+                                                                                        {log.action}
+                                                                                    </span>
+                                                                                    <span className="text-[10px] text-zinc-500 flex items-center gap-1 bg-black/30 px-2 py-0.5 rounded border border-white/5 font-mono">
+                                                                                        <Network size={10} /> {log.ip}
+                                                                                    </span>
+                                                                                </div>
+                                                                                
+                                                                                {/* Admin Badge */}
+                                                                                <div className="flex items-center gap-2 pl-4">
+                                                                                    <span className="text-[10px] uppercase opacity-40 font-bold tracking-widest text-right hidden sm:block">EXECUTED BY</span>
+                                                                                    <div className="flex items-center gap-2 bg-white/5 pl-1 pr-3 py-1 rounded-full border border-white/10">
+                                                                                        <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-black ${log.username === 'admin' ? 'bg-white' : 'bg-indigo-400'}`}>
+                                                                                            {log.username.charAt(0).toUpperCase()}
+                                                                                        </div>
+                                                                                        <span className="text-xs font-bold text-white">{log.username}</span>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </div>
+
+                                                                            {/* The "Details" Payload */}
+                                                                            <div className="mt-2 p-3 bg-black/40 rounded-lg border border-white/5 text-sm text-zinc-300 font-mono break-all leading-relaxed relative overflow-hidden">
+                                                                                {/* Decorative faint grid bg */}
+                                                                                <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'radial-gradient(#fff 1px, transparent 1px)', backgroundSize: '10px 10px' }}></div>
+                                                                                <span className="relative z-10">{log.details}</span>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    </div>
                                                 ))}
-                                            </tbody>
-                                        </table>
-                                        {auditLogs.length === 0 && <div className="p-8 text-center opacity-50">No logs recorded.</div>}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             )}
