@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Lineage, type UserProfile, GlobalConfig } from '../types';
-import { ShieldCheck, RotateCw, BatteryMedium, BatteryFull, BatteryLow, Terminal, Sparkles, WifiOff, Zap, User, Accessibility, Send, Edit2, HelpCircle } from 'lucide-react';
+import { ShieldCheck, RotateCw, BatteryMedium, BatteryFull, BatteryLow, Terminal, Sparkles, WifiOff, Zap, User, Accessibility, Send, Edit2, HelpCircle, Bookmark, Download } from 'lucide-react';
 
 interface HUDProps {
   lineage: Lineage;
@@ -86,6 +86,18 @@ const HUD: React.FC<HUDProps> = ({ lineage, onToggleLineage, profile, onOpenOrac
     if (battery.level < 0.2) return <BatteryLow size={18} className="text-red-500 animate-pulse" />;
     return <BatteryMedium size={18} />;
   };
+  // Add this inside the HUD function:
+  const [isActionDone, setIsActionDone] = useState(false);
+
+  useEffect(() => {
+    // Check initial state
+    setIsActionDone(!!localStorage.getItem('cc_action_done'));
+
+    // Listen for updates from the popup
+    const handleStorage = () => setIsActionDone(!!localStorage.getItem('cc_action_done'));
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, []);
 
   return (
     <div className={`
@@ -164,6 +176,54 @@ const HUD: React.FC<HUDProps> = ({ lineage, onToggleLineage, profile, onOpenOrac
 
       {/* Right: User Actions & Info */}
       <div className="flex items-center gap-3 sm:gap-4">
+
+        {/* NEW: BOOKMARK / INSTALL PROMOTION BUTTON */}
+        {/* 🔖 LIVE BOOKMARK / INSTALL BUTTON */}
+        {/* 🟢 UPDATED: PROMOTION BUTTON (Live Icons) */}
+        <button 
+            onClick={() => {
+                const mobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+                if (mobile) {
+                    alert("📲 Open Menu > 'Add to Home Screen' to install!");
+                } else {
+                    const isMac = /Mac/.test(navigator.platform);
+                    alert(`🔖 Press ${isMac ? 'Command + D' : 'Ctrl + D'} to bookmark!`);
+                }
+                localStorage.setItem('cc_action_done', 'true');
+                setIsActionDone(true); // Stop blinking immediately
+            }}
+            className={`p-2 rounded-full border transition-all hover:scale-110 active:scale-95 flex items-center justify-center relative group
+                ${isWizard ? 'bg-emerald-900/50 border-emerald-500/30' : 'bg-fuchsia-900/50 border-fuchsia-500/30'}
+            `}
+            title={/iPhone|Android/i.test(navigator.userAgent) ? "Install App" : "Bookmark"}
+        >
+            {isActionDone ? (
+                <Sparkles size={16} className="text-yellow-400 animate-pulse" />
+            ) : (
+                <>
+                    {/* ICON LOGIC: Mobile gets Static Install, Desktop gets Animated Bookmark */}
+                    {/iPhone|Android/i.test(navigator.userAgent) ? (
+                        <img 
+                            src="https://img.icons8.com/?size=100&id=101121&format=png&color=000000" 
+                            className="w-5 h-5 object-contain invert opacity-90" 
+                            alt="Install App"
+                        />
+                    ) : (
+                        <img 
+                            src="https://img.icons8.com/?size=100&id=B7hNQrX3PbdD&format=png&color=000000" 
+                            className="w-6 h-6 object-contain invert opacity-90" 
+                            alt="Bookmark Animated"
+                        />
+                    )}
+
+                    {/* 🔴 ALWAYS BLINKING DOT (Until Action Taken) */}
+                    <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                        <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isWizard ? 'bg-emerald-400' : 'bg-fuchsia-400'}`}></span>
+                        <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${isWizard ? 'bg-emerald-500' : 'bg-fuchsia-500'}`}></span>
+                    </span>
+                </>
+            )}
+        </button>
         
         {/* Telegram - Always visible if link exists OR if we want to edit it */}
         <button 

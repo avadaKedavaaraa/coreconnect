@@ -40,19 +40,31 @@ app.use(helmet({
 
 app.use(hpp());
 
+// --- DYNAMIC CORS CONFIGURATION ---
+const extraDomains = process.env.ALLOWED_DOMAINS 
+    ? process.env.ALLOWED_DOMAINS.split(',').map(d => d.trim()) 
+    : [];
+
 const allowedOrigins = [
     'http://localhost:5173',
     'http://localhost:3000',
+    'http://localhost:8888',
     process.env.FRONTEND_URL,
-    process.env.URL, // Netlify default URL
-    process.env.DEPLOY_URL // Netlify deploy URL
+    ...extraDomains // 🟢 Spread the domains from your ENV variable
 ].filter(Boolean);
 
 app.use(cors({
   origin: function (origin, callback) {
     if (!origin) return callback(null, true);
-    // Allow Netlify previews and explicit domains
-    if (allowedOrigins.indexOf(origin) !== -1 || allowedOrigins.some(o => origin.endsWith(o.replace('https://', '')))) {
+    
+    // Check if the origin is in our list OR is a Netlify preview/subdomain
+    const isAllowed = allowedOrigins.some(o => {
+        const cleanOrigin = origin.replace(/^https?:\/\//, '');
+        const cleanAllowed = o.replace(/^https?:\/\//, '');
+        return cleanOrigin === cleanAllowed || cleanOrigin.endsWith('.' + cleanAllowed);
+    });
+    
+    if (isAllowed) {
       callback(null, true);
     } else {
       console.warn(`Blocked CORS for origin: ${origin}`);
@@ -65,14 +77,18 @@ app.use(cors({
 }));
 
 // Rate Limits
+// Replace your old limiter configuration with this:
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, 
   max: 3000, 
   standardHeaders: true,
   legacyHeaders: false,
-  // This prevents blocking the whole college WiFi:
+  // 🟢 ADD THIS: Explicitly find the IP from Netlify's headers
   keyGenerator: (req) => {
-    return req.cookies?.session_id || req.headers['x-forwarded-for'] || req.ip;
+    return req.headers['x-nf-client-connection-ip'] || // Netlify specific header
+           req.headers['x-forwarded-for']?.split(',')[0] || 
+           req.ip || 
+           req.socket.remoteAddress;
   }
 });
 

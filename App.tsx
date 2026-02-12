@@ -22,6 +22,7 @@ import { MY_FILES } from './telegramData';
 import { API_URL } from './lib/config';
 import { trackActivity } from './services/tracking';
 import DOMPurify from 'dompurify';
+import PromotionManager from './components/PromotionManager';
 
 const safeFetch = async (url: string, options: RequestInit = {}) => {
     try {
@@ -854,6 +855,13 @@ function App() {
                 '--theme-secondary': currentSecondary
             }}
         >
+            {/* 🟢 PASTE THIS LINE HERE */}
+            <PromotionManager isWizard={isWizard} />
+
+            {isWizard && (
+                <div className="absolute inset-0 z-50 pointer-events-none parchment-grain"></div>
+            )}
+            
             {/* FIXED: Only show texture if Wizard, otherwise show nothing (No Scanlines) */}
             {isWizard && (
                 <div className="absolute inset-0 z-50 pointer-events-none parchment-grain"></div>
