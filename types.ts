@@ -1,5 +1,5 @@
 import { LucideIcon } from 'lucide-react';
-
+export type SortOrder = 'date_desc' | 'date_asc' | 'name_asc' | 'name_desc' | 'likes_desc' | '';
 export enum Lineage {
   WIZARD = 'WIZARD',
   MUGGLE = 'MUGGLE'
@@ -13,7 +13,7 @@ export interface Sector {
   muggleIcon: string;
   description: string;
   uiTemplate?: string;
-  sortOrder?: 'newest' | 'oldest' | 'alphabetical' | 'manual';
+  sortOrder?: 'newest' | 'oldest' | 'alphabetical' | 'manual' | 'date_desc' | 'date_asc' | 'name_asc' | 'name_desc' | 'likes_desc';
 }
 
 export interface ItemStyle {
@@ -160,7 +160,7 @@ export interface GlobalConfig {
 
   cursorStyle?: 'classic' | 'minimal' | 'blade' | 'enchanted';
   defaultFont?: string;
-  sortOrder?: 'newest' | 'oldest' | 'alphabetical' | 'manual'; // Fallback global sort
+  sortOrder?: 'newest' | 'oldest' | 'alphabetical' | 'manual' | 'date_desc' | 'date_asc' | 'name_asc' | 'name_desc' | 'likes_desc';
 
   // --- NEW THEME SETTINGS ---
   themeSettings?: {

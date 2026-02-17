@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom'; // ✨ NEW: The Teleportation Spell! ✨
 import { Lineage, type CarouselItem } from '../types';
 import {
     X, FileText, ExternalLink, Maximize2, Minimize2, ZoomIn, ZoomOut,
@@ -9,7 +10,7 @@ import {
     Settings, Type, Camera
 } from 'lucide-react';
 import DOMPurify from 'dompurify';
-import OfficeViewer from './OfficeViewer'; // NEW: Import OfficeViewer component
+import OfficeViewer from './OfficeViewer'; 
 import { trackActivity } from '../services/tracking';
 
 interface ItemViewerProps {
@@ -19,16 +20,21 @@ interface ItemViewerProps {
 }
 
 type RenderEngine = 'native' | 'google';
-type VisualFilter = 'none' | 'invert' | 'sepia' | 'grayscale' | 'contrast';
 type VideoPlayerMode = 'smart' | 'native';
 
 const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
     const isWizard = lineage === Lineage.WIZARD;
 
-    // --- SECTOR CHECK ---
-    // STRICTLY Scope "Normal Player" changes to 'resources' sector
+    // 🧹 HELPER: Strips away messy divs and keeps ONLY the iframe video!
+    const extractCleanIframe = (html: string) => {
+        if (!html) return "";
+        const match = html.match(/<iframe.*?<\/iframe>/i);
+        return match ? match[0] : html;
+    };
+
+    const enableSmartTools = true; 
+    
     const isResourcesSector = item.sector === 'resources';
-    const enableSmartTools = isResourcesSector || item.sector === 'lectures' || item.type === 'link_tree';
     const isLinkTree = item.type === 'link_tree';
 
     // --- STATE ---
@@ -38,60 +44,52 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
         return 'google';
     });
 
-    // --- PREFERENCES: VIDEO PLAYER MODE ---
     const [videoPlayerMode, setVideoPlayerMode] = useState<VideoPlayerMode>(() => {
-        // 1. Check Mobile
         const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
-
-        // 2. If Resource + Mobile -> Force Native (Normal) Default
         if (isResourcesSector && isMobile) return 'native';
-
-        // 3. Otherwise load user preference
         const saved = localStorage.getItem('core_video_mode') as VideoPlayerMode;
         return saved || 'smart';
     });
 
-    // Save Preference locally when changed in viewer
     useEffect(() => {
         localStorage.setItem('core_video_mode', videoPlayerMode);
     }, [videoPlayerMode]);
 
-    // View States
+    // ✨ NEW: Multi-Filter State Engine! (Mix and match!) 🧪
+    const [filters, setFilters] = useState({
+        dark: false,
+        sepia: false,
+        grayscale: false,
+    });
+
+    const toggleFilter = (key: keyof typeof filters) => {
+        setFilters(prev => ({ ...prev, [key]: !prev[key] }));
+    };
+
     const [isFullScreen, setIsFullScreen] = useState(false);
     const [zoomLevel, setZoomLevel] = useState(100);
     const [rotation, setRotation] = useState(0);
-    const [filter, setFilter] = useState<VisualFilter>('none');
     const [showRuler, setShowRuler] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [loadError, setLoadError] = useState(false);
-
-    // Video Specific States
     const [isPlaying, setIsPlaying] = useState(false);
     const [videoBrightness, setVideoBrightness] = useState(100);
-
-    // Smart Interaction States
     const [isSmartLayerActive, setIsSmartLayerActive] = useState(false);
     const [isSelectionMode, setIsSelectionMode] = useState(false);
     const [dragStart, setDragStart] = useState<{ x: number, y: number } | null>(null);
     const [selectionRect, setSelectionRect] = useState<{ x: number, y: number, w: number, h: number } | null>(null);
     const [regionBrightness, setRegionBrightness] = useState(100);
-
-    // Control Dock State
     const [showControls, setShowControls] = useState(false);
     const [menuPos, setMenuPos] = useState({ x: window.innerWidth / 2 - 150, y: window.innerHeight / 2 - 200 });
-
-    // Notebook State
     const [showNotes, setShowNotes] = useState(false);
     const [notes, setNotes] = useState('');
     const [savedStatus, setSavedStatus] = useState('');
 
-    // Refs
     const rulerRef = useRef<HTMLDivElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const controlsRef = useRef<HTMLDivElement>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
 
-    // --- INIT & TRACKING ---
     useEffect(() => {
         setIsLoading(true);
         setLoadError(false);
@@ -114,12 +112,10 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
         const saved = localStorage.getItem(`core_notes_${item.id}`);
         if (saved) setNotes(saved);
 
-        // --- 🟢 NEW JASOOSI LOGIC START ---
         try {
             const profile = JSON.parse(localStorage.getItem('core_connect_profile') || '{}');
             if (profile.id) {
-                // 1. Pata lagao ye kya cheez hai?
-                let actionType = 'VIEW_ITEM'; // Default
+                let actionType = 'VIEW_ITEM'; 
                 const url = item.fileUrl?.toLowerCase() || '';
                 
                 if (url.endsWith('.pdf')) actionType = 'OPEN_PDF';
@@ -127,15 +123,11 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                 else if (item.type === 'link') actionType = 'CLICK_LINK';
                 else if (url.includes('drive.google.com')) actionType = 'OPEN_DRIVE_FILE';
 
-                // 2. Server ko batao (Sirf ek baar)
                 trackActivity(profile.id, actionType, item.id, item.title, 0);
             }
         } catch (e) { console.error("Tracking failed", e); }
-        // --- 🔴 END ---
-
     }, [item.id]);
 
-    // Click Outside to Close Menu
     useEffect(() => {
         const handleClickOutside = (e: MouseEvent) => {
             if (showControls && controlsRef.current && !controlsRef.current.contains(e.target as Node)) {
@@ -157,13 +149,16 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
         } catch (e) { return false; }
     };
 
-    const safePdfUrl = isValidUrl(item.fileUrl) ? item.fileUrl! : "";
+    // ✨ THE GOOGLE DRIVE AUTO-FORMATTER ✨
+    let safePdfUrl = isValidUrl(item.fileUrl) ? item.fileUrl! : "";
+    
+    // If you pasted a raw Google Drive link, this instantly cleans it into a pure preview! 🧼
+    if (safePdfUrl.includes('drive.google.com') && safePdfUrl.includes('/view')) {
+        safePdfUrl = safePdfUrl.replace(/\/view.*$/, '/preview');
+    }
     const isVideoFile = item.type === 'video' || (safePdfUrl && safePdfUrl.match(/\.(mp4|webm|ogg|mov)$/i));
-    // 1. Detect PDF (Keep using existing logic)
     const isPdf = safePdfUrl.toLowerCase().endsWith('.pdf');
 
-    // --- NEW: DETECT OFFICE FILES ---
-    // Checks for PPT, DOC, XLS extensions OR if it's a file type that isn't PDF/Video/Image
     const isOfficeFile = /\.(ppt|pptx|doc|docx|xls|xlsx|csv)$/i.test(safePdfUrl) ||
         (item.type === 'file' && !isPdf && !isVideoFile && !item.type.includes('image'));
 
@@ -171,21 +166,14 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
         return <OfficeViewer item={item} lineage={lineage} onClose={onClose} />;
     }
 
-    if (isOfficeFile) {
-        // Dynamically load the OfficeViewer
-        // Note: Ensure you have imported it at the top: import OfficeViewer from './OfficeViewer';
-        return <OfficeViewer item={item} lineage={lineage} onClose={onClose} />;
-    }
     const isGoogleDrive = safePdfUrl.includes('drive.google.com');
     const isMediaView = (item.type === 'file' || item.type === 'video' || item.type === 'link' || item.isLecture) && !!safePdfUrl;
+    const isCloudViewer = isGoogleDrive || isPdf; 
 
-    // --- MODE LOGIC ---
-    // Only apply Native Mode changes if it's a Resource AND user selected Native Mode
     const isNativeMode = isVideoFile && isResourcesSector && videoPlayerMode === 'native';
 
-    // --- VIDEO CONTROLS ---
     const togglePlay = () => {
-        if (isNativeMode) return; // Native controls handle this
+        if (isNativeMode) return; 
         if (videoRef.current) {
             if (videoRef.current.paused) {
                 videoRef.current.play();
@@ -227,9 +215,7 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
     };
 
     const handleMouseDown = (e: React.MouseEvent) => {
-        // In Native Mode, only intercept if Smart Layer is explicitly ACTIVE
         if (isNativeMode && !isSmartLayerActive && !isSelectionMode) return;
-
         if ((!isSmartLayerActive && !isSelectionMode) || !containerRef.current) return;
         if ((e.target as HTMLElement).closest('button')) return;
         if ((e.target as HTMLElement).closest('input')) return;
@@ -243,19 +229,15 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
         setSelectionRect({ x, y, w: 0, h: 0 });
     };
 
-    // --- FIX: GLOBAL DRAG HANDLER (Solves Lag & Outside Click) ---
     useEffect(() => {
-        if (!dragStart) return; // Only run when dragging starts
+        if (!dragStart) return; 
 
         const handleWindowMove = (e: MouseEvent) => {
             if (!containerRef.current) return;
-
-            // Calculate relative coordinates
             const rect = containerRef.current.getBoundingClientRect();
             const currentX = e.clientX - rect.left;
             const currentY = e.clientY - rect.top;
 
-            // Update Selection Box
             setSelectionRect({
                 x: Math.min(dragStart.x, currentX),
                 y: Math.min(dragStart.y, currentY),
@@ -270,38 +252,31 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                 return;
             }
 
-            // Calculate final dimensions one last time to decide if we keep it
             const rect = containerRef.current.getBoundingClientRect();
             const currentX = e.clientX - rect.left;
             const currentY = e.clientY - rect.top;
             const w = Math.abs(currentX - dragStart.x);
             const h = Math.abs(currentY - dragStart.y);
 
-            // Logic: If box is too small (<10px), discard it. Otherwise, keep it.
             if (w < 10 || h < 10) {
                 setSelectionRect(null);
             } else {
-                // Valid selection made
                 setTimeout(() => setShowControls(true), 100);
                 setIsSelectionMode(false);
             }
 
-            // Stop dragging
             setDragStart(null);
         };
 
-        // Attach listeners to WINDOW (handles outside clicks)
         window.addEventListener('mousemove', handleWindowMove);
         window.addEventListener('mouseup', handleWindowUp);
 
-        // Cleanup listeners when drag ends
         return () => {
             window.removeEventListener('mousemove', handleWindowMove);
             window.removeEventListener('mouseup', handleWindowUp);
         };
     }, [dragStart]);
 
-    // --- RULER HANDLER (Separate to keep ruler smooth without dragging) ---
     const handleRulerMove = (e: React.MouseEvent) => {
         if (showRuler && rulerRef.current && containerRef.current) {
             const rect = containerRef.current.getBoundingClientRect();
@@ -309,25 +284,23 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
         }
     };
 
+    // ✨ NEW: Multi-Filter Combiner
+    const getFilterStyle = () => {
+        let f = '';
+        if (filters.dark) f += 'invert(1) hue-rotate(180deg) ';
+        if (filters.sepia) f += 'sepia(0.8) contrast(1.2) ';
+        if (filters.grayscale) f += 'grayscale(1) ';
+        if (videoBrightness !== 100) f += `brightness(${videoBrightness}%) `;
+        return f;
+    };
+
     const handleResetFilters = (e: React.MouseEvent) => {
         e.stopPropagation();
         setVideoBrightness(100);
-        setFilter('none');
+        setFilters({ dark: false, sepia: false, grayscale: false });
         setZoomLevel(100);
         setSelectionRect(null);
         setRotation(0);
-    };
-
-    const getFilterStyle = () => {
-        let f = '';
-        switch (filter) {
-            case 'invert': f += 'invert(1) hue-rotate(180deg) '; break;
-            case 'sepia': f += 'sepia(0.8) contrast(1.2) '; break;
-            case 'grayscale': f += 'grayscale(1) '; break;
-            case 'contrast': f += 'contrast(1.5) saturate(1.5) '; break;
-        }
-        if (videoBrightness !== 100) f += `brightness(${videoBrightness}%) `;
-        return f;
     };
 
     const customStyle = item.style || {};
@@ -347,15 +320,17 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
         fontFamily: titleFont
     };
 
-    const cleanContent = DOMPurify.sanitize(item.content || '', {
-        // FIX: Added 'center' and ensured 'video/source' are present
+    const rawContent = item.content || '';
+    const contentToRender = isLinkTree ? extractCleanIframe(rawContent) : rawContent;
+
+    const cleanContent = DOMPurify.sanitize(contentToRender, {
         ADD_TAGS: ['style', 'iframe', 'img', 'b', 'i', 'em', 'strong', 'a', 'p', 'br', 'ul', 'li', 'ol', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'code', 'pre', 'div', 'span', 'table', 'thead', 'tbody', 'tr', 'td', 'th', 'hr', 'button', 'input', 'label', 'form', 'audio', 'video', 'source', 'track', 'center'],
-        // FIX: Added 'name', 'referrerpolicy', 'loading' for SharePoint compatibility
         ADD_ATTR: ['target', 'href', 'src', 'frameborder', 'allow', 'allowfullscreen', 'style', 'class', 'id', 'width', 'height', 'align', 'controls', 'autoplay', 'loop', 'muted', 'poster', 'type', 'name', 'referrerpolicy', 'loading']
     });
 
-    return (
-        // Z-INDEX MAX to cover everything in Native Mode
+    // ✨✨✨ THE TELEPORTATION MAGIC ✨✨✨
+    // createPortal forces this code to render OUTSIDE of all other elements, directly on the body!
+    const viewerContent = (
         <div className={`fixed top-0 left-0 right-0 bottom-0 z-[2147483647] flex items-center justify-center p-0 sm:p-4 animate-[fade-in_0.2s_ease-out]
         ${isFullScreen || isNativeMode ? 'bg-black' : 'bg-black/90 backdrop-blur-xl'}
     `}>
@@ -367,8 +342,6 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                         : 'w-full max-w-7xl h-[100dvh] sm:h-[90vh] rounded-xl border shadow-2xl overflow-hidden'}
         `}
             >
-
-                {/* --- TOOLBAR (Hidden in Native Mode) --- */}
                 {!isNativeMode && (
                     <div className={`p-2 border-b flex flex-wrap items-center justify-between gap-2 shrink-0 z-30 relative backdrop-blur-md
                 ${isWizard ? 'border-emerald-900/30 bg-emerald-950/40' : 'border-fuchsia-900/30 bg-fuchsia-950/40'}
@@ -381,8 +354,6 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                                 <h3 className={`font-bold text-xs sm:text-sm truncate ${isWizard ? 'text-emerald-100' : 'text-fuchsia-100'}`}>
                                     {item.title}
                                 </h3>
-
-                                {/* Engine Switcher (Media only) */}
                                 {isMediaView && (
                                     <div className="flex gap-2 text-[10px] mt-0.5">
                                         {!isGoogleDrive && (
@@ -400,8 +371,6 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                         </div>
 
                         <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto no-scrollbar">
-
-                            {/* --- NEW: PLAYER MODE TOGGLE IN TOP NAVBAR (Only for Resources) --- */}
                             {isVideoFile && isResourcesSector && (
                                 <div className="flex items-center bg-black/20 rounded p-1 mr-2 border border-white/5">
                                     <button
@@ -420,7 +389,6 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                                     </button>
                                 </div>
                             )}
-                            {/* ✨ NEW: OPEN LINK BUTTON (Only if link exists) ✨ */}
                             {item.fileUrl && (
                                 <button
                                     onClick={() => window.open(item.fileUrl, '_blank')}
@@ -431,9 +399,8 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                                     <span className="text-xs font-bold hidden md:block">Open</span>
                                 </button>
                             )}
-
                             <div className="w-px h-6 bg-white/10 mx-1 hidden sm:block"></div>
-
+                            
                             {enableSmartTools && (
                                 <button
                                     onClick={() => setShowControls(!showControls)}
@@ -448,32 +415,25 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                                     <span className="text-xs font-bold hidden md:block whitespace-nowrap">Controls</span>
                                 </button>
                             )}
-
+                            
                             <div className="w-px h-6 bg-white/10 mx-1 hidden sm:block"></div>
-
                             <div className="flex items-center bg-black/20 rounded p-1">
                                 <button onClick={() => setZoomLevel(z => Math.max(50, z - 10))} className="p-1.5 hover:bg-white/10 rounded text-white/70" title="Zoom Out"><ZoomOut size={16} /></button>
                                 <span className="text-[10px] font-mono w-8 text-center hidden sm:block">{zoomLevel}%</span>
                                 <button onClick={() => setZoomLevel(z => Math.min(200, z + 10))} className="p-1.5 hover:bg-white/10 rounded text-white/70" title="Zoom In"><ZoomIn size={16} /></button>
                             </div>
-
                             <button onClick={() => setShowRuler(!showRuler)} className={`p-2 hover:bg-white/10 rounded transition-colors ${showRuler ? (isWizard ? 'text-emerald-400 bg-emerald-900/30' : 'text-fuchsia-400 bg-fuchsia-900/30') : 'text-white/70'}`} title="Reading Ruler">
                                 <AlignJustify size={18} />
                             </button>
-
                             <div className="w-px h-6 bg-white/10 mx-1 hidden sm:block"></div>
-
                             <button onClick={() => setShowNotes(!showNotes)} className={`p-2 rounded transition-colors flex items-center gap-2 ${showNotes ? (isWizard ? 'bg-emerald-600 text-black' : 'bg-fuchsia-600 text-black') : 'hover:bg-white/10 text-white/70'}`}>
                                 <StickyNote size={18} />
                                 <span className="text-xs font-bold hidden md:block">Notes</span>
                             </button>
-
                             <div className="w-px h-6 bg-white/10 mx-1 hidden sm:block"></div>
-
                             <button onClick={() => setIsFullScreen(!isFullScreen)} className="p-2 hover:bg-white/10 rounded text-white/70 hidden sm:block" title="App Fullscreen">
                                 {isFullScreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
                             </button>
-
                             <button onClick={onClose} className="p-2 hover:bg-red-500/20 rounded text-white/70 hover:text-red-400 transition-colors">
                                 <X size={20} />
                             </button>
@@ -481,10 +441,8 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                     </div>
                 )}
 
-                {/* --- NATIVE MODE FLOATING TRIGGERS (Since Navbar is gone) --- */}
                 {isNativeMode && (
                     <div className="absolute top-0 left-0 right-0 z-50 p-4 flex justify-between pointer-events-none">
-                        {/* Close Button */}
                         <button
                             onClick={onClose}
                             className="pointer-events-auto p-2 bg-black/50 hover:bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-md"
@@ -492,8 +450,6 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                         >
                             <X size={20} />
                         </button>
-
-                        {/* Controls Button */}
                         <button
                             onClick={() => setShowControls(true)}
                             className="control-trigger pointer-events-auto p-2 bg-black/50 hover:bg-white/20 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-md"
@@ -504,19 +460,14 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                     </div>
                 )}
 
-                {/* --- CONTENT + SIDEBAR WRAPPER --- */}
                 <div className="flex flex-1 overflow-hidden relative">
-
-                    {/* GLOBAL CONTENT CONTAINER */}
                     <div
                         ref={containerRef}
                         className="flex-1 bg-zinc-900 relative w-full h-full overflow-hidden flex flex-col"
                         onContextMenu={handleContextMenu}
                         onMouseDown={handleMouseDown}
                         onMouseMove={handleRulerMove}
-                    // REMOVED onMouseUp (Handled globally by useEffect)
                     >
-                        {/* 1. MEDIA MODE (Video/PDF) */}
                         {isMediaView ? (
                             <>
                                 {isLoading && !loadError && (
@@ -527,7 +478,6 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                                         </div>
                                     </div>
                                 )}
-
                                 {loadError && (
                                     <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/90 p-6 text-center">
                                         <AlertTriangle size={48} className="text-yellow-500 mb-4" />
@@ -538,7 +488,6 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                                         </a>
                                     </div>
                                 )}
-
                                 {!loadError && (
                                     <div
                                         className="w-full h-full transition-all duration-300 origin-center relative z-10 flex-1 flex items-center justify-center"
@@ -548,8 +497,7 @@ const ItemViewer: React.FC<ItemViewerProps> = ({ item, lineage, onClose }) => {
                                             <video
                                                 ref={videoRef}
                                                 src={safePdfUrl}
-                                                // Isme humne 'w-full' (poori chaudai) aur 'h-full' (poori lambai) de di hai
-className="w-full h-full object-cover shadow-2xl"
+                                                className="w-full h-full object-cover shadow-2xl"
                                                 onLoadStart={() => setIsLoading(true)}
                                                 onLoadedData={() => setIsLoading(false)}
                                                 onError={() => setLoadError(true)}
@@ -557,47 +505,72 @@ className="w-full h-full object-cover shadow-2xl"
                                                 onPause={handleVideoStateChange}
                                                 style={{
                                                     filter: getFilterStyle(),
-                                                    // Cursor: Crosshair if locked/drawing, Default if Native, Pointer if Smart Player
                                                     cursor: isSmartLayerActive ? 'crosshair' : (isNativeMode ? 'default' : 'pointer')
                                                 }}
-                                                // NATIVE MODE CONTROLS TOGGLE
                                                 controls={isNativeMode}
                                             />
                                         ) : (
-                                            <div className="w-full h-full" style={{ filter: getFilterStyle(), cursor: isSmartLayerActive ? 'crosshair' : 'default' }}>
-                                                {engine === 'native' && !isGoogleDrive ? (
-                                                    isPdf ? (
-                                                        <object data={safePdfUrl} type="application/pdf" className="w-full h-full" onLoad={() => setIsLoading(false)}>
-                                                            <iframe src={safePdfUrl} className="w-full h-full border-0" title="Native Viewer" />
-                                                        </object>
-                                                    ) : (
-                                                        <iframe src={safePdfUrl} className="w-full h-full border-0" title="Native Viewer" onLoad={() => setIsLoading(false)} />
-                                                    )
-                                                ) : (
-                                                    <iframe src={safePdfUrl} className="w-full h-full border-0 bg-white" title="Cloud Viewer" allow="autoplay; fullscreen" onLoad={() => setIsLoading(false)} onError={() => setLoadError(true)} />
-                                                )}
+                                            /* ✨ THE ULTIMATE PRO VIEWER: Dimmer + Tinted Glass ✨ */
+                                            <div className="w-full h-full p-2 sm:p-6 flex items-center justify-center">
+                                                <div className="relative w-full h-full max-w-5xl rounded-2xl overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.8)] border border-white/10 bg-black">
+                                                    
+                                                    {/* 🎛️ LAYER 1: The Dimmer Switch */}
+                                                    {videoBrightness < 100 && (
+                                                        <div 
+                                                            className="absolute inset-0 pointer-events-none z-20 transition-opacity duration-200"
+                                                            style={{ backgroundColor: `rgba(0,0,0, ${1 - (videoBrightness / 100)})` }}
+                                                        />
+                                                    )}
+
+                                                    {/* 🌙 LAYER 2: The Custom Dark Mode Tint */}
+                                                    {filters.dark && isCloudViewer && (
+                                                        <div 
+                                                            className="absolute inset-0 pointer-events-none z-20 mix-blend-multiply transition-all duration-300"
+                                                            style={{ backgroundColor: isWizard ? 'rgba(6, 78, 59, 0.5)' : 'rgba(74, 4, 78, 0.5)' }} 
+                                                        />
+                                                    )}
+
+                                                    {/* 📄 LAYER 3: The PDF Itself! (It now actually applies the inverted CSS properly!) */}
+                                                    <div 
+                                                        className="w-full h-full" 
+                                                        style={{ 
+                                                            filter: getFilterStyle(),
+                                                            cursor: isSmartLayerActive ? 'crosshair' : 'default' 
+                                                        }}
+                                                    >
+                                                        {engine === 'native' && !isGoogleDrive ? (
+                                                            isPdf ? (
+                                                                <object data={safePdfUrl} type="application/pdf" className="w-full h-full" onLoad={() => setIsLoading(false)}>
+                                                                    <iframe src={safePdfUrl} className="w-full h-full border-0" title="Native Viewer" />
+                                                                </object>
+                                                            ) : (
+                                                                <iframe src={safePdfUrl} className="w-full h-full border-0" title="Native Viewer" onLoad={() => setIsLoading(false)} />
+                                                            )
+                                                        ) : (
+                                                            <iframe src={safePdfUrl} className="w-full h-full border-0 bg-white" title="Cloud Viewer" allow="autoplay; fullscreen" onLoad={() => setIsLoading(false)} onError={() => setLoadError(true)} />
+                                                        )}
+                                                    </div>
+
+                                                </div>
                                             </div>
                                         )}
                                     </div>
                                 )}
                             </>
                         ) : (
-                            // 2. TEXT/LINK TREE MODE
                             <div
                                 className={`flex-1 relative 
                             ${isLinkTree
-                                        ? 'p-0 overflow-hidden flex flex-col items-center justify-center' // 👈 Added centering here!
+                                        ? 'p-0 overflow-hidden flex flex-col items-center justify-center' 
                                         : `overflow-y-auto p-6 md:p-10 space-y-8 ${isWizard ? 'scrollbar-wizard' : 'scrollbar-muggle'}`
                                     }
                         `}
                                 style={{ filter: getFilterStyle() }}
                             >
-                                {/* (No changes to text logic) */}
                                 {!isLinkTree && (
                                     <h2 className="text-2xl md:text-3xl font-bold leading-tight break-words mb-6" style={titleStyle}>{item.title}</h2>
                                 )}
                                 <div
-                                    // ✨ FIX: Added [&_iframe] styles to force video to fill container
                                     className={isLinkTree ? "w-full h-full flex items-center justify-center [&_iframe]:w-full [&_iframe]:h-full [&_iframe]:border-none" : `prose prose-invert max-w-none safe-font text-lg leading-relaxed html-content ${isWizard ? 'prose-emerald' : 'prose-fuchsia'}`}
                                     style={{ color: customStyle.contentColor || '#e4e4e7' }}
                                 >
@@ -606,7 +579,6 @@ className="w-full h-full object-cover shadow-2xl"
                             </div>
                         )}
 
-                        {/* --- GLASS LAYER (FRAME INTERACTION LOCK) --- */}
                         {isSmartLayerActive && (
                             <div
                                 className="absolute inset-0 z-30 cursor-crosshair bg-transparent"
@@ -614,7 +586,6 @@ className="w-full h-full object-cover shadow-2xl"
                             ></div>
                         )}
 
-                        {/* --- UNIVERSAL OVERLAYS --- */}
                         {showRuler && (
                             <div ref={rulerRef} className={`absolute left-0 right-0 h-8 pointer-events-none z-30 mix-blend-difference opacity-50 ${isWizard ? 'bg-emerald-500/30 border-y border-emerald-400' : 'bg-fuchsia-500/30 border-y border-fuchsia-400'}`} style={{ top: '50%' }}></div>
                         )}
@@ -631,7 +602,6 @@ className="w-full h-full object-cover shadow-2xl"
                             </div>
                         )}
 
-                        {/* --- CONTROL DOCK --- */}
                         {showControls && (
                             <div
                                 ref={controlsRef}
@@ -640,7 +610,7 @@ className="w-full h-full object-cover shadow-2xl"
                         `}
                                 style={{ left: menuPos.x, top: menuPos.y, minWidth: '320px' }}
                                 onMouseDown={(e) => e.stopPropagation()}
-                                onMouseUp={(e) => e.stopPropagation()} // <--- FIX: Prevents "Close" button from re-triggering open
+                                onMouseUp={(e) => e.stopPropagation()} 
                             >
                                 <div className="flex items-center justify-between text-xs font-bold uppercase tracking-widest opacity-70 mb-1 border-b border-white/10 pb-2">
                                     <span className="flex items-center gap-2"><SlidersHorizontal size={14} /> Smart Controls</span>
@@ -650,7 +620,6 @@ className="w-full h-full object-cover shadow-2xl"
                                     </div>
                                 </div>
 
-                                {/* Smart Layer Switch */}
                                 <button onClick={() => setIsSmartLayerActive(!isSmartLayerActive)} className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-bold border transition-all ${isSmartLayerActive ? (isWizard ? 'bg-emerald-900/50 border-emerald-500 text-emerald-100' : 'bg-fuchsia-900/50 border-fuchsia-500 text-fuchsia-100') : 'bg-white/5 border-white/10 text-white/50 hover:bg-white/10'}`}>
                                     <span className="flex items-center gap-2">{isSmartLayerActive ? <Lock size={14} /> : <Unlock size={14} />} Iframe Interaction Lock</span>
                                     <span className={`text-[10px] px-1.5 py-0.5 rounded ${isSmartLayerActive ? 'bg-emerald-500 text-black' : 'bg-black/50 text-white'}`}>{isSmartLayerActive ? 'ON' : 'OFF'}</span>
@@ -658,7 +627,6 @@ className="w-full h-full object-cover shadow-2xl"
                                 <p className="text-[10px] opacity-40 -mt-2 px-1 text-zinc-400">Turn ON to right-click/draw. Turn OFF for native controls.</p>
                                 <div className="h-px bg-white/10 my-1"></div>
 
-                                {/* --- VIDEO PLAYER MODE (Resources Only) --- */}
                                 {isVideoFile && isResourcesSector && (
                                     <div className="bg-white/5 p-2 rounded-lg border border-white/10">
                                         <label className="text-[10px] font-bold uppercase opacity-70 mb-2 block flex items-center gap-2"><Video size={12} /> Video Player Mode</label>
@@ -670,15 +638,14 @@ className="w-full h-full object-cover shadow-2xl"
                                 )}
                                 <div className="h-px bg-white/10 my-1"></div>
 
-                                {/* Feature Toggles */}
+                                {/* ✨ NEW: Multi-select Buttons! ✨ */}
                                 <div className="grid grid-cols-4 gap-2">
-                                    <button onClick={() => setFilter(f => f === 'invert' ? 'none' : 'invert')} className={`p-2 rounded flex flex-col items-center gap-1 text-[10px] ${filter === 'invert' ? 'bg-white text-black' : 'bg-white/5 hover:bg-white/10'}`}><Moon size={16} /> Dark</button>
-                                    <button onClick={() => setFilter(f => f === 'sepia' ? 'none' : 'sepia')} className={`p-2 rounded flex flex-col items-center gap-1 text-[10px] ${filter === 'sepia' ? 'bg-amber-700 text-amber-100' : 'bg-white/5 hover:bg-white/10'}`}><Sun size={16} /> Sepia</button>
-                                    <button onClick={() => setFilter(f => f === 'grayscale' ? 'none' : 'grayscale')} className={`p-2 rounded flex flex-col items-center gap-1 text-[10px] ${filter === 'grayscale' ? 'bg-zinc-500 text-white' : 'bg-white/5 hover:bg-white/10'}`}><Droplet size={16} /> B&W</button>
+                                    <button onClick={() => toggleFilter('dark')} className={`p-2 rounded flex flex-col items-center gap-1 text-[10px] ${filters.dark ? 'bg-white text-black' : 'bg-white/5 hover:bg-white/10'}`}><Moon size={16} /> Dark</button>
+                                    <button onClick={() => toggleFilter('sepia')} className={`p-2 rounded flex flex-col items-center gap-1 text-[10px] ${filters.sepia ? 'bg-amber-700 text-amber-100' : 'bg-white/5 hover:bg-white/10'}`}><Sun size={16} /> Sepia</button>
+                                    <button onClick={() => toggleFilter('grayscale')} className={`p-2 rounded flex flex-col items-center gap-1 text-[10px] ${filters.grayscale ? 'bg-zinc-500 text-white' : 'bg-white/5 hover:bg-white/10'}`}><Droplet size={16} /> B&W</button>
                                     <button onClick={() => { setIsSelectionMode(true); setShowControls(false); }} className={`p-2 rounded flex flex-col items-center gap-1 text-[10px] bg-white/5 hover:bg-white/10 text-emerald-400`}><Scan size={16} /> Scan</button>
                                 </div>
 
-                                {/* Sliders */}
                                 <div className="space-y-3 pt-2">
                                     <div><div className="flex justify-between text-[10px] mb-1 font-mono text-zinc-300"><span>Brightness</span><span>{videoBrightness}%</span></div><input type="range" min="30" max="200" value={videoBrightness} onChange={(e) => setVideoBrightness(Number(e.target.value))} className={`w-full h-1 rounded-lg appearance-none cursor-pointer ${isWizard ? 'bg-emerald-900/50 accent-emerald-500' : 'bg-fuchsia-900/50 accent-fuchsia-500'}`} /></div>
                                     <div><div className="flex justify-between text-[10px] mb-1 font-mono text-zinc-300"><span>Scale</span><span>{zoomLevel}%</span></div><input type="range" min="50" max="200" value={zoomLevel} onChange={(e) => setZoomLevel(Number(e.target.value))} className={`w-full h-1 rounded-lg appearance-none cursor-pointer ${isWizard ? 'bg-emerald-900/50 accent-emerald-500' : 'bg-fuchsia-900/50 accent-fuchsia-500'}`} /></div>
@@ -693,7 +660,6 @@ className="w-full h-full object-cover shadow-2xl"
                         )}
                     </div>
 
-                    {/* --- RIGHT: NOTEBOOK SIDEBAR --- */}
                     {showNotes && !isNativeMode && (
                         <div className={`w-80 border-l flex flex-col shrink-0 transition-all animate-[fade-in-left_0.2s]
                     ${isWizard ? 'bg-[#050a05] border-emerald-900' : 'bg-[#09050f] border-fuchsia-900'}
@@ -737,7 +703,6 @@ className="w-full h-full object-cover shadow-2xl"
                 </div>
             </div>
 
-            {/* Global Styles for Animations */}
             <style dangerouslySetInnerHTML={{
                 __html: `
         @keyframes fade-in-left { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
@@ -749,6 +714,9 @@ className="w-full h-full object-cover shadow-2xl"
       `}} />
         </div>
     );
+
+    // ✨ THIS IS THE TELEPORTER! 
+    return createPortal(viewerContent, document.body);
 };
 
 export default ItemViewer;

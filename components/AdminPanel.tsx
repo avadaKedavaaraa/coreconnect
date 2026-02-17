@@ -2734,22 +2734,25 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                         </div>
 
                                         {/* --- 6. GATE & SYSTEM --- */}
+                                        {/* --- 🔮 GLOBAL SORTING --- */}
                                         <div className="space-y-4 pt-4 border-t border-white/10">
-                                            <h3 className="font-bold text-lg border-b border-white/10 pb-2">Gate & System</h3>
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div>
-                                                    <label className="text-xs opacity-50 mb-1 block">Wizard Gate Text</label>
-                                                    <textarea value={editedConfig.wizardGateText} onChange={e => setEditedConfig({ ...editedConfig, wizardGateText: e.target.value })} className="w-full p-2 bg-black/40 border border-white/10 rounded text-white text-sm h-20" />
-                                                </div>
-                                                <div>
-                                                    <label className="text-xs opacity-50 mb-1 block">Muggle Gate Text</label>
-                                                    <textarea value={editedConfig.muggleGateText} onChange={e => setEditedConfig({ ...editedConfig, muggleGateText: e.target.value })} className="w-full p-2 bg-black/40 border border-white/10 rounded text-white text-sm h-20" />
-                                                </div>
-                                            </div>
-                                            <div>
-                                                <label className="text-xs opacity-50 mb-1 block">Telegram Channel Link</label>
-                                                <input value={editedConfig.telegramLink || ''} onChange={e => setEditedConfig({ ...editedConfig, telegramLink: e.target.value })} className="w-full p-2 bg-black/40 border border-white/10 rounded text-white text-sm" placeholder="https://t.me/..." />
-                                            </div>
+                                            <h3 className="font-bold text-lg flex items-center gap-2">
+                                                <ArrowDownUp className="text-orange-400" size={20} />
+                                                Global Content Sorting
+                                            </h3>
+                                            <p className="text-xs opacity-50">Default sort order for all sectors (unless overridden in Sectors tab).</p>
+                                            <select 
+                                                value={editedConfig.sortOrder || 'date_desc'} 
+                                                onChange={e => setEditedConfig({ ...editedConfig, sortOrder: e.target.value as any })}
+                                                className="w-full md:w-1/2 p-3 bg-black/40 border border-white/10 rounded-lg text-white text-sm outline-none cursor-pointer focus:border-orange-500/50"
+                                            >
+                                                <option value="date_desc" className="bg-black text-white">Date: Newest First (Default)</option>
+                                                <option value="date_asc" className="bg-black text-white">Date: Oldest First</option>
+                                                <option value="name_asc" className="bg-black text-white">Name: A to Z</option>
+                                                <option value="name_desc" className="bg-black text-white">Name: Z to A</option>
+                                                <option value="likes_desc" className="bg-black text-white">Popularity: Most Liked First</option>
+                                                <option value="manual" className="bg-black text-white">Manual: Drag & Drop (Admin Only)</option>
+                                            </select>
                                         </div>
 
                                         {/* --- 7. STICKY SAVE BUTTON --- */}
@@ -2815,6 +2818,25 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                                             <label className="text-[10px] uppercase opacity-50 block mb-1">Icon Name (Lucide)</label>
                                                             <input value={sector.wizardIcon} onChange={e => handleUpdateSector(idx, 'wizardIcon', e.target.value)} className="w-full p-2 bg-black border border-white/10 rounded text-white text-sm" />
                                                         </div>
+                                                        {/* 🛠️ SECTOR SORTING OVERRIDE */}
+                                                <div className="mt-6 pt-4 border-t border-white/10">
+                                                    <label className="text-[10px] uppercase font-bold opacity-50 block mb-2 text-blue-400 flex items-center gap-1">
+                                                        <ArrowDownUp size={10} /> Sector Sorting Override
+                                                    </label>
+                                                    <select 
+                                                        value={sector.sortOrder || ''} 
+                                                        onChange={e => handleUpdateSector(idx, 'sortOrder', e.target.value)}
+                                                        className="w-full md:w-1/2 p-2 bg-black border border-white/10 rounded text-white text-xs outline-none cursor-pointer hover:border-white/30 transition-colors"
+                                                    >
+                                                        <option value="" className="bg-black">-- Use Global Default --</option>
+                                                        <option value="date_desc" className="bg-black">Date: Newest First</option>
+                                                        <option value="date_asc" className="bg-black">Date: Oldest First</option>
+                                                        <option value="name_asc" className="bg-black">Name: A to Z</option>
+                                                        <option value="name_desc" className="bg-black">Name: Z to A</option>
+                                                        <option value="likes_desc" className="bg-black">Popularity: Most Liked First</option>
+                                                        <option value="manual" className="bg-black">Manual: Drag & Drop (Admin Only)</option>
+                                                    </select>
+                                                </div>
                                                     </div>
                                                     <div className="space-y-4">
                                                         <h4 className="text-xs font-bold uppercase opacity-50 text-fuchsia-400">Muggle Mode</h4>

@@ -13,7 +13,7 @@ interface CarouselProps {
 
 const Carousel: React.FC<CarouselProps> = ({ items, lineage, onExtract, isAdmin, onDelete }) => {
   const [activeIndex, setActiveIndex] = useState(0);
-  const [radius, setRadius] = useState(400);
+  const [baseRadius, setBaseRadius] = useState(400); // 👈 Rename this from radius to baseRadius
   const [localItems, setLocalItems] = useState(items);
   const [isMobile, setIsMobile] = useState(false);
   
@@ -60,9 +60,9 @@ const Carousel: React.FC<CarouselProps> = ({ items, lineage, onExtract, isAdmin,
     const handleResize = () => {
       const w = window.innerWidth;
       setIsMobile(w < 640);
-      if (w < 640) setRadius(350);       
-      else if (w < 1024) setRadius(550); 
-      else setRadius(900);               
+      if (w < 640) setBaseRadius(350);       // 👈 Update to setBaseRadius
+      else if (w < 1024) setBaseRadius(550); // 👈 Update to setBaseRadius
+      else setBaseRadius(900);               // 👈 Update to setBaseRadius
     };
     handleResize();
     window.addEventListener('resize', handleResize);
@@ -118,6 +118,15 @@ const Carousel: React.FC<CarouselProps> = ({ items, lineage, onExtract, isAdmin,
 
   if (localItems.length === 0) return null;
 
+  // const rotateY = -activeIndex * (360 / safeLength);
+  // ✨ DYNAMIC RADIUS CALCULATION
+  // Each item is 300px wide. We add 50px for a comfortable gap = 350px required per item.
+  // Formula: Radius = (Total Items * Required Space) / (2 * Pi)
+  const dynamicRadius = Math.max(
+    baseRadius, 
+    Math.round((safeLength * 350) / (2 * Math.PI))
+  );
+
   const rotateY = -activeIndex * (360 / safeLength);
 
   return (
@@ -163,7 +172,7 @@ const Carousel: React.FC<CarouselProps> = ({ items, lineage, onExtract, isAdmin,
         >
           <div 
             className="relative w-[300px] h-[450px] preserve-3d transition-transform duration-700 ease-out"
-            style={{ transform: `translateZ(-${radius}px) rotateY(${rotateY}deg)` }}
+            style={{ transform: `translateZ(-${dynamicRadius}px) rotateY(${rotateY}deg)` }} 
           >
             {displayItems.map((item, index) => {
               if (!item) return null;
@@ -211,7 +220,7 @@ const Carousel: React.FC<CarouselProps> = ({ items, lineage, onExtract, isAdmin,
                     }
                   `}
                   style={{
-                    transform: `rotateY(${angle}deg) translateZ(${radius}px)`,
+                    transform: `rotateY(${angle}deg) translateZ(${dynamicRadius}px)`, 
                   }}
                   onClick={(e) => { 
                       if (isActive) {

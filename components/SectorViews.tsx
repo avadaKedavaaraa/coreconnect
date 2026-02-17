@@ -403,34 +403,40 @@ export const SectorView: React.FC<SectorViewProps> = ({
 
     // --- DERIVED DATA ---
     const subjects = useMemo(() => Array.from(new Set((items || []).map(i => i.subject || 'General'))).sort(), [items]);
-    const activeSortOrder = currentSector?.sortOrder || 'newest';
+    const activeSortOrder = currentSector?.sortOrder || config?.sortOrder || 'date_desc';
     const isManualSort = activeSortOrder === 'manual';
 
     // --- ITEM SORTING & FILTERING (Files/Announcements) ---
     useEffect(() => {
-        let combined = [...(items || [])]; // Safety check
-        combined.sort((a, b) => {
-            if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
-            if (activeSortOrder === 'manual') {
-                const orderA = a.order_index ?? 9999;
-                const orderB = b.order_index ?? 9999;
-                if (orderA !== orderB) return orderA - orderB;
-            }
-            if (activeSortOrder === 'alphabetical') {
-                return a.title.localeCompare(b.title, undefined, { numeric: true, sensitivity: 'base' });
-            }
-            const dateA = a.date.replace(/\./g, '-');
-            const dateB = b.date.replace(/\./g, '-');
-            if (dateA !== dateB) {
-                const timeA = new Date(dateA).getTime() || 0;
-                const timeB = new Date(dateB).getTime() || 0;
-                return activeSortOrder === 'oldest' ? timeA - timeB : timeB - timeA;
-            }
-            return a.title.localeCompare(b.title, undefined, { numeric: true, sensitivity: 'base' });
-        });
-        setLocalDisplayItems(combined);
-        setIsOrderChanged(false);
-    }, [items, sectorId, activeSortOrder]);
+    let combined = [...(items || [])]; 
+    combined.sort((a, b) => {
+        // 📌 Pinned items always stay at the very top
+        if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
+
+        // 🛠️ Handle Manual Reordering
+        if (activeSortOrder === 'manual') {
+            const orderA = a.order_index ?? 9999;
+            const orderB = b.order_index ?? 9999;
+            if (orderA !== orderB) return orderA - orderB;
+        }
+
+        // 🚀 Advanced Sorting Modes
+        if (activeSortOrder === 'name_asc') return (a.title || '').localeCompare(b.title || '');
+        if (activeSortOrder === 'name_desc') return (b.title || '').localeCompare(a.title || '');
+        if (activeSortOrder === 'likes_desc') return (b.likes || 0) - (a.likes || 0);
+
+        // 📅 Smart Date Sorting (Handles 2025.08.12 format)
+        const dateA = new Date(a.date.replace(/\./g, '-')).getTime() || 0;
+        const dateB = new Date(b.date.replace(/\./g, '-')).getTime() || 0;
+
+        if (activeSortOrder === 'date_asc') return dateA - dateB;
+
+        // Default: Newest First (date_desc)
+        return dateB - dateA;
+    });
+    setLocalDisplayItems(combined);
+    setIsOrderChanged(false);
+}, [items, sectorId, activeSortOrder]);
 
     const filteredItems = useMemo(() => {
         const source = search ? (allItems || items || []) : localDisplayItems;
@@ -1143,7 +1149,7 @@ export const SectorView: React.FC<SectorViewProps> = ({
        3. Removed 'overflow-hidden' from parent: Allows the player UI to render fully.
        4. Added '[&_iframe]:w-full [&_iframe]:h-full': Forces the Microsoft player to fill this new tall box.
     */}
-                        <div className="w-full max-w-7xl h-[85vh] bg-black shadow-2xl rounded-xl border border-white/10 relative group flex flex-col">
+                        <div className="w-full max-w-7xl h-[100vh] bg-black shadow-2xl rounded-xl border border-white/10 relative group flex flex-col">
                             <div
                                 key={cinemaItem.id}
                                 className="flex-1 w-full relative [&_iframe]:w-full [&_iframe]:h-full [&_iframe]:border-none"

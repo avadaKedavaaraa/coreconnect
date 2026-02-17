@@ -572,8 +572,24 @@ function App() {
     }, [selectedFont]);
 
     const currentViewItems = useMemo(() => {
-        return dbItems.filter(i => i.sector === activeSectorId);
-    }, [dbItems, activeSectorId]);
+    const filtered = dbItems.filter(i => i.sector === activeSectorId);
+    const activeSector = sectors.find(s => s.id === activeSectorId);
+    const activeSortOrder = activeSector?.sortOrder || globalConfig.sortOrder || 'date_desc';
+
+    return [...filtered].sort((a, b) => {
+        if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
+
+        if (activeSortOrder === 'name_asc') return (a.title || '').localeCompare(b.title || '');
+        if (activeSortOrder === 'name_desc') return (b.title || '').localeCompare(a.title || '');
+        if (activeSortOrder === 'likes_desc') return (b.likes || 0) - (a.likes || 0);
+
+        const dateA = new Date(a.date.replace(/\./g, '-')).getTime() || 0;
+        const dateB = new Date(b.date.replace(/\./g, '-')).getTime() || 0;
+
+        if (activeSortOrder === 'date_asc') return dateA - dateB;
+        return dateB - dateA;
+    });
+}, [dbItems, activeSectorId, sectors, globalConfig.sortOrder]);
 
     const handleLineageSelect = (l: Lineage, name?: string) => {
         setLineage(l);
